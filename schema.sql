@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS vault_audit.audit_logs (
     user_role VARCHAR(20) NOT NULL,            -- admin, writer, reader
     action VARCHAR(10) NOT NULL,               -- SELECT, INSERT, UPDATE, DELETE
     target_table VARCHAR(100) NOT NULL,        -- e.g. customers, orders
+    database_name VARCHAR(50) DEFAULT 'postgres', -- Database where query was executed
     query_text TEXT NOT NULL,                  -- Exact SQL string executed
     rows_affected INTEGER DEFAULT 0,           -- Number of rows returned or changed
     is_sensitive BOOLEAN DEFAULT FALSE,        -- TRUE if query accessed ssn/credit_card

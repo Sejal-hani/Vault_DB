@@ -15,9 +15,17 @@ SENSITIVE_KEYWORDS = {"ssn", "credit_card", "password", "secret", "cvv"}
 # 1. SQL QUERY PARSER HELPERS
 # ============================================================================
 
+def strip_comments(query: str) -> str:
+    """Removes single-line (-- ...) and multi-line (/* ... */) SQL comments."""
+    q = re.sub(r"--[^\r\n]*", "", query)
+    q = re.sub(r"/\*.*?\*/", "", q, flags=re.DOTALL)
+    return q.strip()
+
+
 def extract_action(query: str) -> str:
-    """Extracts SQL operation: SELECT, INSERT, UPDATE, DELETE."""
-    match = re.match(r"^\s*([A-Za-z]+)", query.strip())
+    """Extracts primary SQL operation (SELECT, INSERT, UPDATE, DELETE)."""
+    clean_query = strip_comments(query)
+    match = re.match(r"^\s*([A-Za-z]+)", clean_query)
     if match:
         action = match.group(1).upper()
         if action in {"SELECT", "INSERT", "UPDATE", "DELETE"}:
@@ -26,20 +34,23 @@ def extract_action(query: str) -> str:
 
 
 def extract_table(query: str) -> str:
-    """Extracts target table name (e.g. app_data.customers -> customers)."""
-    query_clean = query.strip()
-    action = extract_action(query_clean)
+    """
+    Extracts target table name, handling schema qualification and optional quotes
+    (e.g., app_data.customers, "app_data"."customers", or customers -> customers).
+    """
+    clean_query = strip_comments(query)
+    action = extract_action(clean_query)
 
     pattern = None
     if action in {"SELECT", "DELETE"}:
-        pattern = r"\bFROM\s+(?:[A-Za-z0-9_]+\.)?([A-Za-z0-9_]+)"
+        pattern = r'\bFROM\s+(?:(?:"?[A-Za-z0-9_]+"?)?\.)?"?([A-Za-z0-9_]+)"?'
     elif action == "INSERT":
-        pattern = r"\bINTO\s+(?:[A-Za-z0-9_]+\.)?([A-Za-z0-9_]+)"
+        pattern = r'\bINTO\s+(?:(?:"?[A-Za-z0-9_]+"?)?\.)?"?([A-Za-z0-9_]+)"?'
     elif action == "UPDATE":
-        pattern = r"\bUPDATE\s+(?:[A-Za-z0-9_]+\.)?([A-Za-z0-9_]+)"
+        pattern = r'\bUPDATE\s+(?:(?:"?[A-Za-z0-9_]+"?)?\.)?"?([A-Za-z0-9_]+)"?'
 
     if pattern:
-        match = re.search(pattern, query_clean, re.IGNORECASE)
+        match = re.search(pattern, clean_query, re.IGNORECASE)
         if match:
             return match.group(1).lower()
 
@@ -48,7 +59,7 @@ def extract_table(query: str) -> str:
 
 def is_sensitive_query(query: str) -> bool:
     """Returns True if the query touches any sensitive columns."""
-    query_lower = query.lower()
+    query_lower = strip_comments(query).lower()
     for kw in SENSITIVE_KEYWORDS:
         if re.search(rf"\b{re.escape(kw)}\b", query_lower):
             return True
@@ -73,6 +84,7 @@ class VaultClient:
         password: Optional[str] = None,
         dbname: str = "postgres"
     ):
+        self.dbname = dbname
         # Establish direct connection to PostgreSQL
         self.conn = psycopg.connect(
             host=host,
@@ -129,6 +141,7 @@ class VaultClient:
                 user_role=user_role,
                 action=action,
                 target_table=target_table,
+                database_name=self.dbname,
                 query_text=query,
                 rows_affected=rows_affected,
                 is_sensitive=is_sensitive,
@@ -142,6 +155,7 @@ class VaultClient:
         user_role: str,
         action: str,
         target_table: str,
+        database_name: str,
         query_text: str,
         rows_affected: int,
         is_sensitive: bool,
@@ -152,9 +166,9 @@ class VaultClient:
         audit_sql = """
             INSERT INTO vault_audit.audit_logs (
                 app_user, user_role, action, target_table,
-                query_text, rows_affected, is_sensitive,
-                execution_status, error_message
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s);
+                database_name, query_text, rows_affected,
+                is_sensitive, execution_status, error_message
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
         """
         try:
             with self.conn.cursor() as cur:
@@ -162,8 +176,8 @@ class VaultClient:
                     audit_sql,
                     (
                         app_user, user_role, action, target_table,
-                        query_text, rows_affected, is_sensitive,
-                        execution_status, error_message
+                        database_name, query_text, rows_affected,
+                        is_sensitive, execution_status, error_message
                     )
                 )
         except Exception as log_err:
@@ -175,7 +189,7 @@ class VaultClient:
         with self.conn.cursor() as cur:
             cur.execute("""
                 SELECT log_id, logged_at, app_user, user_role, action,
-                       target_table, is_sensitive, execution_status, rows_affected
+                       target_table, database_name, is_sensitive, execution_status, rows_affected
                 FROM vault_audit.audit_logs
                 ORDER BY log_id DESC
                 LIMIT %s;
@@ -186,4 +200,3 @@ class VaultClient:
         """Closes the underlying database connection."""
         if self.conn and not self.conn.closed:
             self.conn.close()
-

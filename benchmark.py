@@ -74,11 +74,11 @@ def run_benchmark():
 
     # 5. Display Latest Audit Logs from PostgreSQL
     print("\n[5] Latest Records in vault_audit.audit_logs:")
-    print("    LOG_ID | USER              | ACTION | TABLE     | SENSITIVE | STATUS  | ROWS")
-    print("    " + "-" * 70)
+    print("    LOG_ID | USER              | ACTION | TABLE     | DATABASE   | SENSITIVE | STATUS  | ROWS")
+    print("    " + "-" * 83)
     for log in client.get_audit_logs(limit=5):
-        log_id, _, user, role, action, table, sensitive, status, rows = log
-        print(f"    {log_id:<6} | {user:<17} | {action:<6} | {table:<9} | {str(sensitive):<9} | {status:<7} | {rows}")
+        log_id, _, user, role, action, table, db, sensitive, status, rows = log
+        print(f"    {log_id:<6} | {user:<17} | {action:<6} | {table:<9} | {db:<10} | {str(sensitive):<9} | {status:<7} | {rows}")
 
     client.close()
     print("\nDemo & Benchmark completed successfully!")
