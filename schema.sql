@@ -1,5 +1,5 @@
 -- ============================================================================
--- VaultDB Schema Initialization
+-- VaultDB Schema Initialization & Immutability Enforcement
 -- Creates the dual-schema structure: app_data (business) & vault_audit (logs)
 -- ============================================================================
 
@@ -45,7 +45,62 @@ CREATE TABLE IF NOT EXISTS vault_audit.audit_logs (
 );
 
 
--- 3. SEED DATA: Sample records for testing in Weeks 3-12
+-- ============================================================================
+-- 3. IMMUTABILITY GUARDS (ENGINE-LEVEL DATABASE TRIGGERS)
+-- ============================================================================
+
+-- Function that strictly enforces write-once, append-only rules
+CREATE OR REPLACE FUNCTION vault_audit.enforce_audit_immutability()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- 1. Block any attempt to UPDATE existing records
+    IF (TG_OP = 'UPDATE') THEN
+        RAISE EXCEPTION 'VaultDB Security Violation: Audit logs in vault_audit.audit_logs are immutable and cannot be updated.';
+    END IF;
+
+    -- 2. Block any attempt to DELETE individual records
+    IF (TG_OP = 'DELETE') THEN
+        RAISE EXCEPTION 'VaultDB Security Violation: Audit logs in vault_audit.audit_logs are immutable and cannot be deleted.';
+    END IF;
+
+    -- 3. Block any attempt to TRUNCATE (mass-wipe) the entire audit table
+    IF (TG_OP = 'TRUNCATE') THEN
+        RAISE EXCEPTION 'VaultDB Security Violation: TRUNCATE operation is forbidden on vault_audit.audit_logs.';
+    END IF;
+
+    -- 4. On INSERT: Force logged_at to server's true current clock time
+    -- Prevents attackers from backdating or forging historical timestamps
+    IF (TG_OP = 'INSERT') THEN
+        NEW.logged_at := CURRENT_TIMESTAMP;
+        RETURN NEW;
+    END IF;
+
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Trigger 1: Intercept UPDATE and DELETE on every row
+DROP TRIGGER IF EXISTS trg_audit_no_update_delete ON vault_audit.audit_logs;
+CREATE TRIGGER trg_audit_no_update_delete
+BEFORE UPDATE OR DELETE ON vault_audit.audit_logs
+FOR EACH ROW EXECUTE FUNCTION vault_audit.enforce_audit_immutability();
+
+-- Trigger 2: Intercept TRUNCATE on the audit table
+DROP TRIGGER IF EXISTS trg_audit_no_truncate ON vault_audit.audit_logs;
+CREATE TRIGGER trg_audit_no_truncate
+BEFORE TRUNCATE ON vault_audit.audit_logs
+FOR EACH STATEMENT EXECUTE FUNCTION vault_audit.enforce_audit_immutability();
+
+-- Trigger 3: Intercept INSERT to prevent timestamp forgery
+DROP TRIGGER IF EXISTS trg_audit_force_timestamp ON vault_audit.audit_logs;
+CREATE TRIGGER trg_audit_force_timestamp
+BEFORE INSERT ON vault_audit.audit_logs
+FOR EACH ROW EXECUTE FUNCTION vault_audit.enforce_audit_immutability();
+
+
+-- ============================================================================
+-- 4. SEED DATA: Sample records for testing
+-- ============================================================================
 INSERT INTO app_data.customers (name, email, ssn, credit_card) VALUES
     ('Alice Smith', 'alice@example.com', '123-45-6789', '4111-2222-3333-4444'),
     ('Bob Johnson', 'bob@example.com', '987-65-4321', '5500-0000-0000-0004'),

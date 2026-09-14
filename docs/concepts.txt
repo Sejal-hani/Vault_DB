@@ -101,18 +101,6 @@ CONCEPT 3: IMMUTABILITY AT THE DATABASE ENGINE LEVEL
    - Even if a query bypasses the permission check, a BEFORE UPDATE OR DELETE trigger
      intercepts the row modification and immediately raises an exception.
 
-3. Trigger Code:
-   CREATE OR REPLACE FUNCTION vault_audit.prevent_log_tampering()
-   RETURNS TRIGGER AS $$
-   BEGIN
-       RAISE EXCEPTION 'Audit records are immutable and cannot be updated or deleted.';
-   END;
-   $$ LANGUAGE plpgsql;
-
-   CREATE TRIGGER trg_audit_immutable
-   BEFORE UPDATE OR DELETE ON vault_audit.audit_logs
-   FOR EACH ROW EXECUTE FUNCTION vault_audit.prevent_log_tampering();
-
 
 --------------------------------------------------------------------------------
 CONCEPT 4: APPLICATION IDENTITY VS. DATABASE IDENTITY
@@ -299,6 +287,22 @@ CONCEPT 14: HONEST MIDDLEWARE OVERHEAD & BENCHMARKING
    PostgreSQL. No fake claims are made—the audit trail is synchronous and guaranteed.
 
 
+--------------------------------------------------------------------------------
+CONCEPT 15: PL/pgSQL IMMUTABILITY TRIGGERS & TIMESTAMP FORGERY DEFENSE
+--------------------------------------------------------------------------------
+1. Plain English:
+   A PL/pgSQL trigger is procedural server-side code executed by PostgreSQL
+   itself whenever an INSERT, UPDATE, DELETE, or TRUNCATE command hits a table.
+
+2. Four Protection Guards in `vault_audit.enforce_audit_immutability()`:
+   - Guard 1 (Block UPDATE): If `TG_OP = 'UPDATE'`, raises exception and aborts.
+   - Guard 2 (Block DELETE): If `TG_OP = 'DELETE'`, raises exception and aborts.
+   - Guard 3 (Block TRUNCATE): If `TG_OP = 'TRUNCATE'`, raises exception and aborts.
+   - Guard 4 (Anti-Timestamp Forgery): If `TG_OP = 'INSERT'`, force overrides
+     `NEW.logged_at := CURRENT_TIMESTAMP;`. Even if an attacker passes a fake
+     past timestamp ('2010-01-01'), the database server forces the true clock time.
+
+
 ================================================================================
 MASTER VIVA QUESTIONS & ANSWERS (ORAL EXAM PREPARATION)
 ================================================================================
@@ -341,10 +345,15 @@ Q9: What causes the ~1.1ms overhead in VaultClient?
 A9: The overhead comes from executing the secondary synchronous INSERT query to
     persist the audit record into vault_audit.audit_logs in PostgreSQL.
 
-Q10: What makes the audit log immutable?
-A10: PostgreSQL permissions (REVOKE UPDATE, DELETE, TRUNCATE) and a PostgreSQL
-     BEFORE UPDATE OR DELETE trigger that aborts any row alteration attempt.
+Q10: What makes the audit log truly immutable in PostgreSQL?
+A10: A PL/pgSQL BEFORE UPDATE OR DELETE OR TRUNCATE trigger that aborts any row
+     modification with a security exception, and forces all INSERT timestamps
+     to the server's real clock time (CURRENT_TIMESTAMP) to prevent backdating.
 
-Q11: Can a PostgreSQL superuser modify the audit log?
-A11: Yes. A superuser has administrative authority over the engine itself. VaultDB
-     protects against all application users and normal database roles.
+Q11: How do you prevent attackers from inserting backdated audit logs?
+A11: The BEFORE INSERT trigger forcefully overwrites `NEW.logged_at := CURRENT_TIMESTAMP`,
+     ignoring any manually supplied fake timestamp.
+
+Q12: Can a PostgreSQL superuser modify the audit log?
+A12: Yes. A superuser has administrative authority over the engine itself. VaultDB
+     protects against all application users, developers, and normal database roles.
