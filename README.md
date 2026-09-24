@@ -77,12 +77,3 @@ for log in logs:
 
 client.close()
 ```
-
----
-
-## Running the Benchmark & Tests
-
-To execute the end-to-end middleware demo and measure query latency:
-```bash
-python benchmark.py
-```

@@ -303,6 +303,39 @@ CONCEPT 15: PL/pgSQL IMMUTABILITY TRIGGERS & TIMESTAMP FORGERY DEFENSE
      past timestamp ('2010-01-01'), the database server forces the true clock time.
 
 
+--------------------------------------------------------------------------------
+CONCEPT 16: `__pycache__` AND PYTHON BYTECODE (.pyc)
+--------------------------------------------------------------------------------
+1. Plain English:
+   When Python imports a file (like `from vault_client import VaultClient`), it compiles
+   the human-readable Python code into machine-efficient "bytecode" and caches it
+   inside a `__pycache__/` folder as `.pyc` files (e.g. `vault_client.cpython-312.pyc`).
+
+2. Why:
+   - Next time your program runs, Python loads the pre-compiled bytecode instantly
+     instead of re-parsing and re-compiling the `.py` source file.
+   - It is purely a cache for speed; deleting `__pycache__` is completely safe
+     (Python will simply recreate it on the next run).
+
+
+--------------------------------------------------------------------------------
+CONCEPT 17: AUDITING FAILED AND ACCESS-DENIED QUERIES
+--------------------------------------------------------------------------------
+1. Plain English:
+   In a security audit tool, we must record NOT ONLY successful queries, but ALSO:
+   - Queries blocked by Access Control (e.g. a reader trying to DELETE).
+   - Queries that failed due to SQL syntax errors or database exceptions.
+
+2. How VaultDB Implements It:
+   - Case A: ACCESS DENIED:
+     When `check_authorization()` fails, `VaultClient` writes an audit row with
+     `execution_status = 'DENIED'` and the reason in `error_message`, then raises `PermissionError`.
+   - Case B: RUNTIME / SYNTAX ERROR:
+     When PostgreSQL throws an exception, `VaultClient` catches it, sets
+     `execution_status = 'ERROR'` with the database error message, and writes the audit
+     record in the `finally` block before re-raising the exception.
+
+
 ================================================================================
 MASTER VIVA QUESTIONS & ANSWERS (ORAL EXAM PREPARATION)
 ================================================================================
