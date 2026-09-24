@@ -1,2 +1,0 @@
-# PostgreSQL direct client driver (psycopg 3 with pre-built binaries)
-psycopg[binary]>=3.1.0
