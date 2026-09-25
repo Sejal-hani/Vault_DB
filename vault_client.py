@@ -1,80 +1,65 @@
 import re
 import psycopg
 
-# 1. Security rules and roles
-SENSITIVE_KEYWORDS = {"ssn", "credit_card", "password", "secret", "cvv"}
-SENSITIVE_TABLES = {"customers"}
-PROTECTED_TABLES = {"audit_logs"}
-
-ROLE_PERMISSIONS = {
-    "admin": {"SELECT", "INSERT", "UPDATE", "DELETE"},
-    "writer": {"SELECT", "INSERT", "UPDATE"},
-    "reader": {"SELECT"}
+# 1. Simple Table Permissions
+PERMISSIONS = {
+    "customer": {
+        "accounts": ["SELECT"],
+        "transactions": ["SELECT"]
+    },
+    "employee": {
+        "accounts": ["SELECT"],
+        "transactions": ["SELECT", "UPDATE", "INSERT"]
+    },
+    "admin": {
+        "users": ["SELECT", "INSERT", "UPDATE", "DELETE", "DDL"],
+        "accounts": ["SELECT", "INSERT", "UPDATE", "DELETE", "DDL"],
+        "transactions": ["SELECT", "INSERT", "UPDATE", "DELETE", "DDL"],
+        "audit_logs": ["SELECT"]
+    }
 }
 
 SQL_RESERVED = {"select", "from", "where", "join", "into", "table", "update", "set", "values", "delete"}
 
 
-# 2. Query helper functions
+# 2. Query Helpers
 def extract_action(query: str) -> str:
-    """Finds the primary SQL action (destructive commands take precedence)."""
     q = query.strip().upper()
     for verb in ["DROP", "TRUNCATE", "ALTER", "CREATE", "DELETE", "UPDATE", "INSERT", "SELECT"]:
-        if q.startswith(verb) or f" {verb} " in q or f"({verb} " in q:
-            if verb in ["DROP", "TRUNCATE", "ALTER", "CREATE"]:
-                return f"DDL:{verb}"
-            return verb
+        if q.startswith(verb) or f" {verb} " in q:
+            return f"DDL:{verb}" if verb in ["DROP", "TRUNCATE", "ALTER", "CREATE"] else verb
     return "UNKNOWN"
 
 
 def extract_tables(query: str) -> list:
-    """Finds all table names mentioned across FROM, INTO, UPDATE, TABLE, and JOIN."""
     tables = set()
     q = query.lower()
     matches = re.finditer(r'\b(from|into|update|table|join)\s+([a-zA-Z0-9_.]+)', q)
     for m in matches:
-        table_name = m.group(2).split('.')[-1]
-        if table_name not in SQL_RESERVED:
-            tables.add(table_name)
+        t = m.group(2).split('.')[-1]
+        if t not in SQL_RESERVED:
+            tables.add(t)
     return sorted(list(tables))
 
 
-def is_sensitive_query(query: str, tables: list = None) -> bool:
-    """Checks if the query touches sensitive fields like SSN or credit cards using exact word match."""
-    q = query.lower()
-    for word in SENSITIVE_KEYWORDS:
-        if re.search(rf"\b{word}\b", q):
-            return True
-    if tables and "*" in q:
-        for t in tables:
-            if t in SENSITIVE_TABLES:
-                return True
-    return False
+def check_authorization(role: str, action: str, tables: list) -> tuple:
+    role = role.lower()
+    if role not in PERMISSIONS:
+        return False, f"Unknown role: {role}"
 
-
-def check_authorization(user_role: str, action: str, tables: list) -> tuple:
-    """Checks if the user's role is allowed to run this query."""
-    role = user_role.lower()
-
-    if role not in ROLE_PERMISSIONS:
-        return False, f"Unknown role: {user_role}"
-
-    if action.startswith("DDL") and role != "admin":
-        return False, f"Role '{user_role}' is not allowed to run DDL commands"
-
-    if action not in ROLE_PERMISSIONS[role]:
-        return False, f"Role '{user_role}' is not allowed to perform {action}"
-
+    allowed_tables = PERMISSIONS[role]
     for t in tables:
-        if t in PROTECTED_TABLES and role != "admin":
-            return False, f"Role '{user_role}' cannot access system table '{t}'"
+        if t not in allowed_tables:
+            return False, f"Role '{role}' cannot access table '{t}'"
+        if action not in allowed_tables[t]:
+            return False, f"Role '{role}' cannot perform {action} on '{t}'"
 
     return True, None
 
 
-# 3. Main VaultDB Client
+# 3. VaultDB Client
 class VaultClient:
-    def __init__(self, host="127.0.0.1", port=5432, user="postgres", password="nimit8222", dbname="postgres"):
+    def __init__(self, host="127.0.0.1", port=5432, user="vault_user", password="vault123", dbname="postgres"):
         self.dbname = dbname
         self.conn = psycopg.connect(
             host=host,
@@ -85,65 +70,70 @@ class VaultClient:
             autocommit=True
         )
 
-    def execute(self, query: str, params=None, app_user="anonymous", user_role="reader"):
-        """Executes a query, checks permissions, and records the audit log."""
+    def get_role(self, email: str) -> str:
+        """Looks up the user's role from app_data.users table."""
+        try:
+            with self.conn.cursor() as cur:
+                cur.execute("SELECT role FROM app_data.users WHERE email = %s;", (email,))
+                row = cur.fetchone()
+                if row:
+                    return row[0]
+        except Exception:
+            pass
+        return "customer"
+
+    def execute(self, query: str, params=None, app_user="alice@bank.com"):
+        role = self.get_role(app_user)
         action = extract_action(query)
         tables = extract_tables(query)
         target_str = ", ".join(tables) if tables else "unknown"
-        is_sensitive = is_sensitive_query(query, tables)
 
-        # 1. Check permissions
-        allowed, reason = check_authorization(user_role, action, tables)
+        # Check permissions
+        allowed, reason = check_authorization(role, action, tables)
         if not allowed:
-            self._log_audit(app_user, user_role, action, target_str, query, 0, is_sensitive, "DENIED", reason)
+            self._log_audit(app_user, role, action, target_str, query, "DENIED")
             raise PermissionError(f"Access Denied: {reason}")
 
-        # 2. Run query in PostgreSQL
-        rows_affected = 0
+        # Run query
         status = "SUCCESS"
-        error_msg = None
         results = []
-
+        self.last_rows_affected = 0
+        self.last_columns = []
         try:
             with self.conn.cursor() as cur:
                 cur.execute(query, params)
                 if cur.description is not None:
                     results = cur.fetchall()
-                    rows_affected = len(results)
+                    self.last_rows_affected = len(results)
+                    self.last_columns = [desc[0] for desc in cur.description]
                 else:
-                    rows_affected = cur.rowcount if cur.rowcount != -1 else 0
+                    self.last_rows_affected = cur.rowcount if cur.rowcount != -1 else 0
+                    self.last_columns = []
             return results
-
         except Exception as e:
             status = "ERROR"
-            error_msg = str(e)
             raise e
-
         finally:
-            # 3. Always write the audit record
-            self._log_audit(app_user, user_role, action, target_str, query, rows_affected, is_sensitive, status, error_msg)
+            self._log_audit(app_user, role, action, target_str, query, status)
 
-    def _log_audit(self, user, role, action, target, query, rows, sensitive, status, error):
+    def _log_audit(self, user, role, action, target, query, status):
         sql = """
-            INSERT INTO vault_audit.audit_logs 
-            (app_user, user_role, action, target_table, database_name, query_text, rows_affected, is_sensitive, execution_status, error_message)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO vault_audit.audit_logs (app_user, user_role, action, target_table, query_text, execution_status)
+            VALUES (%s, %s, %s, %s, %s, %s)
         """
         try:
             with self.conn.cursor() as cur:
-                cur.execute(sql, (user, role, action, target, self.dbname, query, rows, sensitive, status, error))
+                cur.execute(sql, (user, role, action, target, query, status))
         except Exception as err:
             print("Audit write error:", err)
 
     def get_audit_logs(self, limit=10):
-        """Fetches the latest audit logs from the database."""
         with self.conn.cursor() as cur:
             cur.execute("""
-                SELECT log_id, logged_at, app_user, user_role, action, 
-                       target_table, database_name, is_sensitive, execution_status, rows_affected 
+                SELECT log_id, logged_at, app_user, user_role, action, target_table, execution_status, query_text
                 FROM vault_audit.audit_logs 
                 ORDER BY log_id DESC 
-                LIMIT %s
+                LIMIT %s;
             """, (limit,))
             return cur.fetchall()
 

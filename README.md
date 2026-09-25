@@ -13,10 +13,10 @@ VaultDB is a lightweight database middleware layer and compliance auditing tool.
 ### Core Capabilities (V1 Scope)
 1. **Query Logging Middleware**: Intercepts queries, captures human application identity (`app_user`), timestamp, exact query, target tables, and rows affected.
 2. **Immutable Audit Trail**: Audit records in `vault_audit.audit_logs` are protected from modification or deletion via database permissions and PostgreSQL engine-level triggers.
-3. **Role-Based Access Control (RBAC)**: Enforces access policies for 3 roles:
+3. **Role-Based Access Control (RBAC)**: Enforces table-level access policies for 3 roles:
    - `admin`: Full access across all tables.
-   - `writer`: Can read and insert/update assigned operational tables.
-   - `reader`: Read-only (`SELECT`) on assigned tables.
+   - `employee`: Read-only on account details; can process/update transactions; cannot modify account balances directly.
+   - `customer`: View-only (`SELECT`) on permitted account and transaction details.
 4. **Sensitive Query Detection**: Flags queries touching sensitive fields (e.g., `ssn`, `password`, `credit_card`).
 5. **Audit Dashboard & Reports**: Inspect, filter, and export audit trails to PDF for compliance reviews.
 
@@ -61,12 +61,11 @@ from vault_client import VaultClient
 # 1. Initialize client
 client = VaultClient()
 
-# 2. Execute a query with user context
+# 2. Execute a query with user context (role verified from app_data.users)
 results = client.execute(
-    query="SELECT name, email FROM app_data.customers WHERE id = %s",
+    query="SELECT name, ssn, balance FROM app_data.accounts WHERE id = %s",
     params=(1,),
-    app_user="sarah@company.com",
-    user_role="writer"
+    app_user="alice.smith@gmail.com"
 )
 print("Query Results:", results)
 

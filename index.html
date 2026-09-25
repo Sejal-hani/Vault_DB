@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>VaultDB Dashboard</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 30px;
+      line-height: 1.5;
+      color: #222;
+      background: #fafafa;
+    }
+
+    h1 {
+      margin-bottom: 20px;
+    }
+
+    .box {
+      border: 1px solid #ccc;
+      background: #fff;
+      padding: 16px;
+      margin-bottom: 20px;
+      border-radius: 6px;
+    }
+
+    h3 {
+      margin-top: 0;
+    }
+
+    select,
+    button {
+      font-size: 14px;
+      padding: 6px 12px;
+    }
+
+    textarea {
+      width: 100%;
+      height: 70px;
+      margin: 10px 0;
+      font-family: monospace;
+      font-size: 13px;
+      display: block;
+      box-sizing: border-box;
+    }
+
+    button {
+      cursor: pointer;
+      border-radius: 4px;
+    }
+
+    .btn-sample {
+      background: #f0f0f0;
+      border: 1px solid #ccc;
+      margin-right: 6px;
+      margin-bottom: 6px;
+    }
+
+    .btn-sample:hover {
+      background: #e0e0e0;
+    }
+
+    .btn-run {
+      background: #0066cc;
+      color: white;
+      border: none;
+      font-weight: bold;
+    }
+
+    .btn-run:hover {
+      background: #0052a3;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+
+    th,
+    td {
+      border: 1px solid #ddd;
+      padding: 8px;
+      text-align: left;
+      font-size: 13px;
+    }
+
+    th {
+      background: #f2f2f2;
+    }
+
+    #result {
+      margin-top: 12px;
+      padding: 10px;
+      background: #f9f9f9;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      white-space: pre-wrap;
+      font-family: monospace;
+      display: none;
+    }
+  </style>
+</head>
+
+<body>
+
+  <h1>VaultDB Dashboard</h1>
+
+  <!-- 1. Execute Query -->
+  <div class="box">
+    <h3>1. Execute Query</h3>
+
+    <label>User: </label>
+    <select id="user">
+      <option value="alice@bank.com">alice@bank.com (Customer - View Only)</option>
+      <option value="john@bank.com">john@bank.com (Employee - Read Accounts / Update Tx)</option>
+      <option value="admin@bank.com">admin@bank.com (Admin - Full Access)</option>
+    </select>
+
+    <div style="margin-top: 10px;">
+      <span style="font-size: 13px; color: #666;">Paste sample query:</span><br>
+      <button type="button" class="btn-sample"
+        onclick="document.getElementById('user').value='alice@bank.com'; document.getElementById('query').value='SELECT * FROM app_data.accounts;'">Sample:
+        View Accounts</button>
+      <button type="button" class="btn-sample"
+        onclick="document.getElementById('user').value='john@bank.com'; document.getElementById('query').value='UPDATE app_data.transactions SET status = \'approved\' WHERE id = 1;'">Sample:
+        Update Transaction</button>
+      <button type="button" class="btn-sample"
+        onclick="document.getElementById('user').value='john@bank.com'; document.getElementById('query').value='UPDATE app_data.accounts SET balance = 99999 WHERE id = 1;'">Sample:
+        Blocked Balance Edit</button>
+      <button type="button" class="btn-sample"
+        onclick="document.getElementById('user').value='admin@bank.com'; document.getElementById('query').value='SELECT * FROM app_data.transactions;'">Sample:
+        Admin View</button>
+      <button type="button" class="btn-sample"
+        onclick="document.getElementById('user').value='alice@bank.com'; document.getElementById('query').value='SELECT * FROM vault_audit.audit_logs;'">Sample:
+        Try Access Audit Log (Blocked!)</button>
+    </div>
+
+    <textarea id="query">SELECT * FROM app_data.accounts;</textarea>
+    <button type="button" class="btn-run" onclick="runQuery()">Run Query</button>
+
+    <div id="result"></div>
+  </div>
+
+  <!-- 2. Audit Log -->
+  <div class="box">
+    <h3>2. Audit Log</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Time</th>
+          <th>User</th>
+          <th>Role</th>
+          <th>Action</th>
+          <th>Table</th>
+          <th>Status</th>
+          <th>Query</th>
+        </tr>
+      </thead>
+      <tbody id="logs">
+        <tr>
+          <td colspan="8">No logs loaded.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <script>
+    const API = window.location.protocol === 'file:' ? 'http://localhost:8080' : '';
+
+    async function runQuery() {
+      const user = document.getElementById('user').value;
+      const query = document.getElementById('query').value.trim();
+      const res = document.getElementById('result');
+      if (!query) return;
+
+      res.style.display = 'block';
+      res.style.color = '#333';
+      res.innerText = 'Executing query...';
+
+      try {
+        const resp = await fetch(API + '/api/execute', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user, query })
+        });
+        const data = await resp.json();
+
+        if (data.status === 'SUCCESS') {
+          res.style.color = '#007a3d';
+          if (data.columns && data.columns.length > 0) {
+            if (!data.results || data.results.length === 0) {
+              res.innerText = 'SUCCESS (0 rows returned):\nQuery ran on PostgreSQL successfully, but 0 records matched (e.g. id does not exist).';
+            } else {
+              const header = data.columns.join(' | ');
+              const rows = data.results.map(r => r.join(' | ')).join('\n');
+              res.innerText = `SUCCESS (${data.results.length} rows returned from PostgreSQL):\n\n${header}\n${'-'.repeat(header.length)}\n${rows}`;
+            }
+          } else {
+            const count = data.rows_affected || 0;
+            res.innerText = `SUCCESS: Query executed in PostgreSQL (${count} rows modified).`;
+          }
+        } else {
+          res.style.color = '#c00';
+          res.innerText = 'ACCESS DENIED (Blocked by VaultDB Middleware):\n' + (data.error || 'Blocked by VaultDB');
+        }
+      } catch (err) {
+        res.style.color = '#c00';
+        res.innerText = 'Error: ' + err;
+      }
+
+      // Update the audit log ONLY after running the query
+      loadLogs();
+    }
+
+    async function loadLogs() {
+      try {
+        const resp = await fetch(API + '/api/logs');
+        const list = await resp.json();
+        const tbody = document.getElementById('logs');
+        if (!list || list.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="8">No logs found.</td></tr>';
+          return;
+        }
+        tbody.innerHTML = list.map(l => `
+          <tr>
+            <td>#${l.id}</td>
+            <td>${l.time ? l.time.substring(11, 19) : ''}</td>
+            <td>${l.user}</td>
+            <td>${l.role}</td>
+            <td>${l.action}</td>
+            <td>${l.table}</td>
+            <td style="font-weight:bold; color:${l.status === 'SUCCESS' ? '#007a3d' : '#c00'}">${l.status}</td>
+            <td><code>${l.query}</code></td>
+          </tr>
+        `).join('');
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    // Load initial logs on page open once. No background timers.
+    loadLogs();
+  </script>
+
+</body>
+
+</html>
