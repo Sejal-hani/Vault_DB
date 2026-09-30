@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS app_data.users (
 CREATE TABLE IF NOT EXISTS app_data.accounts (
     id SERIAL PRIMARY KEY,
     name VARCHAR(50) NOT NULL,
+    ssn VARCHAR(20) DEFAULT '***-**-1234',
     balance DECIMAL(10, 2) NOT NULL
 );
 
@@ -75,4 +76,3 @@ GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA app_data, vault_audit TO vault_us
 REVOKE ALL ON vault_audit.audit_logs FROM PUBLIC;
 REVOKE ALL ON vault_audit.audit_logs FROM vault_user;
 GRANT SELECT, INSERT ON vault_audit.audit_logs TO vault_user;
-

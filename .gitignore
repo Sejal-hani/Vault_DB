@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.env
+
+# immudb data and logs
+data/
+immulog/
+*.log
+*.csv
+
+# IDE
+.vscode/
+.idea/
