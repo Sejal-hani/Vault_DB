@@ -9,7 +9,7 @@ from fastapi import APIRouter, HTTPException, Query, Request, Response
 
 from src.vault_db.reports.pdf_generator import generate_audit_pdf_report
 from src.vault_db.core.engine import VaultEngine
-from src.vault_db.core.rbac import AccessDeniedError
+from src.vault_db.core.rbac import AccessDeniedError, QueryExecutionError
 from src.vault_db.core.parser import SQLParser
 from src.vault_db.api.models import (
     ExecuteQueryRequest,
@@ -79,12 +79,31 @@ async def execute_query(req: ExecuteQueryRequest, request: Request):
         )
     except AccessDeniedError as pe:
         analysis = SQLParser.analyze(req.query)
+        rec = getattr(pe, "immudb_record", {}) or {}
         return ExecuteQueryResponse(
             status="DENIED",
             error=str(pe),
             rows_affected=0,
             is_sensitive=analysis.is_sensitive,
             sensitive_fields=analysis.sensitive_fields_found,
+            immudb_log_id=rec.get("id"),
+            immudb_tx_id=rec.get("immudb_tx_id"),
+            immudb_verified=rec.get("immudb_verified", True),
+            immudb_tx_hash=rec.get("immudb_tx_hash"),
+        )
+    except QueryExecutionError as qe:
+        analysis = SQLParser.analyze(req.query)
+        rec = getattr(qe, "immudb_record", {}) or {}
+        return ExecuteQueryResponse(
+            status="ERROR",
+            error=str(qe),
+            rows_affected=0,
+            is_sensitive=analysis.is_sensitive,
+            sensitive_fields=analysis.sensitive_fields_found,
+            immudb_log_id=rec.get("id"),
+            immudb_tx_id=rec.get("immudb_tx_id"),
+            immudb_verified=rec.get("immudb_verified", True),
+            immudb_tx_hash=rec.get("immudb_tx_hash"),
         )
     except Exception as ex:
         analysis = SQLParser.analyze(req.query)

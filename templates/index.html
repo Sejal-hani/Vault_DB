@@ -1260,14 +1260,22 @@
           renderResultTable(data.columns, data.results);
         } else if (data.status === 'DENIED') {
           banner.className = 'alert-banner denied';
-          banner.innerHTML = `<strong>ACCESS DENIED:</strong> ${escapeHtml(data.error)}<br><span style="font-size:11px; opacity:0.85;">Security violation cryptographically logged to immudb.</span>`;
-          stats.innerText = 'BLOCKED | Policy violation';
+          let msg = `<strong>ACCESS DENIED (SECURITY VIOLATION):</strong> ${escapeHtml(data.error)}`;
+          if (data.immudb_tx_id) {
+            msg += `<br><span style="font-family:var(--font-mono); font-size:11px; color:#fb7185;">Security violation permanently recorded in immudb at Tx #${data.immudb_tx_id} (Log #${data.immudb_log_id})</span>`;
+          }
+          banner.innerHTML = msg;
+          stats.innerText = data.immudb_tx_id ? `BLOCKED | immudb Tx #${data.immudb_tx_id}` : 'BLOCKED | Policy violation';
           clearResultTable('Query blocked by VaultDB access policy.');
         } else {
           banner.className = 'alert-banner warning';
-          banner.innerHTML = `<strong>DATABASE ERROR:</strong> ${escapeHtml(data.error)}`;
-          stats.innerText = 'ERROR';
-          clearResultTable('Database error encountered.');
+          let msg = `<strong>DATABASE ERROR / BAD QUERY:</strong> ${escapeHtml(data.error)}`;
+          if (data.immudb_tx_id) {
+            msg += `<br><span style="font-family:var(--font-mono); font-size:11px; color:#fbbf24;">Failed query attempt permanently recorded in immudb at Tx #${data.immudb_tx_id} (Log #${data.immudb_log_id})</span>`;
+          }
+          banner.innerHTML = msg;
+          stats.innerText = data.immudb_tx_id ? `ERROR | immudb Tx #${data.immudb_tx_id}` : 'ERROR';
+          clearResultTable('Database error encountered. Incident logged to immudb.');
         }
       } catch (err) {
         banner.className = 'alert-banner warning';

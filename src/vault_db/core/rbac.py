@@ -3,12 +3,21 @@ Role-Based Access Control (RBAC) Module
 Enforces table-level and action-level policies based on authenticated user roles.
 """
 
-from typing import Dict, List, Set, Tuple, Optional
+from typing import Dict, List, Set, Tuple, Optional, Any
 
 
 class AccessDeniedError(Exception):
     """Raised when an application user attempts an operation prohibited by RBAC policy."""
-    pass
+    def __init__(self, message: str, immudb_record: Optional[Dict[str, Any]] = None):
+        super().__init__(message)
+        self.immudb_record = immudb_record or {}
+
+
+class QueryExecutionError(Exception):
+    """Raised when a query fails execution on the database (syntax error, unknown table, etc.)."""
+    def __init__(self, message: str, immudb_record: Optional[Dict[str, Any]] = None):
+        super().__init__(message)
+        self.immudb_record = immudb_record or {}
 
 
 # Default role-to-table permissions

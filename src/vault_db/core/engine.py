@@ -8,7 +8,7 @@ import time
 import logging
 from typing import Any, Dict, List, Optional, Tuple
 
-from src.vault_db.core.rbac import RBACManager, AccessDeniedError
+from src.vault_db.core.rbac import RBACManager, AccessDeniedError, QueryExecutionError
 from src.vault_db.core.parser import SQLParser, QueryAnalysis
 from src.vault_db.storage.postgres import PostgresStorage
 from src.vault_db.storage.immudb_vault import ImmudbVault
@@ -53,9 +53,20 @@ class VaultEngine:
         5. Commits immutable, cryptographically verifiable audit record to immudb.
         """
         start_time = time.perf_counter()
-        analysis: QueryAnalysis = SQLParser.analyze(query)
-        user_role = self.get_user_role(app_user)
-        target_str = ", ".join(analysis.tables) if analysis.tables else "unknown"
+        
+        # Resolve human identity & role
+        try:
+            user_role = self.get_user_role(app_user)
+        except Exception:
+            user_role = "unknown"
+
+        # Analyze SQL query safely
+        try:
+            analysis = SQLParser.analyze(query)
+            target_str = ", ".join(analysis.tables) if analysis.tables else "unknown"
+        except Exception:
+            analysis = QueryAnalysis(raw_query=query, action="UNKNOWN")
+            target_str = "unknown"
 
         # 1. RBAC Policy Enforcement
         is_allowed, denial_reason = self.rbac.check_authorization(
@@ -66,7 +77,7 @@ class VaultEngine:
 
         if not is_allowed:
             elapsed_ms = (time.perf_counter() - start_time) * 1000
-            # Record Access Violation in immudb ledger
+            # Cryptographically seal security violation into immudb ledger
             immudb_record = self.immudb.append_audit_log(
                 app_user=app_user,
                 user_role=user_role,
@@ -80,62 +91,89 @@ class VaultEngine:
                 client_ip=client_ip,
             )
             # Redundant copy in PostgreSQL
-            self.postgres.write_audit_log(
-                app_user=app_user,
-                user_role=user_role,
-                action=analysis.action,
-                target_table=target_str,
-                query_text=query,
-                execution_status="DENIED",
-                immudb_tx_id=immudb_record.get("immudb_tx_id"),
-                immudb_tx_hash=immudb_record.get("immudb_tx_hash"),
-            )
-            raise AccessDeniedError(f"Access Denied: {denial_reason}")
+            try:
+                self.postgres.write_audit_log(
+                    app_user=app_user,
+                    user_role=user_role,
+                    action=analysis.action,
+                    target_table=target_str,
+                    query_text=query,
+                    execution_status="DENIED",
+                    immudb_tx_id=immudb_record.get("immudb_tx_id"),
+                    immudb_tx_hash=immudb_record.get("immudb_tx_hash"),
+                )
+            except Exception as pe_err:
+                logger.warning(f"Could not write redundant denial log to PostgreSQL: {pe_err}")
+
+            raise AccessDeniedError(f"Access Denied: {denial_reason}", immudb_record=immudb_record)
 
         # 2. Execution on Business Database (PostgreSQL)
-        status = "SUCCESS"
-        results: List[Any] = []
-        columns: List[str] = []
-        rows_affected: int = 0
-        error_message: Optional[str] = None
-
         try:
             results, columns, rows_affected = self.postgres.execute_query(query, params)
         except Exception as e:
-            status = "ERROR"
-            error_message = str(e)
-            raise
-        finally:
             elapsed_ms = (time.perf_counter() - start_time) * 1000
-
-            # 3. Cryptographically append audit record to immudb
+            # Cryptographically record failed/bad query into immudb ledger
             immudb_record = self.immudb.append_audit_log(
                 app_user=app_user,
                 user_role=user_role,
                 action=analysis.action,
                 target_table=target_str,
                 query_text=query,
-                execution_status=status,
+                execution_status="ERROR",
                 execution_time_ms=elapsed_ms,
                 is_sensitive=analysis.is_sensitive,
                 sensitive_fields=analysis.sensitive_fields_found,
                 client_ip=client_ip,
             )
+            try:
+                self.postgres.write_audit_log(
+                    app_user=app_user,
+                    user_role=user_role,
+                    action=analysis.action,
+                    target_table=target_str,
+                    query_text=query,
+                    execution_status="ERROR",
+                    immudb_tx_id=immudb_record.get("immudb_tx_id"),
+                    immudb_tx_hash=immudb_record.get("immudb_tx_hash"),
+                )
+            except Exception as pe_err:
+                logger.warning(f"Could not write redundant error log to PostgreSQL: {pe_err}")
 
-            # Redundant copy in PostgreSQL
+            raise QueryExecutionError(str(e), immudb_record=immudb_record)
+
+        elapsed_ms = (time.perf_counter() - start_time) * 1000
+
+        # 3. Cryptographically append successful audit record to immudb
+        immudb_record = self.immudb.append_audit_log(
+            app_user=app_user,
+            user_role=user_role,
+            action=analysis.action,
+            target_table=target_str,
+            query_text=query,
+            execution_status="SUCCESS",
+            execution_time_ms=elapsed_ms,
+            is_sensitive=analysis.is_sensitive,
+            sensitive_fields=analysis.sensitive_fields_found,
+            client_ip=client_ip,
+        )
+
+        # Redundant copy in PostgreSQL
+        try:
             self.postgres.write_audit_log(
                 app_user=app_user,
                 user_role=user_role,
                 action=analysis.action,
                 target_table=target_str,
                 query_text=query,
-                execution_status=status,
+                execution_status="SUCCESS",
                 immudb_tx_id=immudb_record.get("immudb_tx_id"),
                 immudb_tx_hash=immudb_record.get("immudb_tx_hash"),
             )
+        except Exception as pe_err:
+            logger.warning(f"Could not write redundant success log to PostgreSQL: {pe_err}")
 
         return {
-            "status": status,
+            "status": "SUCCESS",
             "results": results,
             "columns": columns,
             "rows_affected": rows_affected,
