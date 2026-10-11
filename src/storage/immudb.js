@@ -30,6 +30,7 @@ export class ImmudbStorage {
 
     this.latestRootHash = null;
     this.isInitialized = false;
+    this._writeQueue = Promise.resolve();
   }
 
   /**
@@ -94,9 +95,15 @@ export class ImmudbStorage {
   }
 
   /**
-   * Cryptographically appends an audit record to immudb.
+   * Cryptographically appends an audit record to immudb with sequential queue serialization.
    */
-  async appendAuditLog({
+  appendAuditLog(params) {
+    const op = () => this._doAppendAuditLog(params);
+    this._writeQueue = this._writeQueue.then(op, op);
+    return this._writeQueue;
+  }
+
+  async _doAppendAuditLog({
     appUser,
     userRole,
     action,
@@ -134,40 +141,50 @@ export class ImmudbStorage {
       );
     `;
 
-    const client = await this.pool.connect();
-    try {
-      await client.query(sql, [
-        appUser,
-        userRole,
-        action,
-        targetTable,
-        queryText,
-        executionStatus,
-        executionTimeMs,
-        isSensitive,
-        sensitiveFieldsStr,
-        clientIp,
-        entryHash,
-      ]);
+    let attempts = 0;
+    while (attempts < 5) {
+      attempts++;
+      const client = await this.pool.connect();
+      try {
+        await client.query(sql, [
+          appUser,
+          userRole,
+          action,
+          targetTable,
+          queryText,
+          executionStatus,
+          executionTimeMs,
+          isSensitive,
+          sensitiveFieldsStr,
+          clientIp,
+          entryHash,
+        ]);
 
-      // Fetch newly generated auto-increment id
-      const idRes = await client.query('SELECT MAX(id) as last_id FROM audit_ledger;');
-      const logId = parseInt(idRes.rows[0]?.last_id || '1', 10);
+        // Fetch newly generated auto-increment id
+        const idRes = await client.query('SELECT MAX(id) as last_id FROM audit_ledger;');
+        const logId = parseInt(idRes.rows[0]?.last_id || '1', 10);
 
-      // Compute updated Merkle state root hash
-      const prevHash = this.latestRootHash || '0000000000000000000000000000000000000000000000000000000000000000';
-      const rootHash = crypto.createHash('sha256').update(`${prevHash}:${entryHash}:${logId}`).digest('hex');
-      this.latestRootHash = rootHash;
+        // Compute updated Merkle state root hash
+        const prevHash = this.latestRootHash || '0000000000000000000000000000000000000000000000000000000000000000';
+        const rootHash = crypto.createHash('sha256').update(`${prevHash}:${entryHash}:${logId}`).digest('hex');
+        this.latestRootHash = rootHash;
 
-      return {
-        id: logId,
-        immudb_tx_id: logId, // Monotonic increment (+1)
-        immudb_tx_hash: rootHash,
-        entry_hash: entryHash,
-        immudb_verified: true,
-      };
-    } finally {
-      client.release();
+        return {
+          id: logId,
+          immudb_tx_id: logId, // Monotonic increment (+1)
+          immudb_tx_hash: rootHash,
+          entry_hash: entryHash,
+          immudb_verified: true,
+        };
+      } catch (err) {
+        if (err.message && err.message.includes('tx read conflict') && attempts < 5) {
+          await new Promise((r) => setTimeout(r, 15 * attempts));
+          continue;
+        }
+        throw err;
+      } finally {
+        client.release();
+      }
     }
   }
 
@@ -235,6 +252,7 @@ export class ImmudbStorage {
       log_id: parseInt(row.id, 10),
       immudb_key: `audit:log:${row.id}`,
       tx_id: parseInt(row.id, 10),
+      entry_hash: row.entry_hash,
       verified: isMatch,
       tamper_detected: !isMatch,
       current_root_hash: this.latestRootHash || row.entry_hash,

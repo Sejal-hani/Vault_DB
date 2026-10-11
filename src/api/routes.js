@@ -156,14 +156,20 @@ router.get('/tables', async (req, res) => {
  */
 router.get('/tables/:table_name', async (req, res) => {
   const tableName = req.params.table_name;
-  const limit = parseInt(req.query.limit || '50', 10);
+  const limit = Math.max(1, Math.min(1000, parseInt(req.query.limit || '50', 10)));
+  const offset = Math.max(0, parseInt(req.query.offset || '0', 10));
   try {
-    const data = await engine.postgres.getTableData(tableName, limit);
+    const data = await engine.postgres.getTableData(tableName, limit, offset);
     return res.json({
       table: tableName,
       columns: data.columns,
       rows: data.rows,
+      limit: data.limit,
+      offset: data.offset,
       total_rows_returned: data.totalRows,
+      total_count: data.totalCount,
+      page: data.page,
+      total_pages: data.totalPages,
     });
   } catch (err) {
     return res.status(500).json({ error: err.message });

@@ -157,19 +157,27 @@ export class PostgresStorage {
   }
 
   /**
-   * Fetches paginated sample rows for a specific table.
+   * Fetches paginated sample rows for a specific table with total row count and pagination metadata.
    */
-  async getTableData(tableName, limit = 50) {
+  async getTableData(tableName, limit = 50, offset = 0) {
     const cleanTable = tableName.replace(/[^a-zA-Z0-9_]/g, '');
-    const sql = `SELECT * FROM app_data.${cleanTable} LIMIT $1;`;
-    const res = await this.pool.query(sql, [limit]);
+    const countRes = await this.pool.query(`SELECT COUNT(*)::int as cnt FROM app_data.${cleanTable};`);
+    const totalCount = countRes.rows[0]?.cnt || 0;
+
+    const sql = `SELECT * FROM app_data.${cleanTable} ORDER BY 1 LIMIT $1 OFFSET $2;`;
+    const res = await this.pool.query(sql, [limit, offset]);
     const columns = res.fields ? res.fields.map((f) => f.name) : [];
     const rows = res.rows.map((row) => columns.map((col) => row[col]));
     return {
       tableName: `app_data.${cleanTable}`,
       columns,
       rows,
+      limit,
+      offset,
       totalRows: rows.length,
+      totalCount,
+      page: Math.floor(offset / limit) + 1,
+      totalPages: Math.ceil(totalCount / limit) || 1,
     };
   }
 
