@@ -729,16 +729,9 @@
     </div>
 
     <nav class="nav-group">
-      <span class="nav-label">Navigation</span>
+      <span class="nav-label">Workstation</span>
 
-      <div class="nav-item active" onclick="showView('view-overview', this)">
-        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/>
-        </svg>
-        <span>Overview & Telemetry</span>
-      </div>
-      
-      <div class="nav-item" onclick="showView('view-console', this)">
+      <div class="nav-item active" onclick="showView('view-console', this)">
         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
         </svg>
@@ -757,14 +750,7 @@
         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"/>
         </svg>
-        <span>Schema Explorer</span>
-      </div>
-
-      <div class="nav-item" onclick="showView('view-compliance', this)">
-        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-        </svg>
-        <span>Compliance Reports</span>
+        <span>Schema Explorer & Reports</span>
       </div>
     </nav>
 
@@ -796,132 +782,59 @@
       <div class="breadcrumb">
         <span class="breadcrumb-root">VaultDB</span>
         <span class="breadcrumb-sep">/</span>
-        <span id="view-title">Overview & Telemetry</span>
+        <span id="view-title">SQL Console</span>
       </div>
 
       <div class="topbar-actions">
-        <a href="/api/reports/pdf" class="btn btn-secondary" target="_blank">
+        <button type="button" class="btn btn-secondary" onclick="showView('view-explorer', document.querySelectorAll('.nav-item')[2])">
           <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
           </svg>
-          Export Compliance PDF
-        </a>
+          Compliance Reports
+        </button>
         <a href="/docs" class="btn btn-secondary" target="_blank">API Docs</a>
       </div>
     </header>
 
     <div class="viewport">
-      <!-- VIEW 0: Overview & Project Milestones -->
-      <section id="view-overview" class="view-pane active">
-        <!-- KPI Cards -->
-        <div class="kpi-grid">
-          <div class="kpi-card">
-            <span class="kpi-label">Total Audited Queries</span>
-            <span class="kpi-value" id="kpi-total">0</span>
-            <span class="kpi-sub">Interception coverage: 100%</span>
-          </div>
-          <div class="kpi-card">
-            <span class="kpi-label">Policy Violations Blocked</span>
-            <span class="kpi-value" id="kpi-denied" style="color: #fb7185;">0</span>
-            <span class="kpi-sub">Zero-trust RBAC enforcement</span>
-          </div>
-          <div class="kpi-card">
-            <span class="kpi-label">Flagged Sensitive Queries</span>
-            <span class="kpi-value" id="kpi-sensitive" style="color: #fcd34d;">0</span>
-            <span class="kpi-sub">PII/SSN access monitored</span>
-          </div>
-          <div class="kpi-card">
-            <span class="kpi-label">Immutable Ledger Height</span>
-            <span class="kpi-value" id="kpi-height" style="color: #93c5fd;">#0</span>
-            <span class="kpi-sub">Monotonic Merkle blocks</span>
-          </div>
+      <!-- Universal Telemetry Ribbon -->
+      <div class="kpi-grid" style="margin-bottom: 14px;">
+        <div class="kpi-card">
+          <span class="kpi-label">Total Audited Queries</span>
+          <span class="kpi-value" id="kpi-total">0</span>
+          <span class="kpi-sub">Interception coverage: 100%</span>
         </div>
+        <div class="kpi-card">
+          <span class="kpi-label">Policy Violations Blocked</span>
+          <span class="kpi-value" id="kpi-denied" style="color: #fb7185;">0</span>
+          <span class="kpi-sub">Zero-trust RBAC enforcement</span>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-label">Flagged Sensitive Queries</span>
+          <span class="kpi-value" id="kpi-sensitive" style="color: #fcd34d;">0</span>
+          <span class="kpi-sub">PII/SSN access monitored</span>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-label">Immutable Ledger Height</span>
+          <span class="kpi-value" id="kpi-height" style="color: #93c5fd;">#0</span>
+          <span class="kpi-sub">Monotonic Merkle blocks</span>
+        </div>
+      </div>
 
-        <!-- Merkle State Panel -->
-        <div class="panel-card">
-          <div class="panel-header">
-            <span class="panel-title">Active Cryptographic Merkle State</span>
-            <span class="tag tag-success">Untampered & Verified</span>
-          </div>
-          <div class="panel-body">
-            <div style="display: flex; flex-direction: column; gap: 8px;">
-              <span class="identity-label">State Merkle Root Hash (SHA-256):</span>
-              <div class="json-box" id="overview-root-hash" style="color: #93c5fd; font-size: 12px;">Loading root hash...</div>
-            </div>
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-top: 4px;">
-              <div>
-                <span class="identity-label">Ledger Engine:</span>
-                <div style="font-weight: 600; color: var(--text); margin-top: 2px;">immudb v1.11.2 (defaultdb)</div>
-              </div>
-              <div>
-                <span class="identity-label">Relational Engine:</span>
-                <div style="font-weight: 600; color: var(--text); margin-top: 2px;">PostgreSQL 16 (psycopg/pg)</div>
-              </div>
-              <div>
-                <span class="identity-label">Middleware Runtime:</span>
-                <div style="font-weight: 600; color: var(--text); margin-top: 2px;">Node.js v24 (ES Modules)</div>
-              </div>
-            </div>
-          </div>
+      <!-- Active Merkle State Ribbon -->
+      <div style="background: #101014; border: 1px solid var(--border); border-radius: 6px; padding: 10px 14px; margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+          <span style="font-size: 11px; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.04em;">State Merkle Root Hash:</span>
+          <code class="mono" id="overview-root-hash" style="color: #93c5fd; font-size: 11px; word-break: break-all;">Loading root hash...</code>
         </div>
-
-        <!-- Implementation Roadmap Panel -->
-        <div class="panel-card">
-          <div class="panel-header">
-            <span class="panel-title">Implementation Roadmap & Syllabus Tracker</span>
-            <span class="panel-meta">Reference: vault_db.txt</span>
-          </div>
-          <div class="panel-body">
-            <div class="roadmap-list">
-              <div class="roadmap-item">
-                <span class="roadmap-badge completed">WEEK 1–2 COMPLETED</span>
-                <div class="roadmap-details">
-                  <span class="roadmap-title">System Architecture & Dual-Storage Design</span>
-                  <span class="roadmap-desc">Designed dual-storage model separating relational banking data (PostgreSQL) from forensic Merkle logs (immudb). Established 12-factor configuration, threat models, and comprehensive LEARNINGS.md report.</span>
-                </div>
-              </div>
-              <div class="roadmap-item">
-                <span class="roadmap-badge completed">WEEK 3–4 COMPLETED</span>
-                <div class="roadmap-details">
-                  <span class="roadmap-title">Query Interception & Sensitive Column Detection</span>
-                  <span class="roadmap-desc">Engineered AST/regex query interceptor in parser.js. Flags sensitive compliance fields (SSN, Passwords, Credit Cards) with sub-2.5ms latency.</span>
-                </div>
-              </div>
-              <div class="roadmap-item">
-                <span class="roadmap-badge completed">WEEK 5–6 COMPLETED</span>
-                <div class="roadmap-details">
-                  <span class="roadmap-title">Cryptographic Immutable Ledger (immudb)</span>
-                  <span class="roadmap-desc">Integrated immudb append-only engine in immudb.js with canonical SHA-256 payload hashing and zero-trust Merkle inclusion proof verification.</span>
-                </div>
-              </div>
-              <div class="roadmap-item">
-                <span class="roadmap-badge completed">WEEK 7–8 COMPLETED</span>
-                <div class="roadmap-details">
-                  <span class="roadmap-title">Granular Role-Based Access Control (RBAC)</span>
-                  <span class="roadmap-desc">Implemented least-privilege matrix across 4 roles (admin, writer, reader, auditor). Security violations are intercepted and sealed in immudb under official receipts.</span>
-                </div>
-              </div>
-              <div class="roadmap-item">
-                <span class="roadmap-badge completed">WEEK 9–10 COMPLETED</span>
-                <div class="roadmap-details">
-                  <span class="roadmap-title">Enterprise Dark-Zinc Compliance Workstation</span>
-                  <span class="roadmap-desc">Built high-end developer dashboard with zero emojis, monospace alignment, live log filtering, and one-click Merkle proof verification.</span>
-                </div>
-              </div>
-              <div class="roadmap-item">
-                <span class="roadmap-badge completed">WEEK 11–12 COMPLETED</span>
-                <div class="roadmap-details">
-                  <span class="roadmap-title">Certified Compliance PDF Reports & 1,000+ Query Benchmarks</span>
-                  <span class="roadmap-desc">Integrated PDFKit compliance export stamped with cryptographic Merkle root seals (GDPR Art. 30, HIPAA §164.312), benchmarked 1,000+ audited queries.</span>
-                </div>
-              </div>
-            </div>
-          </div>
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <span class="tag tag-success">Untampered & Verified</span>
+          <span class="tag" style="background: rgba(37,99,235,0.08); border: 1px solid rgba(37,99,235,0.25); color: #93c5fd;">immudb Append-Only</span>
         </div>
-      </section>
+      </div>
 
       <!-- VIEW 1: SQL Console -->
-      <section id="view-console" class="view-pane">
+      <section id="view-console" class="view-pane active">
         <div class="panel-card">
           <div class="panel-header">
             <span class="panel-title">Query Interception & Access Control</span>
@@ -1048,8 +961,49 @@
         </div>
       </section>
 
-      <!-- VIEW 3: Schema Explorer -->
+      <!-- VIEW 3: Schema Explorer & Reports -->
       <section id="view-explorer" class="view-pane">
+        <!-- Integrated Certified Regulatory Report Card -->
+        <div class="panel-card" style="margin-bottom: 14px; background: #0e0e12; border: 1px solid var(--border);">
+          <div class="panel-header" style="justify-content: space-between;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span class="panel-title">Certified Regulatory Audit Export</span>
+              <span class="tag tag-success">GDPR Art. 30 &bull; HIPAA &bull; PCI-DSS</span>
+            </div>
+            <span class="panel-meta" id="report-active-table-badge" style="color: #93c5fd; font-family: var(--font-mono); font-size: 11px;">Target: app_data.accounts</span>
+          </div>
+          <div class="panel-body">
+            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+              <div style="font-size: 12px; color: var(--text-muted); line-height: 1.5; max-width: 540px;">
+                Generate an official, tamper-evident PDF audit documentation for <strong id="report-target-name" style="color:var(--text);">app_data.accounts</strong>. 
+                Cryptographically sealed with the active immudb Merkle root state for external compliance audits.
+              </div>
+              <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                <select id="schema-pdf-user" class="clean-select" style="width: auto; padding: 5px 8px; font-size: 11.5px;">
+                  <option value="">All Identities</option>
+                  <option value="admin@bank.com">admin@bank.com</option>
+                  <option value="compliance.lead@bank.com">compliance.lead@bank.com</option>
+                  <option value="john@bank.com">john@bank.com</option>
+                  <option value="alice@bank.com">alice@bank.com</option>
+                  <option value="sarah.auditor@bank.com">sarah.auditor@bank.com</option>
+                </select>
+                <select id="schema-pdf-status" class="clean-select" style="width: auto; padding: 5px 8px; font-size: 11.5px;">
+                  <option value="">All Statuses</option>
+                  <option value="SUCCESS">SUCCESS</option>
+                  <option value="DENIED">DENIED (Security Violations)</option>
+                  <option value="ERROR">ERROR</option>
+                </select>
+                <button type="button" class="btn btn-primary" onclick="downloadSchemaTablePdf()" style="padding: 6px 12px; font-size: 11.5px; display: flex; align-items: center; gap: 6px;">
+                  <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                  </svg>
+                  Generate Certified PDF
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div class="panel-card">
           <div class="panel-header">
             <span class="panel-title">PostgreSQL Storage Browser (app_data)</span>
@@ -1081,7 +1035,7 @@
               </div>
             </div>
 
-            <div class="table-responsive" style="max-height: 520px;">
+            <div class="table-responsive" style="max-height: 520px; margin-top: 10px;">
               <table id="explorer-table" class="data-table">
                 <thead id="explorer-thead"></thead>
                 <tbody id="explorer-tbody"></tbody>
@@ -1090,66 +1044,8 @@
           </div>
         </div>
       </section>
-
-      <!-- VIEW 4: Compliance Reports -->
-      <section id="view-compliance" class="view-pane">
-        <div class="panel-card">
-          <div class="panel-header">
-            <span class="panel-title">Regulatory Compliance & PDF Audit Generation</span>
-            <span class="tag tag-success">GDPR &bull; HIPAA &bull; PCI-DSS</span>
-          </div>
-          <div class="panel-body">
-            <div style="background: #0e0e12; border: 1px solid var(--border); border-radius: 6px; padding: 14px 16px;">
-              <div style="font-weight: 600; color: var(--text); margin-bottom: 4px;">Certified Cryptographic Audit Documentation</div>
-              <div style="color: var(--text-muted); font-size: 12.5px; line-height: 1.5;">
-                Generates a formal compliance report anchored to the active immudb Merkle root state. 
-                Fulfills regulatory requirements under <strong>GDPR Article 30</strong> (Records of Processing Activities), 
-                <strong>HIPAA §164.312(b)</strong> (Audit Controls), and <strong>PCI-DSS Requirement 10</strong>.
-              </div>
-            </div>
-
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px;">
-              <div>
-                <label class="identity-label" style="display:block; margin-bottom: 6px;">Filter by Table:</label>
-                <select id="pdf-table-filter" class="clean-select">
-                  <option value="">All Tables</option>
-                  <option value="accounts">accounts</option>
-                  <option value="transactions">transactions</option>
-                  <option value="users">users</option>
-                </select>
-              </div>
-              <div>
-                <label class="identity-label" style="display:block; margin-bottom: 6px;">Filter by Identity:</label>
-                <select id="pdf-user-filter" class="clean-select">
-                  <option value="">All Identities</option>
-                  <option value="admin@bank.com">admin@bank.com</option>
-                  <option value="compliance.lead@bank.com">compliance.lead@bank.com</option>
-                  <option value="john@bank.com">john@bank.com</option>
-                  <option value="alice@bank.com">alice@bank.com</option>
-                </select>
-              </div>
-              <div>
-                <label class="identity-label" style="display:block; margin-bottom: 6px;">Filter by Status:</label>
-                <select id="pdf-status-filter" class="clean-select">
-                  <option value="">All Statuses</option>
-                  <option value="SUCCESS">SUCCESS</option>
-                  <option value="DENIED">DENIED (Security Violations)</option>
-                  <option value="ERROR">ERROR</option>
-                </select>
-              </div>
-            </div>
-
-            <div class="action-row" style="margin-top: 8px;">
-              <button type="button" class="btn btn-primary" onclick="downloadFilteredPdf()">
-                <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                </svg>
-                Generate Certified PDF Report
-              </button>
-            </div>
-          </div>
-        </div>
-      </section>
+    </div>
+  </main>
     </div>
   </main>
 
@@ -1188,21 +1084,18 @@
       document.getElementById(viewId).classList.add('active');
 
       const titles = {
-        'view-overview': 'Overview & Telemetry',
-        'view-console': 'SQL Console',
+        'view-console': 'SQL Console & Policy Enforcement',
         'view-ledger': 'Cryptographic Audit Ledger',
-        'view-explorer': 'Schema Explorer',
-        'view-compliance': 'Compliance Reports'
+        'view-explorer': 'Schema Explorer & Compliance Reports',
       };
       document.getElementById('view-title').innerText = titles[viewId] || 'Workspace';
 
-      if (viewId === 'view-overview') loadStats();
       if (viewId === 'view-ledger') loadAuditLogs();
-      if (viewId === 'view-explorer') exploreTable('accounts');
+      if (viewId === 'view-explorer') exploreTable(currentExplorerTable || 'accounts');
     }
 
     function setQuery(user, sql) {
-      showView('view-console', document.querySelectorAll('.nav-item')[1]);
+      showView('view-console', document.querySelectorAll('.nav-item')[0]);
       document.getElementById('user-select').value = user;
       updateIdentityBadge();
       document.getElementById('sql-input').value = sql;
@@ -1507,6 +1400,11 @@
       thead.innerHTML = '<tr><th>Loading schema...</th></tr>';
       tbody.innerHTML = '';
 
+      const badge = document.getElementById('report-active-table-badge');
+      if (badge) badge.innerText = `Target: app_data.${tableName}`;
+      const highlight = document.getElementById('report-target-name');
+      if (highlight) highlight.innerText = `app_data.${tableName}`;
+
       try {
         const resp = await fetch(`${API}/api/tables/${tableName}?limit=${explorerLimit}&offset=${explorerOffset}`);
         const data = await resp.json();
@@ -1560,17 +1458,13 @@
       exploreTable(currentExplorerTable, false);
     }
 
-    function downloadFilteredPdf() {
-      const table = document.getElementById('pdf-table-filter').value;
-      const user = document.getElementById('pdf-user-filter').value;
-      const status = document.getElementById('pdf-status-filter').value;
+    function downloadSchemaTablePdf() {
+      const user = document.getElementById('schema-pdf-user').value;
+      const status = document.getElementById('schema-pdf-status').value;
 
-      let url = `${API}/api/reports/pdf?`;
-      const params = [];
-      if (table) params.push(`table=${encodeURIComponent(table)}`);
-      if (user) params.push(`user=${encodeURIComponent(user)}`);
-      if (status) params.push(`status=${encodeURIComponent(status)}`);
-      url += params.join('&');
+      let url = `${API}/api/reports/pdf?table=${encodeURIComponent(currentExplorerTable)}`;
+      if (user) url += `&user=${encodeURIComponent(user)}`;
+      if (status) url += `&status=${encodeURIComponent(status)}`;
 
       window.open(url, '_blank');
     }
