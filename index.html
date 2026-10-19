@@ -336,6 +336,13 @@
       display: flex;
       flex-direction: column;
       gap: 3px;
+      cursor: pointer;
+      transition: border-color 0.12s ease, background-color 0.12s ease;
+    }
+
+    .kpi-card:hover {
+      border-color: var(--border-hover);
+      background: var(--panel-elevated);
     }
 
     .kpi-label {
@@ -1091,19 +1098,19 @@
     <div class="viewport">
       <!-- Top Stats Bar -->
       <div class="kpi-grid">
-        <div class="kpi-card">
+        <div class="kpi-card" onclick="navigateToLedger('')" title="Click to view all audit records">
           <span class="kpi-label">Total audited queries</span>
           <span class="kpi-value" id="kpi-total">0</span>
         </div>
-        <div class="kpi-card">
+        <div class="kpi-card" onclick="navigateToLedger('DENIED')" title="Click to filter blocked violations">
           <span class="kpi-label">Policy violations blocked</span>
           <span class="kpi-value" id="kpi-denied" style="color: var(--red);">0</span>
         </div>
-        <div class="kpi-card">
+        <div class="kpi-card" onclick="navigateToLedger('', true)" title="Click to filter flagged sensitive queries">
           <span class="kpi-label">Flagged sensitive queries</span>
           <span class="kpi-value" id="kpi-sensitive" style="color: var(--amber);">0</span>
         </div>
-        <div class="kpi-card">
+        <div class="kpi-card" onclick="navigateToLedger('', false, true)" title="Click to view ledger transactions">
           <span class="kpi-label">Ledger height</span>
           <span class="kpi-value" id="kpi-height">#0</span>
         </div>
@@ -1249,6 +1256,7 @@
                 <option value="SUCCESS">SUCCESS</option>
                 <option value="DENIED">DENIED</option>
                 <option value="ERROR">ERROR</option>
+                <option value="SENSITIVE">Flagged sensitive (PII)</option>
               </select>
 
               <select id="ledger-date-filter" class="clean-select" onchange="loadAuditLogs()">
@@ -1414,6 +1422,34 @@
 
       if (viewId === 'view-ledger') loadAuditLogs();
       if (viewId === 'view-explorer') loadTableMetadata();
+    }
+
+    function navigateToLedger(statusFilter = '', isSensitive = false, sortByTx = false) {
+      const navItems = document.querySelectorAll('.nav-item');
+      if (navItems.length > 1) {
+        showView('view-ledger', navItems[1]);
+      }
+
+      document.getElementById('ledger-search').value = '';
+      document.getElementById('ledger-user-filter').value = '';
+      document.getElementById('ledger-date-filter').value = 'all';
+
+      const statusSelect = document.getElementById('ledger-status-filter');
+      if (statusSelect) {
+        if (isSensitive) {
+          statusSelect.value = 'SENSITIVE';
+        } else {
+          statusSelect.value = statusFilter;
+        }
+      }
+
+      if (sortByTx) {
+        sortColumn = 'immudb_tx_id';
+        sortAscending = false;
+        updateSortIcons();
+      }
+
+      loadAuditLogs();
     }
 
     function switchTable(tableName, element) {
@@ -1655,7 +1691,7 @@
         let url = `${API}/api/logs?limit=${limit}`;
         if (timeRange && timeRange !== 'all') url += `&time_range=${timeRange}`;
         if (user) url += `&user=${encodeURIComponent(user)}`;
-        if (status) url += `&status=${encodeURIComponent(status)}`;
+        if (status && status !== 'SENSITIVE') url += `&status=${encodeURIComponent(status)}`;
 
         const resp = await fetch(url);
         cachedLedger = await resp.json();
@@ -1715,7 +1751,9 @@
           (l.user && l.user.toLowerCase().includes(search)) ||
           (l.table && l.table.toLowerCase().includes(search));
         const matchesUser = !user || l.user === user;
-        const matchesStatus = !status || l.status === status;
+        const matchesStatus = !status 
+          ? true 
+          : (status === 'SENSITIVE' ? !!l.is_sensitive : l.status === status);
         
         let matchesTime = true;
         if (cutoff && l.time) {
