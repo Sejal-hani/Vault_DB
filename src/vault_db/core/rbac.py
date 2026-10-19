@@ -33,6 +33,7 @@ DEFAULT_ROLE_PERMISSIONS: Dict[str, Dict[str, Set[str]]] = {
         "compliance_policies": {"SELECT"}
     },
     "admin": {
+        "*": {"SELECT", "INSERT", "UPDATE", "DELETE", "DDL"},
         "users": {"SELECT", "INSERT", "UPDATE", "DELETE", "DDL"},
         "accounts": {"SELECT", "INSERT", "UPDATE", "DELETE", "DDL"},
         "transactions": {"SELECT", "INSERT", "UPDATE", "DELETE", "DDL"},
@@ -40,10 +41,27 @@ DEFAULT_ROLE_PERMISSIONS: Dict[str, Dict[str, Set[str]]] = {
         "audit_logs": {"SELECT"}
     },
     "auditor": {
+        "*": {"SELECT"},
         "users": {"SELECT"},
         "accounts": {"SELECT"},
         "transactions": {"SELECT"},
         "compliance_policies": {"SELECT"},
+        "audit_logs": {"SELECT"}
+    },
+    "writer": {
+        "*": {"SELECT", "INSERT", "UPDATE"},
+        "accounts": {"SELECT", "INSERT", "UPDATE"},
+        "transactions": {"SELECT", "INSERT", "UPDATE"},
+        "compliance_policies": {"SELECT"},
+        "reports": {"SELECT", "INSERT", "UPDATE"}
+    },
+    "reader": {
+        "*": {"SELECT"},
+        "users": {"SELECT"},
+        "accounts": {"SELECT"},
+        "transactions": {"SELECT"},
+        "compliance_policies": {"SELECT"},
+        "reports": {"SELECT"},
         "audit_logs": {"SELECT"}
     }
 }
@@ -58,6 +76,7 @@ class RBACManager:
     def check_authorization(self, role: str, action: str, tables: List[str]) -> Tuple[bool, Optional[str]]:
         """
         Validates if the specified role is permitted to perform 'action' on all specified 'tables'.
+        Supports explicit table names and wildcard '*' rules for arbitrary external schemas.
         Returns (is_allowed, denial_reason).
         """
         role = role.lower()
@@ -68,16 +87,23 @@ class RBACManager:
 
         # For queries that don't target a specific table (e.g. SELECT 1, SELECT CURRENT_TIMESTAMP)
         if not tables:
+            if action != "SELECT":
+                if role != "admin":
+                    return False, f"Role '{role}' is not permitted to perform {action} without explicit permissions"
             return True, None
 
         for table in tables:
             clean_table = table.lower()
-            if clean_table not in allowed_tables:
+            
+            # Resolve allowed actions: specific table first, fallback to wildcard '*'
+            if clean_table in allowed_tables:
+                allowed_actions = allowed_tables[clean_table]
+            elif "*" in allowed_tables:
+                allowed_actions = allowed_tables["*"]
+            else:
                 return False, f"Role '{role}' is forbidden from accessing table '{clean_table}'"
 
             # Check action authorization
-            allowed_actions = allowed_tables[clean_table]
-            # Handle DDL actions (e.g. DDL:DROP)
             base_action = "DDL" if action.startswith("DDL") else action
 
             if base_action not in allowed_actions and action not in allowed_actions:

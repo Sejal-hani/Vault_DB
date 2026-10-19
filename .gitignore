@@ -14,3 +14,10 @@ immulog/
 # IDE
 .vscode/
 .idea/
+
+# Testing & Dependencies
+node_modules/
+.pytest_cache/
+.coverage
+htmlcov/
+

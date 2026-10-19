@@ -1,0 +1,58 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: vaultdb-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: nimit8222
+      POSTGRES_DB: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./schema.sql:/docker-entrypoint-initdb.d/01_schema.sql
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  immudb:
+    image: codenotary/immudb:latest
+    container_name: vaultdb-immudb
+    ports:
+      - "3322:3322"
+      - "5433:5433"
+    volumes:
+      - immudb_data:/var/lib/immudb
+
+  vaultdb:
+    build: .
+    container_name: vaultdb-app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      immudb:
+        condition: service_started
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: postgres
+      POSTGRES_USER: vault_user
+      POSTGRES_PASSWORD: vault123
+      POSTGRES_ADMIN_USER: postgres
+      POSTGRES_ADMIN_PASSWORD: nimit8222
+      IMMUDB_HOST: immudb
+      IMMUDB_PORT: 3322
+      IMMUDB_USER: immudb
+      IMMUDB_PASSWORD: immudb
+      IMMUDB_DATABASE: defaultdb
+      APP_HOST: 0.0.0.0
+      APP_PORT: 8000
+    ports:
+      - "8000:8000"
+    entrypoint: ["sh", "-c", "python scripts/init_databases.py && python scripts/apply_auth_and_triggers.py && python server.py"]
+
+volumes:
+  pg_data:
+  immudb_data:

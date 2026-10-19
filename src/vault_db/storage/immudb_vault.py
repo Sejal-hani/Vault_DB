@@ -37,10 +37,12 @@ class ImmudbVault:
         self.database = database or settings.IMMUDB_DATABASE
         self._lock = threading.Lock()
         self._client: Optional[ImmudbClient] = None
+        self._cached_counter: Optional[int] = None
         self._connect()
 
     def _connect(self):
         """Establishes authenticated session with immudb server."""
+        self._cached_counter = None
         try:
             client = ImmudbClient(self.address)
             client.login(self.username, self.password)
@@ -73,12 +75,18 @@ class ImmudbVault:
                 self._connect()
 
     def _peek_next_id(self) -> int:
-        """Reads current counter without incrementing transaction height."""
+        """Reads or advances current counter atomically while lock is held."""
+        if self._cached_counter is not None:
+            self._cached_counter += 1
+            return self._cached_counter
+
         self._ensure_connected()
         try:
             val_bytes = self._client.get(self.COUNTER_KEY).value
-            return int(val_bytes.decode("utf-8")) + 1
+            self._cached_counter = int(val_bytes.decode("utf-8")) + 1
+            return self._cached_counter
         except Exception:
+            self._cached_counter = 1
             return 1
 
     def append_audit_log(
@@ -127,6 +135,7 @@ class ImmudbVault:
                 self.COUNTER_KEY: str(log_id).encode("utf-8"),
                 key: val,
             })
+            self._cached_counter = log_id
 
             # Fetch current cryptographic state
             state = self._client.currentState()

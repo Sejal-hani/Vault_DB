@@ -323,9 +323,14 @@
       border-color: var(--border-hover);
     }
 
-    .btn-icon {
-      padding: 6px;
-      border-radius: 6px;
+    .btn-sm {
+      padding: 5px 9px;
+      font-size: 11.5px;
+    }
+
+    .btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
     }
 
     /* Content Area */
@@ -349,7 +354,46 @@
       display: flex;
     }
 
-    /* Cards / Panels */
+    /* KPI Telemetry Ribbon */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 14px;
+      margin-bottom: 4px;
+    }
+
+    .kpi-card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .kpi-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .kpi-value {
+      font-family: var(--font-mono);
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--text);
+      line-height: 1.2;
+    }
+
+    .kpi-sub {
+      font-size: 11px;
+      color: var(--text-dim);
+    }
+
+    /* Cards */
     .panel-card {
       background: var(--panel);
       border: 1px solid var(--border);
@@ -358,12 +402,11 @@
     }
 
     .panel-header {
-      padding: 14px 18px;
+      padding: 12px 18px;
       border-bottom: 1px solid var(--border);
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 12px;
       background: #101013;
     }
 
@@ -372,15 +415,12 @@
       font-weight: 600;
       color: var(--text);
       letter-spacing: -0.01em;
-      display: flex;
-      align-items: center;
-      gap: 8px;
     }
 
     .panel-meta {
-      font-family: var(--font-mono);
       font-size: 11px;
       color: var(--text-dim);
+      font-family: var(--font-mono);
     }
 
     .panel-body {
@@ -390,48 +430,40 @@
       gap: 16px;
     }
 
-    /* User Selector & Identity Banner */
+    /* Identity Row */
     .identity-row {
       display: flex;
       align-items: center;
       gap: 14px;
-      background: #0e0e11;
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 10px 14px;
+      flex-wrap: wrap;
     }
 
     .identity-select-wrap {
-      flex: 1;
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 8px;
     }
 
     .identity-label {
-      font-size: 11px;
-      font-weight: 600;
+      font-size: 12px;
+      font-weight: 500;
       color: var(--text-dim);
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      white-space: nowrap;
     }
 
-    select.clean-select {
-      background: var(--panel);
+    .clean-select {
+      background: #09090b;
       color: var(--text);
       border: 1px solid var(--border);
       border-radius: 6px;
       padding: 6px 10px;
-      font-family: var(--font-mono);
+      font-family: var(--font-sans);
       font-size: 12px;
-      width: 100%;
       outline: none;
       cursor: pointer;
       transition: border-color 0.12s ease;
     }
 
-    select.clean-select:focus {
+    .clean-select:focus {
       border-color: var(--border-hover);
     }
 
@@ -443,43 +475,41 @@
 
     .role-badge {
       font-family: var(--font-mono);
-      font-size: 11px;
+      font-size: 10.5px;
       font-weight: 600;
-      text-transform: uppercase;
-      padding: 3px 8px;
+      padding: 2px 7px;
       border-radius: 4px;
       letter-spacing: 0.03em;
-      white-space: nowrap;
+      text-transform: uppercase;
     }
 
     .role-admin {
-      color: #93c5fd;
-      background: rgba(59, 130, 246, 0.1);
-      border: 1px solid rgba(59, 130, 246, 0.25);
+      background: rgba(168, 85, 247, 0.12);
+      color: #c084fc;
+      border: 1px solid rgba(168, 85, 247, 0.3);
     }
 
     .role-auditor {
-      color: #a78bfa;
-      background: rgba(139, 92, 246, 0.1);
-      border: 1px solid rgba(139, 92, 246, 0.25);
+      background: rgba(59, 130, 246, 0.12);
+      color: #93c5fd;
+      border: 1px solid rgba(59, 130, 246, 0.3);
     }
 
-    .role-employee {
-      color: #34d399;
-      background: rgba(16, 185, 129, 0.1);
-      border: 1px solid rgba(16, 185, 129, 0.25);
+    .role-employee, .role-writer {
+      background: rgba(16, 185, 129, 0.12);
+      color: #6ee7b7;
+      border: 1px solid rgba(16, 185, 129, 0.3);
     }
 
-    .role-customer {
+    .role-customer, .role-reader {
+      background: rgba(245, 158, 11, 0.12);
       color: #fcd34d;
-      background: rgba(245, 158, 11, 0.1);
-      border: 1px solid rgba(245, 158, 11, 0.25);
+      border: 1px solid rgba(245, 158, 11, 0.3);
     }
 
     .identity-desc {
       font-size: 12px;
       color: var(--text-dim);
-      white-space: nowrap;
     }
 
     /* Scenario Chips */
@@ -503,6 +533,57 @@
       gap: 8px;
     }
 
+    .persona-bar {
+      background: #0d0d10;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .persona-identity {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .persona-btns {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .persona-btn {
+      background: transparent;
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 4px 10px;
+      font-size: 11.5px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.12s ease;
+    }
+
+    .persona-btn:hover {
+      background: var(--panel-elevated);
+      color: var(--text);
+      border-color: var(--border-hover);
+    }
+
+    .persona-btn.active {
+      background: var(--panel-elevated);
+      color: var(--white);
+      border-color: var(--white);
+      font-weight: 600;
+    }
+
     .chip-btn {
       background: transparent;
       color: var(--text-muted);
@@ -515,12 +596,28 @@
       cursor: pointer;
       transition: all 0.12s ease;
       white-space: nowrap;
+      user-select: none;
+    }
+
+    .chip-btn:focus {
+      outline: none;
+    }
+
+    .chip-btn:focus-visible {
+      outline: 1px solid var(--border-hover);
     }
 
     .chip-btn:hover {
       background: var(--panel-elevated);
       color: var(--text);
       border-color: var(--border-hover);
+    }
+
+    .chip-btn.active {
+      background: var(--panel-elevated);
+      color: var(--white);
+      border-color: var(--white);
+      font-weight: 600;
     }
 
     .chip-btn.violation {
@@ -530,7 +627,7 @@
     }
 
     .chip-btn.violation:hover {
-      background: rgba(244, 63, 94, 0.1);
+      background: rgba(244, 63, 94, 0.12);
       border-color: var(--rose);
       color: #fff;
     }
@@ -542,7 +639,7 @@
     }
 
     .chip-btn.sensitive:hover {
-      background: rgba(245, 158, 11, 0.1);
+      background: rgba(245, 158, 11, 0.12);
       border-color: var(--amber);
       color: #fff;
     }
@@ -737,6 +834,76 @@
       border-color: var(--border-hover);
     }
 
+    /* Integrated Schema Report Box */
+    .schema-report-bar {
+      background: #0d0d10;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 12px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .report-bar-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .report-bar-title {
+      font-size: 11.5px;
+      font-weight: 600;
+      color: var(--text);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    /* Pagination Bar */
+    .pagination-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      padding: 10px 14px;
+      background: #101013;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      flex-wrap: wrap;
+    }
+
+    .pagination-info {
+      font-size: 12px;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+    }
+
+    .pagination-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .page-input {
+      width: 50px;
+      background: #09090b;
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 4px 6px;
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      text-align: center;
+      outline: none;
+    }
+
+    .page-input:focus {
+      border-color: var(--border-hover);
+    }
+
     /* Modal */
     .modal-overlay {
       display: none;
@@ -754,7 +921,7 @@
       background: var(--panel);
       border: 1px solid var(--border);
       border-radius: 8px;
-      width: 600px;
+      width: 720px;
       max-width: 100%;
       overflow: hidden;
       box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
@@ -775,6 +942,7 @@
       font-size: 13px;
       font-weight: 600;
       color: var(--text);
+      letter-spacing: -0.01em;
     }
 
     .modal-close-btn {
@@ -812,6 +980,58 @@
       line-height: 1.5;
       color: #e4e4e7;
       overflow-x: auto;
+    }
+
+    /* Visual Merkle Pipeline */
+    .pipeline-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 6px;
+      background: #09090b;
+      padding: 12px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+    }
+
+    .pipeline-node {
+      background: #121216;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 8px;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .pipeline-num {
+      font-size: 9.5px;
+      font-family: var(--font-mono);
+      color: var(--text-dim);
+      text-transform: uppercase;
+    }
+
+    .pipeline-name {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .pipeline-status {
+      font-size: 9.5px;
+      font-family: var(--font-mono);
+      color: #34d399;
+      font-weight: 600;
+    }
+
+    .plain-english-card {
+      background: rgba(37, 99, 235, 0.06);
+      border: 1px solid rgba(37, 99, 235, 0.2);
+      border-radius: 6px;
+      padding: 12px 14px;
+      font-size: 12px;
+      line-height: 1.55;
+      color: #cbd5e1;
     }
 
     /* Filters Toolbar */
@@ -876,37 +1096,9 @@
         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"/>
         </svg>
-        <span>Schema Explorer</span>
-      </div>
-
-      <div class="nav-item" onclick="showView('view-compliance', this)">
-        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-        </svg>
-        <span>Compliance Reports</span>
+        <span>Schema Explorer & Reports</span>
       </div>
     </nav>
-
-    <div class="sidebar-footer">
-      <div class="system-status-row">
-        <span class="system-status-label">PostgreSQL:</span>
-        <span class="system-status-value">
-          <span class="status-dot"></span>
-          <span id="pg-status-side" style="color: var(--text);">Connected</span>
-        </span>
-      </div>
-      <div class="system-status-row">
-        <span class="system-status-label">immudb Ledger:</span>
-        <span class="system-status-value">
-          <span class="status-dot blue"></span>
-          <span id="immu-status-side" style="color: var(--text);">Active</span>
-        </span>
-      </div>
-      <div class="system-status-row">
-        <span class="system-status-label">Ledger Height:</span>
-        <span class="system-status-value" id="tx-height-side" style="color: #93c5fd;">#--</span>
-      </div>
-    </div>
   </aside>
 
   <!-- Right Workspace -->
@@ -932,6 +1124,30 @@
     </header>
 
     <div class="viewport">
+      <!-- Universal Telemetry Ribbon -->
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <span class="kpi-label">Total Audited Queries</span>
+          <span class="kpi-value" id="kpi-total">0</span>
+          <span class="kpi-sub">Interception coverage: 100%</span>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-label">Policy Violations Blocked</span>
+          <span class="kpi-value" id="kpi-denied" style="color: #fb7185;">0</span>
+          <span class="kpi-sub">Zero-trust RBAC enforcement</span>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-label">Flagged Sensitive Queries</span>
+          <span class="kpi-value" id="kpi-sensitive" style="color: #fcd34d;">0</span>
+          <span class="kpi-sub">PII/SSN access monitored</span>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-label">Immutable Ledger Height</span>
+          <span class="kpi-value" id="kpi-height" style="color: #93c5fd;">#0</span>
+          <span class="kpi-sub">Monotonic Merkle blocks</span>
+        </div>
+      </div>
+
       <!-- VIEW 1: SQL Console -->
       <section id="view-console" class="view-pane active">
         <!-- Query Composition Panel -->
@@ -941,46 +1157,45 @@
             <span class="tag tag-success">RBAC Enforcing</span>
           </div>
           <div class="panel-body">
-            <!-- Identity Selection -->
-            <div class="identity-row">
-              <div class="identity-select-wrap">
-                <span class="identity-label">User Identity:</span>
-                <select id="user-select" class="clean-select" onchange="updateIdentityBadge()">
-                  <option value="admin@bank.com" data-role="Admin" data-desc="Chief Security Officer &bull; Full schema access and DDL privileges">admin@bank.com</option>
-                  <option value="compliance.lead@bank.com" data-role="Auditor" data-desc="Helen Vance &bull; Compliance team lead &bull; Read-only accounts and policies">compliance.lead@bank.com</option>
-                  <option value="sarah.auditor@bank.com" data-role="Auditor" data-desc="Sarah Lin &bull; Independent regulatory review &bull; Read-only audit access">sarah.auditor@bank.com</option>
-                  <option value="john@bank.com" data-role="Employee" data-desc="Johnathan Reed &bull; Bank branch staff &bull; Read accounts, write transactions">john@bank.com</option>
-                  <option value="rachel.ops@bank.com" data-role="Employee" data-desc="Rachel Green &bull; Risk & fraud operations &bull; Transaction clearance">rachel.ops@bank.com</option>
-                  <option value="alice@bank.com" data-role="Customer" data-desc="Alice Smith &bull; Retail account holder &bull; Scoped personal access">alice@bank.com</option>
-                  <option value="carlos.m@techcorp.io" data-role="Customer" data-desc="Carlos Mendez &bull; TechCorp corporate treasury &bull; Scoped commercial access">carlos.m@techcorp.io</option>
-                </select>
-              </div>
-              <div class="identity-badge-group">
+            <!-- Cryptographic Identity & Persona Authentication Ribbon -->
+            <div class="persona-bar">
+              <div class="persona-identity">
+                <span class="identity-label">Identity:</span>
+                <span id="current-user-email" style="font-weight: 600; color: var(--text);">admin@bank.com</span>
                 <span class="role-badge role-admin" id="identity-role-badge">ADMIN</span>
+                <span class="tag tag-success" style="font-size: 10px;">HS256 JWT &bull; PBKDF2</span>
                 <span class="identity-desc" id="identity-desc-text">Chief Security Officer &bull; Full schema access and DDL privileges</span>
+                <input type="hidden" id="user-select" value="admin@bank.com">
+              </div>
+              <div class="persona-btns">
+                <span style="font-size: 11px; color: var(--text-dim); margin-right: 2px;">Switch Persona:</span>
+                <button type="button" class="persona-btn active" id="btn-persona-admin" onclick="switchPersona('admin')">Admin</button>
+                <button type="button" class="persona-btn" id="btn-persona-auditor" onclick="switchPersona('auditor')">Auditor</button>
+                <button type="button" class="persona-btn" id="btn-persona-employee" onclick="switchPersona('employee')">Employee</button>
+                <button type="button" class="persona-btn" id="btn-persona-customer" onclick="switchPersona('customer')">Customer</button>
               </div>
             </div>
 
             <!-- Scenarios -->
             <div class="scenario-container">
               <span class="scenario-label">Preset Compliance Scenarios:</span>
-              <div class="chips-group">
-                <button type="button" class="chip-btn" onclick="setQuery('admin@bank.com', 'SELECT account_number, name, account_type, balance FROM app_data.accounts WHERE balance > 100000 ORDER BY balance DESC;')">
+              <div class="chips-group" id="preset-chips">
+                <button type="button" class="chip-btn" onclick="setQueryScenario('admin', 'SELECT account_number, name, account_type, balance FROM app_data.accounts WHERE balance > 100000 ORDER BY balance DESC;', this)">
                   High-Value Accounts
                 </button>
-                <button type="button" class="chip-btn" onclick="setQuery('john@bank.com', 'SELECT t.id, a.name, t.transaction_type, t.amount, t.merchant, t.status FROM app_data.transactions t JOIN app_data.accounts a ON t.account_id = a.id WHERE t.amount > 100000 ORDER BY t.amount DESC LIMIT 10;')">
+                <button type="button" class="chip-btn" onclick="setQueryScenario('employee', 'SELECT t.id, a.name, t.transaction_type, t.amount, t.merchant, t.status FROM app_data.transactions t JOIN app_data.accounts a ON t.account_id = a.id WHERE t.amount > 100000 ORDER BY t.amount DESC LIMIT 10;', this)">
                   SWIFT Transfers &gt; $100K
                 </button>
-                <button type="button" class="chip-btn" onclick="setQuery('compliance.lead@bank.com', 'SELECT policy_code, title, standard, enforcement_level FROM app_data.compliance_policies;')">
+                <button type="button" class="chip-btn" onclick="setQueryScenario('auditor', 'SELECT policy_code, title, standard, enforcement_level FROM app_data.compliance_policies;', this)">
                   Compliance Frameworks
                 </button>
-                <button type="button" class="chip-btn violation" onclick="setQuery('john@bank.com', 'UPDATE app_data.accounts SET balance = 9999999 WHERE id = 1;')">
+                <button type="button" class="chip-btn violation" onclick="setQueryScenario('employee', 'UPDATE app_data.accounts SET balance = 9999999 WHERE id = 1;', this)">
                   Violation: Alter Balance
                 </button>
-                <button type="button" class="chip-btn violation" onclick="setQuery('alice@bank.com', 'DELETE FROM app_data.transactions WHERE id = 1;')">
+                <button type="button" class="chip-btn violation" onclick="setQueryScenario('customer', 'DELETE FROM app_data.transactions WHERE id = 1;', this)">
                   Violation: Customer Delete
                 </button>
-                <button type="button" class="chip-btn sensitive" onclick="setQuery('alice@bank.com', 'SELECT name, ssn, balance FROM app_data.accounts WHERE id = 1;')">
+                <button type="button" class="chip-btn sensitive" onclick="setQueryScenario('customer', 'SELECT name, ssn, balance FROM app_data.accounts WHERE id = 1;', this)">
                   Sensitive: SSN Access
                 </button>
               </div>
@@ -1010,7 +1225,17 @@
         <div class="panel-card">
           <div class="panel-header">
             <span class="panel-title">Execution State & Results</span>
-            <span class="panel-meta" id="exec-stats">Ready</span>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 11px; color: var(--text-dim);">Max Display Rows:</span>
+              <select id="result-limit-select" class="clean-select" style="padding: 3px 6px; font-size: 11px;" onchange="renderResultTableLimited()">
+                <option value="25">25</option>
+                <option value="50" selected>50</option>
+                <option value="100">100</option>
+                <option value="250">250</option>
+                <option value="all">All Rows</option>
+              </select>
+              <span class="panel-meta" id="exec-stats">Ready</span>
+            </div>
           </div>
           <div class="panel-body">
             <div id="query-banner" class="alert-banner"></div>
@@ -1034,12 +1259,29 @@
         <div class="panel-card">
           <div class="panel-header">
             <span class="panel-title">immudb Cryptographic Ledger (Append-Only Merkle Tree)</span>
-            <button class="btn btn-secondary" onclick="loadAuditLogs()">Refresh Ledger</button>
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+              <span style="font-size: 11px; color: var(--text-dim);">Watch:</span>
+              <select id="ledger-limit-select" class="clean-select" style="padding: 3px 6px; font-size: 11px;" onchange="loadAuditLogs()">
+                <option value="25">25 logs</option>
+                <option value="50">50 logs</option>
+                <option value="100" selected>100 logs</option>
+                <option value="250">250 logs</option>
+                <option value="500">500 logs</option>
+                <option value="1000">1000 logs</option>
+              </select>
+              <button class="btn btn-secondary btn-sm" id="btn-live-watch" onclick="toggleLiveWatch()">Live Watch: OFF</button>
+              <button class="btn btn-secondary btn-sm" onclick="loadAuditLogs()">Refresh Ledger</button>
+              <button class="btn btn-secondary btn-sm" id="btn-simulate-tamper" onclick="simulateTampering()" style="border-color: rgba(244, 63, 94, 0.4); color: #fda4af;">
+                <span style="display:inline-block; width:6px; height:6px; border-radius:50%; background:#f43f5e; margin-right:4px;"></span>
+                Simulate DB Tampering
+              </button>
+            </div>
           </div>
           <div class="panel-body">
             <div class="toolbar-row">
               <input type="text" id="ledger-search" class="search-input" placeholder="Filter statement, user identity, or table..." oninput="filterLedger()">
-              <select id="ledger-user-filter" class="clean-select" style="width: auto; min-width: 170px;" onchange="filterLedger()">
+              
+              <select id="ledger-user-filter" class="clean-select" style="width: auto; min-width: 170px;" onchange="loadAuditLogs()">
                 <option value="">All Identities</option>
                 <option value="admin@bank.com">admin@bank.com</option>
                 <option value="compliance.lead@bank.com">compliance.lead@bank.com</option>
@@ -1047,11 +1289,19 @@
                 <option value="alice@bank.com">alice@bank.com</option>
                 <option value="sarah.auditor@bank.com">sarah.auditor@bank.com</option>
               </select>
-              <select id="ledger-status-filter" class="clean-select" style="width: auto; min-width: 140px;" onchange="filterLedger()">
+
+              <select id="ledger-status-filter" class="clean-select" style="width: auto; min-width: 140px;" onchange="loadAuditLogs()">
                 <option value="">All Statuses</option>
                 <option value="SUCCESS">SUCCESS</option>
                 <option value="DENIED">DENIED (Violations)</option>
                 <option value="ERROR">ERROR</option>
+              </select>
+
+              <select id="ledger-date-filter" class="clean-select" style="width: auto; min-width: 150px;" onchange="loadAuditLogs()">
+                <option value="all">All Time</option>
+                <option value="24h">Last 24 Hours</option>
+                <option value="7d" selected>Last 7 Days</option>
+                <option value="30d">Last 30 Days</option>
               </select>
             </div>
 
@@ -1080,89 +1330,100 @@
         </div>
       </section>
 
-      <!-- VIEW 3: Schema Explorer -->
+      <!-- VIEW 3: Schema Explorer & Integrated Reports -->
       <section id="view-explorer" class="view-pane">
         <div class="panel-card">
           <div class="panel-header">
-            <span class="panel-title">PostgreSQL Storage Browser (app_data)</span>
-            <div class="chips-group">
-              <button class="chip-btn" onclick="exploreTable('accounts')">accounts</button>
-              <button class="chip-btn" onclick="exploreTable('transactions')">transactions</button>
-              <button class="chip-btn" onclick="exploreTable('users')">users</button>
-              <button class="chip-btn" onclick="exploreTable('compliance_policies')">compliance_policies</button>
+            <span class="panel-title">PostgreSQL Storage Browser & Regulatory Export (app_data)</span>
+            <div class="chips-group" id="table-chips">
+              <button class="chip-btn active" onclick="switchTable('accounts', this)">accounts</button>
+              <button class="chip-btn" onclick="switchTable('transactions', this)">transactions</button>
+              <button class="chip-btn" onclick="switchTable('users', this)">users</button>
+              <button class="chip-btn" onclick="switchTable('compliance_policies', this)">compliance_policies</button>
             </div>
           </div>
+
           <div class="panel-body">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-              <span id="explorer-table-name" style="font-weight: 600; font-size: 13px; color: var(--text);">app_data.accounts</span>
-              <span id="explorer-row-count" class="panel-meta">Loading...</span>
+            <!-- Integrated Compliance Report Generator Toolbar -->
+            <div class="schema-report-bar">
+              <div class="report-bar-left">
+                <span class="report-bar-title">Certified Audit Export:</span>
+                <select id="report-user-filter" class="clean-select" style="width: auto;">
+                  <option value="">All Users</option>
+                  <option value="admin@bank.com">admin@bank.com</option>
+                  <option value="compliance.lead@bank.com">compliance.lead@bank.com</option>
+                  <option value="john@bank.com">john@bank.com</option>
+                  <option value="alice@bank.com">alice@bank.com</option>
+                </select>
+                <select id="report-status-filter" class="clean-select" style="width: auto;">
+                  <option value="">All Statuses</option>
+                  <option value="SUCCESS">SUCCESS only</option>
+                  <option value="DENIED">DENIED violations</option>
+                </select>
+                <select id="report-date-filter" class="clean-select" style="width: auto;">
+                  <option value="all">All Time</option>
+                  <option value="24h">Last 24 Hours</option>
+                  <option value="7d">Last 7 Days</option>
+                  <option value="30d">Last 30 Days</option>
+                </select>
+                <select id="report-limit-select" class="clean-select" style="width: auto;">
+                  <option value="50">50 records</option>
+                  <option value="100" selected>100 records</option>
+                  <option value="250">250 records</option>
+                  <option value="500">500 records</option>
+                  <option value="1000">1000 records</option>
+                </select>
+              </div>
+              <button class="btn btn-secondary btn-sm" onclick="exportTablePdf()">
+                <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+                Generate Certified PDF Report
+              </button>
             </div>
 
+            <!-- Table Header Meta -->
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 10px; margin-bottom: 6px;">
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <span id="explorer-table-name" style="font-weight: 600; font-size: 13px; color: var(--text);">app_data.accounts</span>
+                <span id="explorer-row-count" class="panel-meta">Loading metadata...</span>
+              </div>
+              <input type="text" id="explorer-row-filter" class="search-input" placeholder="Search visible rows..." oninput="filterExplorerRows()" style="max-width: 240px; font-size: 11px; padding: 4px 8px;">
+            </div>
+
+            <!-- Tabular View -->
             <div class="table-responsive" style="max-height: 520px;">
               <table id="explorer-table" class="data-table">
                 <thead id="explorer-thead"></thead>
                 <tbody id="explorer-tbody"></tbody>
               </table>
             </div>
-          </div>
-        </div>
-      </section>
 
-      <!-- VIEW 4: Compliance Reports -->
-      <section id="view-compliance" class="view-pane">
-        <div class="panel-card">
-          <div class="panel-header">
-            <span class="panel-title">Regulatory Compliance & PDF Audit Generation</span>
-            <span class="tag tag-success">GDPR &bull; HIPAA &bull; PCI-DSS</span>
-          </div>
-          <div class="panel-body">
-            <div style="background: #0e0e12; border: 1px solid var(--border); border-radius: 6px; padding: 14px 16px;">
-              <div style="font-weight: 600; color: var(--text); margin-bottom: 4px;">Certified Cryptographic Audit Documentation</div>
-              <div style="color: var(--text-muted); font-size: 12.5px; line-height: 1.5;">
-                Generates a formal compliance report anchored to the active immudb Merkle root state. 
-                Fulfills regulatory requirements under <strong>GDPR Article 30</strong> (Records of Processing Activities), 
-                <strong>HIPAA §164.312(b)</strong> (Audit Controls), and <strong>PCI-DSS Requirement 10</strong>.
+            <!-- Pagination Toolbar -->
+            <div class="pagination-bar">
+              <div class="pagination-info" id="pagination-info-text">
+                Showing rows 0 - 0 of 0
               </div>
-            </div>
-
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px;">
-              <div>
-                <label class="identity-label" style="display:block; margin-bottom: 6px;">Filter by Table:</label>
-                <select id="pdf-table-filter" class="clean-select">
-                  <option value="">All Tables</option>
-                  <option value="accounts">accounts</option>
-                  <option value="transactions">transactions</option>
-                  <option value="users">users</option>
-                </select>
+              <div class="pagination-controls">
+                <div style="display: flex; align-items: center; gap: 6px;">
+                  <span style="font-size: 11px; color: var(--text-dim);">Page Size:</span>
+                  <select id="page-size-select" class="clean-select" style="padding: 3px 6px; font-size: 11px;" onchange="onPageSizeChange()">
+                    <option value="25">25</option>
+                    <option value="50" selected>50</option>
+                    <option value="100">100</option>
+                    <option value="250">250</option>
+                    <option value="500">500</option>
+                    <option value="1000">1000</option>
+                  </select>
+                </div>
+                <button class="btn btn-secondary btn-sm" id="btn-page-first" onclick="goToPage(1)" title="First Page">&lt;&lt;</button>
+                <button class="btn btn-secondary btn-sm" id="btn-page-prev" onclick="prevPage()" title="Previous Page">&lt; Prev</button>
+                <span style="font-size: 11px; color: var(--text-dim); display: flex; align-items: center; gap: 4px;">
+                  Page <input type="number" id="current-page-input" class="page-input" value="1" min="1" onchange="onPageInput(this.value)"> of <span id="total-pages-span">1</span>
+                </span>
+                <button class="btn btn-secondary btn-sm" id="btn-page-next" onclick="nextPage()" title="Next Page">Next &gt;</button>
+                <button class="btn btn-secondary btn-sm" id="btn-page-last" onclick="goToLastPage()" title="Last Page">&gt;&gt;</button>
               </div>
-              <div>
-                <label class="identity-label" style="display:block; margin-bottom: 6px;">Filter by Identity:</label>
-                <select id="pdf-user-filter" class="clean-select">
-                  <option value="">All Identities</option>
-                  <option value="admin@bank.com">admin@bank.com</option>
-                  <option value="compliance.lead@bank.com">compliance.lead@bank.com</option>
-                  <option value="john@bank.com">john@bank.com</option>
-                  <option value="alice@bank.com">alice@bank.com</option>
-                </select>
-              </div>
-              <div>
-                <label class="identity-label" style="display:block; margin-bottom: 6px;">Filter by Status:</label>
-                <select id="pdf-status-filter" class="clean-select">
-                  <option value="">All Statuses</option>
-                  <option value="SUCCESS">SUCCESS</option>
-                  <option value="DENIED">DENIED (Security Violations)</option>
-                  <option value="ERROR">ERROR</option>
-                </select>
-              </div>
-            </div>
-
-            <div class="action-row" style="margin-top: 8px;">
-              <button type="button" class="btn btn-primary" onclick="downloadFilteredPdf()">
-                <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                </svg>
-                Generate Certified PDF Report
-              </button>
             </div>
           </div>
         </div>
@@ -1170,33 +1431,27 @@
     </div>
   </main>
 
-  <!-- Cryptographic Proof Modal -->
-  <div class="modal-overlay" id="proofModal" onclick="if(event.target === this) closeModal()">
+  <!-- Cryptographic Proof Verification Modal -->
+  <div id="proofModal" class="modal-overlay" onclick="if(event.target===this) closeModal()">
     <div class="modal-dialog">
       <div class="modal-head">
-        <span class="modal-head-title">Cryptographic Inclusion Proof (immudb)</span>
+        <span class="modal-head-title">Zero-Trust Merkle Inclusion Proof &bull; Cryptographic Audit Verification</span>
         <button class="modal-close-btn" onclick="closeModal()">&times;</button>
       </div>
-      <div class="modal-body" id="modal-content"></div>
+      <div class="modal-body" id="modal-content">
+        <!-- Injected via JavaScript -->
+      </div>
     </div>
   </div>
 
   <script>
-    const API = window.location.protocol === 'file:' ? 'http://localhost:8000' : '';
+    const API = '';
     let cachedLedger = [];
-
-    function updateIdentityBadge() {
-      const select = document.getElementById('user-select');
-      const opt = select.options[select.selectedIndex];
-      const role = opt.getAttribute('data-role') || 'User';
-      const desc = opt.getAttribute('data-desc') || '';
-
-      const badge = document.getElementById('identity-role-badge');
-      badge.innerText = role.toUpperCase();
-      badge.className = 'role-badge ' + ('role-' + role.toLowerCase());
-
-      document.getElementById('identity-desc-text').innerHTML = desc;
-    }
+    let currentTable = 'accounts';
+    let currentPage = 1;
+    let currentPageSize = 50;
+    let currentTotalPages = 1;
+    let currentTotalCount = 0;
 
     function showView(viewId, element) {
       document.querySelectorAll('.view-pane').forEach(v => v.classList.remove('active'));
@@ -1207,19 +1462,99 @@
       const titles = {
         'view-console': 'SQL Console',
         'view-ledger': 'Cryptographic Audit Ledger',
-        'view-explorer': 'Schema Explorer',
-        'view-compliance': 'Compliance Reports'
+        'view-explorer': 'Schema Explorer & Reports'
       };
       document.getElementById('view-title').innerText = titles[viewId] || 'Workspace';
 
       if (viewId === 'view-ledger') loadAuditLogs();
-      if (viewId === 'view-explorer') exploreTable('accounts');
+      if (viewId === 'view-explorer') loadTableMetadata();
+    }
+
+    function switchTable(tableName, element) {
+      currentTable = tableName;
+      currentPage = 1;
+      document.querySelectorAll('#table-chips .chip-btn').forEach(btn => btn.classList.remove('active'));
+      if (element) element.classList.add('active');
+      exploreTableData(currentTable, currentPage, currentPageSize);
+    }
+
+    async function switchPersona(persona) {
+      document.querySelectorAll('.persona-btns .persona-btn').forEach(b => b.classList.remove('active'));
+      const activeBtn = document.getElementById(`btn-persona-${persona}`);
+      if (activeBtn) activeBtn.classList.add('active');
+
+      try {
+        const resp = await fetch(`${API}/api/auth/demo-login/${persona}`, { method: 'POST' });
+        const data = await resp.json();
+
+        document.getElementById('current-user-email').innerText = data.email;
+        document.getElementById('user-select').value = data.email;
+
+        const roleBadge = document.getElementById('identity-role-badge');
+        roleBadge.className = `role-badge role-${data.role.toLowerCase()}`;
+        roleBadge.innerText = data.role.toUpperCase();
+
+        const roleDescriptions = {
+          'admin': 'Chief Security Officer &bull; Full schema access and DDL privileges',
+          'auditor': 'Independent Regulatory Review &bull; Read-only audit ledger and compliance policies',
+          'employee': 'Bank Branch Operations &bull; Read accounts, insert transactions, balance alter blocked',
+          'customer': 'Retail Account Holder &bull; Row-level personal isolation, deletion blocked'
+        };
+        document.getElementById('identity-desc-text').innerHTML = roleDescriptions[persona.toLowerCase()] || data.department;
+
+        const ledgerUserFilter = document.getElementById('ledger-user-filter');
+        if (ledgerUserFilter && ledgerUserFilter.value) {
+          ledgerUserFilter.value = data.email;
+          loadAuditLogs();
+        }
+      } catch (err) {
+        console.error('Failed to switch persona:', err);
+      }
+    }
+
+    async function setQueryScenario(persona, sql, element) {
+      document.querySelectorAll('#preset-chips .chip-btn').forEach(b => {
+        b.classList.remove('active');
+        b.blur();
+      });
+      if (element) {
+        element.classList.add('active');
+        setTimeout(() => { element.blur(); }, 150);
+      }
+      await switchPersona(persona);
+      document.getElementById('sql-input').value = sql;
     }
 
     function setQuery(user, sql) {
       document.getElementById('user-select').value = user;
-      updateIdentityBadge();
       document.getElementById('sql-input').value = sql;
+    }
+
+    function updateIdentityBadge() {
+      // Legacy wrapper
+    }
+
+    async function simulateTampering() {
+      try {
+        const resp = await fetch(`${API}/api/tamper-demo/simulate`, { method: 'POST' });
+        const data = await resp.json();
+        alert(`DEMO TAMPER INJECTED: Log #${data.log_id} was modified directly in PostgreSQL!\n\nAltered query:\n"${data.tampered_query}"\n\nNow click 'Verify Proof' on Log #${data.log_id} in the ledger to watch immudb detect the corruption!`);
+        await loadAuditLogs();
+      } catch(e) {
+        alert('Tamper simulation error: ' + e.message);
+      }
+    }
+
+    async function restoreTamperedRecord(logId) {
+      try {
+        const resp = await fetch(`${API}/api/tamper-demo/restore?log_id=${logId}`, { method: 'POST' });
+        const data = await resp.json();
+        alert(`RESTORED: ${data.message}`);
+        await verifyProof(logId);
+        await loadAuditLogs();
+      } catch(e) {
+        alert('Restore error: ' + e.message);
+      }
     }
 
     document.getElementById('sql-input').addEventListener('keydown', function(e) {
@@ -1228,7 +1563,50 @@
       }
     });
 
+    document.getElementById('sql-input').addEventListener('input', function() {
+      document.querySelectorAll('#preset-chips .chip-btn').forEach(b => {
+        b.classList.remove('active');
+        b.blur();
+      });
+    });
+
+    let lastQueryColumns = [];
+    let lastQueryRows = [];
+    let liveWatchInterval = null;
+
+    function renderResultTableLimited() {
+      const limitVal = document.getElementById('result-limit-select') ? document.getElementById('result-limit-select').value : '50';
+      let rowsToRender = lastQueryRows;
+      if (limitVal !== 'all') {
+        const lim = parseInt(limitVal, 10);
+        rowsToRender = lastQueryRows.slice(0, lim);
+      }
+      renderResultTable(lastQueryColumns, rowsToRender, lastQueryRows.length);
+    }
+
+    function toggleLiveWatch() {
+      const btn = document.getElementById('btn-live-watch');
+      if (liveWatchInterval) {
+        clearInterval(liveWatchInterval);
+        liveWatchInterval = null;
+        btn.innerText = 'Live Watch: OFF';
+        btn.classList.remove('btn-primary');
+        btn.classList.add('btn-secondary');
+      } else {
+        loadAuditLogs();
+        liveWatchInterval = setInterval(loadAuditLogs, 4000);
+        btn.innerText = 'Live Watch: ON';
+        btn.classList.remove('btn-secondary');
+        btn.classList.add('btn-primary');
+      }
+    }
+
     async function runQuery() {
+      document.querySelectorAll('#preset-chips .chip-btn').forEach(b => {
+        b.classList.remove('active');
+        b.blur();
+      });
+
       const user = document.getElementById('user-select').value;
       const query = document.getElementById('sql-input').value.trim();
       const banner = document.getElementById('query-banner');
@@ -1251,13 +1629,24 @@
         if (data.status === 'SUCCESS') {
           banner.className = 'alert-banner success';
           let msg = `<strong>SUCCESS</strong> &mdash; Sealed in immudb at Tx #${data.immudb_tx_id}`;
-          if (data.is_sensitive) {
-            msg += `<br><span style="color:#fbbf24;">SENSITIVE DATA ACCESSED: [${data.sensitive_fields.join(', ')}] flagged in compliance audit trail.</span>`;
+          if (data.is_masked) {
+            msg += `<br><span style="color:#fcd34d;">DYNAMIC DATA MASKING ENFORCED: Sensitive columns [${(data.masked_fields||[]).join(', ')}] masked for unauthorized role.</span>`;
+          }
+          if (data.is_scoped) {
+            msg += `<br><span style="color:#93c5fd;">ROW-LEVEL SECURITY ACTIVE: Query scoped strictly to user tenant partition.</span>`;
+          }
+          if (data.anomalies && data.anomalies.length > 0) {
+            msg += `<br><span style="color:#fb7185;">ANOMALY ALERT: ${escapeHtml(data.anomalies.join('; '))}</span>`;
+          }
+          if (data.is_sensitive && !data.is_masked) {
+            msg += `<br><span style="color:#fbbf24;">SENSITIVE DATA ACCESSED: [${(data.sensitive_fields||[]).join(', ')}] flagged in compliance audit trail.</span>`;
           }
           banner.innerHTML = msg;
 
           stats.innerText = `${data.execution_time_ms} ms | ${data.rows_affected} row(s) | immudb Tx #${data.immudb_tx_id}`;
-          renderResultTable(data.columns, data.results);
+          lastQueryColumns = data.columns || [];
+          lastQueryRows = data.results || [];
+          renderResultTableLimited();
         } else if (data.status === 'DENIED') {
           banner.className = 'alert-banner denied';
           let msg = `<strong>ACCESS DENIED (SECURITY VIOLATION):</strong> ${escapeHtml(data.error)}`;
@@ -1283,11 +1672,11 @@
         stats.innerText = 'Failed';
       }
 
-      loadSystemStatus();
+      loadStats();
       loadAuditLogs();
     }
 
-    function renderResultTable(columns, rows) {
+    function renderResultTable(columns, rows, totalRows) {
       const thead = document.getElementById('result-thead');
       const tbody = document.getElementById('result-tbody');
 
@@ -1304,19 +1693,38 @@
         return;
       }
 
-      tbody.innerHTML = rows.map(r => `
+      let html = rows.map(r => `
         <tr>${r.map(c => `<td class="mono">${escapeHtml(String(c === null ? 'NULL' : c))}</td>`).join('')}</tr>
       `).join('');
+
+      if (totalRows !== undefined && totalRows > rows.length) {
+        html += `<tr><td colspan="${columns.length}" style="padding:10px 14px; text-align:center; font-size:11px; color:var(--text-dim); background:#101013;">Showing top ${rows.length} of ${totalRows} returned records (expand with 'Max Display Rows')</td></tr>`;
+      }
+
+      tbody.innerHTML = html;
     }
 
     function clearResultTable(msg) {
+      lastQueryColumns = [];
+      lastQueryRows = [];
       document.getElementById('result-thead').innerHTML = '<tr><th>Status</th></tr>';
       document.getElementById('result-tbody').innerHTML = `<tr><td style="padding:14px; color:var(--text-dim);">${escapeHtml(msg)}</td></tr>`;
     }
 
     async function loadAuditLogs() {
       try {
-        const resp = await fetch(API + '/api/logs?limit=50');
+        const timeRange = document.getElementById('ledger-date-filter').value;
+        const user = document.getElementById('ledger-user-filter').value;
+        const status = document.getElementById('ledger-status-filter').value;
+        const limitSelect = document.getElementById('ledger-limit-select');
+        const limit = limitSelect ? limitSelect.value : 100;
+
+        let url = `${API}/api/logs?limit=${limit}`;
+        if (timeRange && timeRange !== 'all') url += `&time_range=${timeRange}`;
+        if (user) url += `&user=${encodeURIComponent(user)}`;
+        if (status) url += `&status=${encodeURIComponent(status)}`;
+
+        const resp = await fetch(url);
         cachedLedger = await resp.json();
         document.getElementById('sidebar-log-count').innerText = cachedLedger.length;
         filterLedger();
@@ -1329,6 +1737,13 @@
       const search = document.getElementById('ledger-search').value.toLowerCase();
       const user = document.getElementById('ledger-user-filter').value;
       const status = document.getElementById('ledger-status-filter').value;
+      const timeRange = document.getElementById('ledger-date-filter').value;
+
+      const now = new Date();
+      let cutoff = null;
+      if (timeRange === '24h') cutoff = new Date(now.getTime() - 24 * 3600 * 1000);
+      else if (timeRange === '7d') cutoff = new Date(now.getTime() - 7 * 24 * 3600 * 1000);
+      else if (timeRange === '30d') cutoff = new Date(now.getTime() - 30 * 24 * 3600 * 1000);
 
       const filtered = cachedLedger.filter(l => {
         const matchesSearch = !search ||
@@ -1337,7 +1752,16 @@
           (l.table && l.table.toLowerCase().includes(search));
         const matchesUser = !user || l.user === user;
         const matchesStatus = !status || l.status === status;
-        return matchesSearch && matchesUser && matchesStatus;
+        
+        let matchesTime = true;
+        if (cutoff && l.time) {
+          try {
+            const entryDate = new Date(l.time);
+            matchesTime = entryDate >= cutoff;
+          } catch(e) { matchesTime = true; }
+        }
+
+        return matchesSearch && matchesUser && matchesStatus && matchesTime;
       });
 
       renderLedgerTable(filtered);
@@ -1346,7 +1770,7 @@
     function renderLedgerTable(logs) {
       const tbody = document.getElementById('ledger-tbody');
       if (!logs || logs.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="10" style="padding:24px; text-align:center; color:var(--text-dim);">No audit records found.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="10" style="padding:24px; text-align:center; color:var(--text-dim);">No audit records found matching criteria.</td></tr>';
         return;
       }
 
@@ -1380,46 +1804,154 @@
       const modal = document.getElementById('proofModal');
       const body = document.getElementById('modal-content');
       modal.style.display = 'flex';
-      body.innerHTML = '<p style="color: var(--text-dim);">Fetching cryptographic inclusion proof from immudb...</p>';
+      body.innerHTML = '<p style="color: var(--text-dim);">Querying immudb gRPC for cryptographic inclusion proof...</p>';
 
       try {
         const resp = await fetch(`${API}/api/verify/${logId}`);
         const data = await resp.json();
 
-        if (data.verified) {
+        if (data.database_tampered) {
+          const mismatchList = (data.mismatches && data.mismatches.length > 0)
+            ? data.mismatches.map(m => `<li style="margin-bottom: 6px; color: #fecdd3;">${escapeHtml(m)}</li>`).join('')
+            : `<li style="color: #fecdd3;">${escapeHtml(data.message)}</li>`;
+
           body.innerHTML = `
-            <div style="background: var(--emerald-bg); border: 1px solid var(--emerald-border); color: #34d399; padding: 12px 14px; border-radius: 6px;">
-              <strong style="display:block; margin-bottom: 3px;">Cryptographic Inclusion Proof Verified</strong>
-              ${data.message}
-            </div>
-            <div style="display: flex; flex-direction: column; gap: 8px; font-size: 12px; margin-top: 4px;">
-              <div style="display: flex; justify-content: space-between;">
-                <span style="color: var(--text-dim);">Audit Record ID:</span>
-                <span class="mono" style="font-weight: 600;">#${data.log_id}</span>
+            <!-- Top Status Alert -->
+            <div style="background: rgba(244, 63, 94, 0.12); border: 1.5px solid var(--rose); color: #fb7185; padding: 14px 16px; border-radius: 6px; display: flex; align-items: flex-start; justify-content: space-between;">
+              <div>
+                <strong style="display:block; font-size: 13.5px; margin-bottom: 2px; color: #fff;">CRITICAL TAMPERING DETECTED: POSTGRESQL RECORD MUTATED</strong>
+                <span style="font-size: 12px; color: #fecdd3;">PostgreSQL mirror does not match the immutable immudb Merkle root! Tampering caught.</span>
               </div>
-              <div style="display: flex; justify-content: space-between;">
-                <span style="color: var(--text-dim);">Ledger Key:</span>
+              <span class="tag tag-denied" style="font-size: 11px;">TAMPER ALERT</span>
+            </div>
+
+            <!-- Mismatches Breakdown -->
+            <div style="background: #09090b; border: 1px solid var(--rose-border); border-radius: 6px; padding: 12px 14px;">
+              <span style="font-size: 11px; font-weight: 600; color: #fda4af; text-transform: uppercase; display: block; margin-bottom: 8px;">
+                Mismatches Detected Between Database & Sealed Ledger:
+              </span>
+              <ul style="font-family: var(--font-mono); font-size: 11.5px; list-style-position: inside; padding-left: 4px;">
+                ${mismatchList}
+              </ul>
+            </div>
+
+            <!-- Plain English Explanation for Non-Technical Auditors -->
+            <div class="plain-english-card" style="background: rgba(244, 63, 94, 0.05); border-color: rgba(244, 63, 94, 0.25);">
+              <strong style="color: #fda4af; display: block; margin-bottom: 4px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em;">Auditor Incident Report (Non-Repudiation Verified)</strong>
+              An out-of-band mutation was executed on PostgreSQL directly. 
+              Because VaultDB cryptographically sealed the original transaction into immudb's append-only Merkle tree, the rogue modification was immediately exposed.
+            </div>
+
+            <!-- Cryptographic Details Breakdown -->
+            <div style="display: flex; flex-direction: column; gap: 8px; font-size: 12px; margin-top: 4px;">
+              <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-subtle); padding-bottom: 6px;">
+                <span style="color: var(--text-dim);">Audit Record ID:</span>
+                <span class="mono" style="font-weight: 600; color: #fb7185;">#${data.log_id}</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-subtle); padding-bottom: 6px;">
+                <span style="color: var(--text-dim);">immudb Ledger Key:</span>
                 <span class="mono" style="color: #93c5fd;">${data.immudb_key}</span>
               </div>
-              <div style="display: flex; justify-content: space-between;">
+              <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-subtle); padding-bottom: 6px;">
                 <span style="color: var(--text-dim);">Transaction Height:</span>
-                <span class="mono" style="font-weight: 600;">#${data.tx_id}</span>
+                <span class="mono" style="font-weight: 600; color: #93c5fd;">Tx #${data.tx_id}</span>
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 4px;">
+                <span style="color: var(--text-dim);">immudb State Merkle Root Hash:</span>
+                <div class="json-box" style="font-size: 11px; word-break: break-all; color: #a1a1aa;">${data.current_root_hash || '-'}</div>
+              </div>
+            </div>
+
+            <!-- Restore Action Button -->
+            <div style="display: flex; align-items: center; justify-content: space-between; padding-top: 10px; border-top: 1px solid var(--border);">
+              <button class="btn btn-primary" onclick="restoreTamperedRecord(${data.log_id})" style="background: #f43f5e; border-color: #f43f5e; color: #fff; font-weight: 600;">
+                Restore Untampered State from immudb
+              </button>
+              <span style="font-size: 11px; color: var(--text-dim);">Overwrites PostgreSQL row with authentic immudb payload.</span>
+            </div>
+          `;
+        } else if (data.verified) {
+          body.innerHTML = `
+            <!-- Top Status Alert -->
+            <div style="background: var(--emerald-bg); border: 1px solid var(--emerald-border); color: #34d399; padding: 12px 14px; border-radius: 6px; display: flex; align-items: flex-start; justify-content: space-between;">
+              <div>
+                <strong style="display:block; font-size: 13px; margin-bottom: 2px;">Cryptographic Inclusion Proof Verified (Untampered)</strong>
+                <span style="font-size: 12px; color: #a7f3d0;">Verified against immudb cryptographic Merkle tree root hash. Legal non-repudiation established.</span>
+              </div>
+              <span class="tag tag-success" style="font-size: 11px;">100% INTACT</span>
+            </div>
+
+            <!-- Plain English Explanation for Non-Technical Auditors -->
+            <div class="plain-english-card">
+              <strong style="color: #93c5fd; display: block; margin-bottom: 4px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em;">Auditor Explanation (Human Interpretable)</strong>
+              This audit record is sealed inside an immutable, append-only cryptographic ledger. The 64-character Merkle root hash below acts as an unbreakable mathematical fingerprint. 
+              <strong>What this proves:</strong> Even if a system administrator or database superuser with root access attempts to alter, backdate, or delete this SQL query, the Merkle tree proof immediately fails. 
+              Zero bits have been modified since this record was permanently written at Transaction #${data.tx_id}.
+            </div>
+
+            <!-- 5-Step Visual Cryptographic Pipeline -->
+            <div>
+              <span style="font-size: 11px; font-weight: 600; color: var(--text-dim); text-transform: uppercase; display: block; margin-bottom: 6px;">Zero-Trust Merkle Verification Pipeline:</span>
+              <div class="pipeline-grid">
+                <div class="pipeline-node">
+                  <span class="pipeline-num">Step 1</span>
+                  <span class="pipeline-name">Log Payload</span>
+                  <span class="pipeline-status">SHA-256</span>
+                </div>
+                <div class="pipeline-node">
+                  <span class="pipeline-num">Step 2</span>
+                  <span class="pipeline-name">Leaf Node</span>
+                  <span class="pipeline-status">Computed</span>
+                </div>
+                <div class="pipeline-node">
+                  <span class="pipeline-num">Step 3</span>
+                  <span class="pipeline-name">Audit Path</span>
+                  <span class="pipeline-status">Traversed</span>
+                </div>
+                <div class="pipeline-node">
+                  <span class="pipeline-num">Step 4</span>
+                  <span class="pipeline-name">Root Hash</span>
+                  <span class="pipeline-status">Matched</span>
+                </div>
+                <div class="pipeline-node">
+                  <span class="pipeline-num">Step 5</span>
+                  <span class="pipeline-name">Verdict</span>
+                  <span class="pipeline-status">Sealed</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Cryptographic Details Breakdown -->
+            <div style="display: flex; flex-direction: column; gap: 8px; font-size: 12px; margin-top: 4px;">
+              <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-subtle); padding-bottom: 6px;">
+                <span style="color: var(--text-dim);">Audit Record ID:</span>
+                <span class="mono" style="font-weight: 600; color: var(--text);">#${data.log_id}</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-subtle); padding-bottom: 6px;">
+                <span style="color: var(--text-dim);">immudb Ledger Key:</span>
+                <span class="mono" style="color: #93c5fd;">${data.immudb_key}</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-subtle); padding-bottom: 6px;">
+                <span style="color: var(--text-dim);">Transaction Height:</span>
+                <span class="mono" style="font-weight: 600; color: #93c5fd;">Tx #${data.tx_id}</span>
               </div>
               <div style="display: flex; flex-direction: column; gap: 4px;">
                 <span style="color: var(--text-dim);">State Merkle Root Hash:</span>
                 <div class="json-box" style="font-size: 11px; word-break: break-all; color: #a1a1aa;">${data.current_root_hash}</div>
               </div>
             </div>
-            <div style="margin-top: 4px;">
+
+            <!-- Immutable Payload Data -->
+            <div>
               <span style="font-size: 11px; font-weight: 600; color: var(--text-dim); text-transform: uppercase;">Verified Immutable Payload:</span>
-              <pre class="json-box" style="margin-top: 6px;">${JSON.stringify(data.record, null, 2)}</pre>
+              <pre class="json-box" style="margin-top: 6px; max-height: 160px; overflow-y: auto;">${JSON.stringify(data.record, null, 2)}</pre>
             </div>
           `;
         } else {
           body.innerHTML = `
             <div style="background: var(--rose-bg); border: 1px solid var(--rose-border); color: #fb7185; padding: 12px 14px; border-radius: 6px;">
-              <strong style="display:block; margin-bottom: 3px;">Verification Failed</strong>
-              ${data.message || data.error}
+              <strong style="display:block; margin-bottom: 3px;">Verification Failed &bull; Tampering Detected</strong>
+              ${escapeHtml(data.message || data.error)}
             </div>
           `;
         }
@@ -1432,7 +1964,23 @@
       document.getElementById('proofModal').style.display = 'none';
     }
 
-    async function exploreTable(tableName) {
+    async function loadTableMetadata() {
+      try {
+        const resp = await fetch(`${API}/api/tables`);
+        const tables = await resp.json();
+        const chipsContainer = document.getElementById('table-chips');
+        chipsContainer.innerHTML = tables.map(t => `
+          <button class="chip-btn ${t.name === currentTable ? 'active' : ''}" onclick="switchTable('${t.name}', this)">
+            ${t.name} <span style="font-size:10px; color:var(--text-dim);">(${t.row_count.toLocaleString()})</span>
+          </button>
+        `).join('');
+      } catch(e) {
+        console.error("Failed loading table metadata:", e);
+      }
+      exploreTableData(currentTable, currentPage, currentPageSize);
+    }
+
+    async function exploreTableData(tableName, page, limit) {
       document.getElementById('explorer-table-name').innerText = `app_data.${tableName}`;
       const thead = document.getElementById('explorer-thead');
       const tbody = document.getElementById('explorer-tbody');
@@ -1440,61 +1988,144 @@
       tbody.innerHTML = '';
 
       try {
-        const resp = await fetch(`${API}/api/tables/${tableName}?limit=50`);
+        const resp = await fetch(`${API}/api/tables/${tableName}?limit=${limit}&page=${page}`);
         const data = await resp.json();
 
-        document.getElementById('explorer-row-count').innerText = `${data.total_rows_returned} records displayed (Limit 50)`;
+        currentTotalCount = data.total_count || 0;
+        currentTotalPages = data.total_pages || 1;
+        currentPage = data.page || page;
+
+        document.getElementById('explorer-row-count').innerText = `${currentTotalCount.toLocaleString()} total rows`;
+
+        // Update pagination bar
+        const startRow = Math.min((currentPage - 1) * limit + 1, currentTotalCount);
+        const endRow = Math.min(startRow + data.total_rows_returned - 1, currentTotalCount);
+        document.getElementById('pagination-info-text').innerText = 
+          currentTotalCount > 0 
+            ? `Showing rows ${startRow.toLocaleString()} - ${endRow.toLocaleString()} of ${currentTotalCount.toLocaleString()} records in app_data.${tableName}`
+            : `0 records in app_data.${tableName}`;
+
+        document.getElementById('current-page-input').value = currentPage;
+        document.getElementById('total-pages-span').innerText = currentTotalPages;
+
+        document.getElementById('btn-page-first').disabled = currentPage <= 1;
+        document.getElementById('btn-page-prev').disabled = currentPage <= 1;
+        document.getElementById('btn-page-next').disabled = currentPage >= currentTotalPages;
+        document.getElementById('btn-page-last').disabled = currentPage >= currentTotalPages;
+
         thead.innerHTML = `<tr>${data.columns.map(c => `<th>${escapeHtml(c)}</th>`).join('')}</tr>`;
         tbody.innerHTML = data.rows.map(r => `
           <tr>${r.map(c => `<td class="mono">${escapeHtml(String(c === null ? 'NULL' : c))}</td>`).join('')}</tr>
         `).join('');
+
+        filterExplorerRows();
       } catch (err) {
         thead.innerHTML = '<tr><th>Error</th></tr>';
         tbody.innerHTML = `<tr><td style="color:var(--rose); padding:14px;">Error: ${escapeHtml(err.message)}</td></tr>`;
       }
     }
 
-    function downloadFilteredPdf() {
-      const table = document.getElementById('pdf-table-filter').value;
-      const user = document.getElementById('pdf-user-filter').value;
-      const status = document.getElementById('pdf-status-filter').value;
+    function filterExplorerRows() {
+      const input = document.getElementById('explorer-row-filter');
+      const filter = input ? input.value.toLowerCase().trim() : '';
+      const tbody = document.getElementById('explorer-tbody');
+      const trs = tbody.getElementsByTagName('tr');
+      for (let i = 0; i < trs.length; i++) {
+        const rowText = trs[i].innerText.toLowerCase();
+        if (!filter || rowText.includes(filter)) {
+          trs[i].style.display = '';
+        } else {
+          trs[i].style.display = 'none';
+        }
+      }
+    }
 
-      let url = `${API}/api/reports/pdf?`;
-      const params = [];
-      if (table) params.push(`table=${encodeURIComponent(table)}`);
-      if (user) params.push(`user=${encodeURIComponent(user)}`);
-      if (status) params.push(`status=${encodeURIComponent(status)}`);
-      url += params.join('&');
+    function onPageSizeChange() {
+      currentPageSize = parseInt(document.getElementById('page-size-select').value, 10);
+      currentPage = 1;
+      exploreTableData(currentTable, currentPage, currentPageSize);
+    }
+
+    function goToPage(page) {
+      if (page < 1) page = 1;
+      if (page > currentTotalPages) page = currentTotalPages;
+      currentPage = page;
+      exploreTableData(currentTable, currentPage, currentPageSize);
+    }
+
+    function prevPage() {
+      if (currentPage > 1) {
+        goToPage(currentPage - 1);
+      }
+    }
+
+    function nextPage() {
+      if (currentPage < currentTotalPages) {
+        goToPage(currentPage + 1);
+      }
+    }
+
+    function goToLastPage() {
+      goToPage(currentTotalPages);
+    }
+
+    function onPageInput(val) {
+      const p = parseInt(val, 10);
+      if (!isNaN(p)) {
+        goToPage(p);
+      }
+    }
+
+    function exportTablePdf() {
+      const user = document.getElementById('report-user-filter').value;
+      const status = document.getElementById('report-status-filter').value;
+      const timeRange = document.getElementById('report-date-filter').value;
+      const limitSelect = document.getElementById('report-limit-select');
+      const limit = limitSelect ? limitSelect.value : '100';
+
+      let url = `${API}/api/reports/pdf?table=${encodeURIComponent(currentTable)}&limit=${limit}`;
+      if (user) url += `&user=${encodeURIComponent(user)}`;
+      if (status) url += `&status=${encodeURIComponent(status)}`;
+      if (timeRange && timeRange !== 'all') url += `&time_range=${timeRange}`;
 
       window.open(url, '_blank');
     }
 
     async function loadSystemStatus() {
-      try {
-        const hRes = await fetch(API + '/api/health');
-        if (hRes.ok) {
-          const h = await hRes.json();
-          document.getElementById('pg-status-side').innerText = h.postgres;
-          document.getElementById('immu-status-side').innerText = h.immudb;
-        }
+      // Legacy wrapper
+    }
 
-        const sRes = await fetch(API + '/api/ledger-state');
-        if (sRes.ok) {
-          const s = await sRes.json();
-          document.getElementById('tx-height-side').innerText = '#' + s.tx_id;
+    async function loadStats() {
+      try {
+        const resp = await fetch(API + '/api/stats');
+        if (resp.ok) {
+          const s = await resp.json();
+          document.getElementById('kpi-total').innerText = (s.total_audited || 0).toLocaleString();
+          document.getElementById('kpi-denied').innerText = (s.denied_count || 0).toLocaleString();
+          document.getElementById('kpi-sensitive').innerText = (s.sensitive_count || 0).toLocaleString();
+          document.getElementById('kpi-height').innerText = '#' + (s.ledger_height || 0).toLocaleString();
         }
       } catch (e) {
-        console.error("Health check error:", e);
+        console.error("Error loading stats:", e);
       }
     }
 
     function escapeHtml(str) {
-      return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
     }
 
-    updateIdentityBadge();
-    loadSystemStatus();
+    // Initialization
+    switchPersona('admin');
+    loadStats();
     loadAuditLogs();
+    loadTableMetadata();
+    setInterval(loadStats, 10000);
   </script>
 </body>
 </html>

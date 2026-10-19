@@ -62,12 +62,46 @@ def test_get_logs_endpoint():
 
 
 def test_verify_log_endpoint():
-    # Fetch latest log id
-    logs_res = client.get("/api/logs?limit=1")
-    log_id = logs_res.json()[0]["id"]
+    # Execute query to create synchronized test record across immudb and PostgreSQL
+    exec_res = client.post(
+        "/api/execute",
+        json={
+            "user": "admin@bank.com",
+            "query": "SELECT account_number FROM app_data.accounts LIMIT 1;"
+        }
+    )
+    assert exec_res.status_code == 200
+    log_id = exec_res.json()["immudb_log_id"]
 
     verify_res = client.get(f"/api/verify/{log_id}")
     assert verify_res.status_code == 200
     vdata = verify_res.json()
     assert vdata["verified"] is True
     assert vdata["tamper_detected"] is False
+
+
+def test_table_pagination_endpoint():
+    response = client.get("/api/tables/accounts?limit=2&page=1")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["table"] == "accounts"
+    assert "total_count" in data
+    assert data["page"] == 1
+    assert data["limit"] == 2
+    assert "total_pages" in data
+    assert len(data["rows"]) <= 2
+
+
+def test_get_logs_with_filters():
+    response = client.get("/api/logs?limit=10&time_range=7d&status=SUCCESS")
+    assert response.status_code == 200
+    logs = response.json()
+    assert isinstance(logs, list)
+
+
+def test_export_pdf_endpoint():
+    response = client.get("/api/reports/pdf?table=accounts&limit=10")
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "application/pdf"
+    assert len(response.content) > 1000
+

@@ -65,12 +65,20 @@ class SQLParser:
         tables: Set[str] = set()
         q = query.lower()
 
-        # Match table references after FROM, INTO, UPDATE, TABLE, JOIN
-        matches = re.finditer(r'\b(from|into|update|table|join)\s+([a-zA-Z0-9_.]+)', q)
+        # Match table references after FROM, INTO, UPDATE, TABLE, JOIN, TRUNCATE
+        matches = re.finditer(r'\b(from|into|update|table|join|truncate)\s+([a-zA-Z0-9_.]+)', q)
         for m in matches:
             token = m.group(2)
             # Remove schema if present (e.g. app_data.accounts -> accounts)
-            clean_name = token.split('.')[-1].strip('`"\'[]')
+            clean_name = token.split('.')[-1].strip('`"\'[];')
+            if clean_name and clean_name not in SQL_RESERVED_KEYWORDS:
+                tables.add(clean_name)
+
+        # Match table references after DROP TABLE, ALTER TABLE, DROP SCHEMA
+        drop_alter_matches = re.finditer(r'\b(?:drop|alter)\s+(?:table|schema)\s+([a-zA-Z0-9_.]+)', q)
+        for m in drop_alter_matches:
+            token = m.group(1)
+            clean_name = token.split('.')[-1].strip('`"\'[];')
             if clean_name and clean_name not in SQL_RESERVED_KEYWORDS:
                 tables.add(clean_name)
 

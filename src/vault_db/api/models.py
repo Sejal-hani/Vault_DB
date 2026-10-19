@@ -7,8 +7,8 @@ from pydantic import BaseModel, Field
 
 
 class ExecuteQueryRequest(BaseModel):
-    user: str = Field(default="alice@bank.com", description="Application user email/identity")
     query: str = Field(..., description="SQL statement to execute")
+    user: Optional[str] = Field(default=None, description="Optional legacy fallback identity")
     params: Optional[List[Any]] = Field(default=None, description="Optional parameterized arguments")
 
 
@@ -20,6 +20,10 @@ class ExecuteQueryResponse(BaseModel):
     execution_time_ms: float = 0.0
     is_sensitive: bool = False
     sensitive_fields: Optional[List[str]] = None
+    is_masked: bool = False
+    masked_fields: Optional[List[str]] = None
+    is_scoped: bool = False
+    anomalies: Optional[List[str]] = None
     immudb_log_id: Optional[int] = None
     immudb_tx_id: Optional[int] = None
     immudb_verified: Optional[bool] = None
@@ -46,6 +50,8 @@ class VerifyLogResponse(BaseModel):
     tx_id: Optional[int] = None
     verified: bool
     tamper_detected: bool
+    database_tampered: bool = False
+    mismatches: Optional[List[str]] = None
     current_root_hash: Optional[str] = None
     record: Optional[Dict[str, Any]] = None
     message: str

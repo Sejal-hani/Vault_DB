@@ -1,153 +1,271 @@
-# VaultDB (v2.0)
+# VaultDB: Cryptographically Immutable Database Middleware
 
-> **Cryptographically Immutable Database Middleware with PostgreSQL & immudb**  
-> Meets compliance standards (GDPR Art. 30, HIPAA §164.312) by answering:  
-> *"Who accessed what data, what exact SQL query was run, when, and can you mathematically prove the audit trail was never tampered with?"*
+VaultDB is an enterprise-grade compliance and database security middleware connecting application clients to PostgreSQL and immudb. It provides server-derived authentication, zero-trust role-based access control (RBAC), row-level security (RLS), dynamic data masking, real-time anomaly detection, and dual-layer tamper-evident audit logging backed by cryptographic Merkle tree proofs (satisfying GDPR Art. 30, HIPAA §164.312, and PCI-DSS 10.2).
 
 ---
 
-## 🌟 Key Highlights & What's New in v2.0
-
-1. **immudb Cryptographic Immutability**:
-   - Zero-trust audit trails committed to **immudb** using append-only Merkle trees.
-   - Cryptographic verification proofs (`verifiedSet` / `verifiedGet`) guaranteeing logs cannot be altered, deleted, or backdated—even by database administrators.
-2. **Production Scalability**:
-   - **PostgreSQL Connection Pooling (`psycopg_pool`)**: Eliminates connection latency under concurrent load.
-   - **High-Performance Asynchronous API (`FastAPI` + `Uvicorn`)**: High-throughput REST API with interactive Swagger docs.
-3. **Enterprise Project Structure**:
-   - Clean layered architecture separating `core` (RBAC, SQL parser), `storage` (Postgres, immudb), and `api` (FastAPI routes, schemas).
-4. **Interactive Dashboard**:
-   - Live immudb ledger height and Merkle tree root hash indicator.
-   - Interactive SQL query tester with RBAC feedback.
-   - **"🛡️ Verify Proof"** button on each log record validating Merkle cryptographic proofs on the fly.
-5. **CLI Verification Tool**:
-   - `python scripts/verify_integrity.py` generates an audited tamper-proof report for compliance inspections.
-
----
-
-## 📂 Project Directory Structure
+## 1. System Architecture
 
 ```
-Vault_DB/
-├── bin/
-│   └── immudb.exe                  # Standalone immudb server binary (Windows)
-├── config/
-│   ├── __init__.py
-│   └── settings.py                 # Centralized 12-factor configuration
-├── src/
-│   └── vault_db/
-│       ├── __init__.py
-│       ├── core/
-│       │   ├── rbac.py             # Role-Based Access Control matrix & policies
-│       │   ├── parser.py           # SQL parsing, action extraction & sensitive column detector
-│       │   └── engine.py           # VaultEngine middleware orchestrator
-│       ├── storage/
-│       │   ├── postgres.py         # PostgreSQL client with psycopg-pool
-│       │   └── immudb_vault.py     # immudb client (verified writes & Merkle proofs)
-│       └── api/
-│           ├── models.py           # Pydantic schemas
-│           ├── routes.py           # REST endpoints (/api/execute, /api/logs, /api/verify)
-│           └── app.py              # FastAPI application
-├── templates/
-│   └── index.html                  # Upgraded Dashboard UI
-├── scripts/
-│   ├── init_databases.py           # PostgreSQL & immudb dual-database initialization
-│   ├── start_services.py           # One-click launcher for immudb & FastAPI
-│   ├── start_immudb.ps1            # PowerShell helper to run immudb standalone
-│   └── verify_integrity.py         # CLI tool to cryptographically audit logs
-├── tests/
-│   ├── test_rbac.py                # RBAC unit tests
-│   ├── test_immudb.py              # immudb verified operations & tamper proofs
-│   └── test_api.py                 # FastAPI endpoint integration tests
-├── .env.example                    # Sample environment variables
-├── requirements.txt                # Project dependencies
-├── ARCHITECTURE.md                 # Detailed architecture specification & viva Q&A
-└── README.md                       # Documentation & Quickstart
++---------------------------------------------------------------------------------------------------+
+|                                        Client Applications                                        |
+|              (Web Management Console, Python SDK, Microservices, Automated Test Suites)           |
++-------------------------------------------------+-------------------------------------------------+
+                                                  |
+                                                  v
++---------------------------------------------------------------------------------------------------+
+|                                         VaultDB Middleware                                        |
+|                                                                                                   |
+|  [Authentication & Identity]                                                                      |
+|    - Salted PBKDF2-HMAC-SHA256 Password Verification                                              |
+|    - RFC 7519 Compliant HS256 JWT (HttpOnly Cookie / Bearer Token)                                |
+|    - Cryptographic API Key Verification (X-API-Key Header)                                        |
+|    - Server-Derived Identity (Zero Client-Side Trust)                                             |
+|                                                                                                   |
+|  [SQL Security & Parser Engine]                                                                   |
+|    - Action Extraction (SELECT, INSERT, UPDATE, DELETE, DDL:DROP, ALTER, TRUNCATE)                |
+|    - Multi-Statement & CTE Write Inspection                                                       |
+|    - Table & Schema Scope Extractor (Empty-Table Defense)                                         |
+|    - Sensitive Column Detector                                                                    |
+|                                                                                                   |
+|  [Policy & Enforcement Layer]                                                                     |
+|    - Role-Based Access Control (Admin, Auditor, Employee, Customer)                               |
+|    - Dynamic Data Masking (SSN: ***-**-XXXX, Card Numbers, CVVs)                                  |
+|    - Row-Level Security (RLS Query Rewriting Scoping Customer to Personal Rows)                   |
+|    - Real-Time Anomaly Detector (Bulk Records >= 1000, Off-Hours Access, Unprivileged PII)        |
+|                                                                                                   |
+|  [Dual-Storage Audit Orchestrator]                                                                |
+|    - Pre-execution attempt logging                                                                |
+|    - Synchronized dual-commit (PostgreSQL Relational Mirror + immudb Merkle Tree)                 |
+|    - Cross-Verification Engine (Merkle Root Consistency & Field-Level Diff Tracking)               |
++----------------------------------+------------------------------------+---------------------------+
+                                   |                                    |
+                                   v                                    v
++---------------------------------------------------+  +--------------------------------------------+
+|             PostgreSQL Relational Store           |  |          immudb Cryptographic Ledger       |
+|                                                   |  |                                            |
+| - ConnectionPool (psycopg-pool)                   |  | - Append-Only Merkle Tree Ledger           |
+| - Business Data:                                  |  | - Cryptographic verifiedSet / verifiedGet  |
+|     app_data.users                                |  | - Zero-Trust Inclusion Proofs              |
+|     app_data.accounts                             |  | - SHA-256 State Root Commitments           |
+|     app_data.transactions                         |  | - Immutable Audit Trail History            |
+|     app_data.compliance_policies                  |  |                                            |
+| - Relational Audit Mirror:                        |  |                                            |
+|     vault_audit.audit_logs                        |  |                                            |
+| - Immutability Triggers:                          |  |                                            |
+|     Blocks UPDATE, DELETE, TRUNCATE at DB engine  |  |                                            |
++---------------------------------------------------+  +--------------------------------------------+
+```
+
+### Request and Audit Lifecycle
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Client as Authenticated Client
+    participant Auth as Auth & Identity Engine
+    participant Engine as VaultEngine Middleware
+    participant Policy as RBAC, RLS & Masking
+    participant PG as PostgreSQL (Business DB)
+    participant Immu as immudb (Merkle Ledger)
+
+    Client->>Auth: Request + JWT Cookie / X-API-Key
+    Auth->>Auth: Verify Signature & Derive User (email, role)
+    Client->>Engine: Execute SQL Query
+    Engine->>Engine: Parse AST, extract actions, tables, columns
+    Engine->>Policy: Evaluate RBAC permissions
+
+    alt Access Denied
+        Policy-->>Engine: Violation Detected (403 Forbidden)
+        Engine->>Immu: verifiedSet(audit_log, status="DENIED")
+        Engine->>PG: INSERT INTO vault_audit.audit_logs (status="DENIED")
+        Engine-->>Client: 403 Forbidden + Rejection Details
+    else Access Allowed
+        Policy-->>Engine: Authorized
+        Engine->>Policy: Apply RLS Scoping & Anomaly Detection
+        Engine->>PG: Execute Query on ConnectionPool
+        PG-->>Engine: Raw Results
+        Engine->>Policy: Apply Dynamic Data Masking (SSN, Cards)
+        Engine->>Immu: verifiedSet(audit_log, status="SUCCESS")
+        Immu-->>Engine: TxId + Merkle Root Hash
+        Engine->>PG: INSERT INTO vault_audit.audit_logs (status="SUCCESS", immudb_tx_id)
+        Engine-->>Client: Sanitized Results + Verification Metadata
+    end
 ```
 
 ---
 
-## 🚀 Quickstart Guide
+## 2. Threat Model
 
-### 1. Requirements
-* Python 3.12+
-* PostgreSQL 16+ (Running on default port `5432`)
-* immudb standalone binary (Pre-packaged in `bin/immudb.exe`)
+### What VaultDB Protects Against
 
-### 2. Installation
+1. **Unauthenticated Identity Spoofing**:
+   - In prototype architectures, query clients declare their own username or role in the payload. VaultDB derives all identity strictly server-side from cryptographically signed HS256 JWTs or salted API keys.
+2. **Rogue Database Administrator (DBA) Tampering**:
+   - Standard database audit logs can be wiped or modified by anyone with superuser or DBA access. VaultDB employs database-level PL/pgSQL triggers (`prevent_audit_log_tampering`) that reject `UPDATE`, `DELETE`, and `TRUNCATE` operations on `vault_audit.audit_logs`.
+   - Furthermore, even if a DBA disables database triggers out-of-band and mutates a relational record, immudb's append-only Merkle tree ledger maintains the cryptographic source of truth. Any discrepancy between PostgreSQL and immudb is immediately flagged as a critical integrity breach with field-by-field diffs.
+3. **Multi-Statement SQL Injection & Privilege Escalation**:
+   - Adversarial inputs attempting stacked queries (e.g., `SELECT 1; DROP TABLE app_data.transactions;`), CTE write vectors (`WITH x AS (DELETE ...) SELECT 1;`), `COPY PROGRAM`, or `SET ROLE` are intercepted and blocked before execution.
+4. **Unauthorized PII Exfiltration**:
+   - Sensitive fields such as Social Security Numbers, credit card numbers, and security codes are automatically masked (`***-**-XXXX`) for non-admin/auditor roles.
+5. **Cross-Tenant Data Exposure**:
+   - Row-Level Security (RLS) dynamically intercepts customer queries and constrains them to their personal records, preventing customer-to-customer data leaks.
+6. **Covert Audit Gap Infiltration**:
+   - Audit logs are committed for both successful queries and unauthorized attempts, guaranteeing that reconnaissance scans and attack attempts are permanently recorded.
+
+### What VaultDB Does NOT Protect Against (Residual Risks)
+
+1. **Compromised Operating System Kernel / Physical Host**:
+   - If an attacker possesses root access to the physical host running the immudb or PostgreSQL processes, they could inspect memory addresses or terminate running daemons.
+2. **immudb Superuser Credential Compromise without External State Anchoring**:
+   - If immudb superuser credentials are leaked, an adversary could append bogus entries to the ledger. To mitigate this in strict regulated environments, immudb root hashes should be anchored periodically to external public trust services or notary servers.
+3. **Application Vulnerabilities Upstream of the Middleware**:
+   - VaultDB inspects and governs database interactions. It does not sanitize untrusted inputs rendered elsewhere in external client web frameworks.
+
+---
+
+## 3. Five-Minute Live Demo Script
+
+Use this walkthrough to demonstrate VaultDB's compliance and cryptographic capabilities:
+
+### Step 1: Login as Employee (Unauthorized Mutation Attempt)
+1. Open the Web Console at `http://localhost:8000`.
+2. Click the **Employee** persona button on the top authentication bar.
+3. Click the preset scenario **Balance Manipulation (Violation)**.
+4. Click **Run Query**.
+5. **Outcome**: The query is blocked with an HTTP 403 Forbidden status. The rejection explanation confirms that employees cannot modify customer balances. The violation is committed to the immutable audit trail.
+
+### Step 2: Login as Customer (Row-Level Security & Masking)
+1. Click the **Customer** persona button (`alice@bank.com`).
+2. Run the query: `SELECT * FROM app_data.accounts;`
+3. **Outcome**:
+   - Notice the **RLS Active** badge: The query is automatically rewritten to restrict rows to Alice Smith's personal account.
+   - Notice the **Masking Applied** badge: The SSN column is masked (`***-**-1234`), protecting PII.
+
+### Step 3: Login as Auditor & Review Audit Ledger
+1. Click the **Auditor** persona button (`compliance.lead@bank.com`).
+2. Navigate down to the **Audit Ledger** section.
+3. Filter by action, user, or status.
+4. Click **Verify Proof** on any log entry.
+5. **Outcome**: A green modal displays the immudb Merkle root hash, transaction ID, timestamp, and a verification confirmation indicating zero cryptographic discrepancies.
+
+### Step 4: The Live Tamper Demonstration
+1. In the Audit Ledger toolbar, click the button labeled **Simulate DB Tampering**.
+2. A superuser background transaction disables PostgreSQL triggers, modifies an audit record's `query_text` in PostgreSQL to simulate a rogue DBA altering records, and re-enables the trigger.
+3. Locate the row with the amber/red highlight or click **Verify Proof** on that row.
+4. **Outcome**: The modal displays a prominent RED alert:
+   ```
+   CRITICAL INTEGRITY BREACH: DATABASE TAMPERING DETECTED
+   Field: query_text
+   PostgreSQL Mirror: SELECT * FROM simulated_tamper_attempt;
+   immudb Ledger Truth: SELECT * FROM app_data.accounts WHERE ...
+   ```
+5. Click **Restore Untampered State** inside the modal.
+6. VaultDB reads the immutable cryptographic record from immudb, overwrites the corrupted PostgreSQL row, and restores integrity.
+7. Click **Verify Proof** again: The row is verified 100% INTACT.
+
+### Step 5: Export Compliance Audit Report
+1. In the Audit Ledger toolbar, click **Export PDF**.
+2. Download and inspect the PDF compliance report containing the cryptographic signatures, transaction heights, and session details suitable for regulatory review.
+
+---
+
+## 4. Quickstart Guide
+
+### Option A: Turnkey Docker Deployment (Recommended)
+
+Ensure Docker and Docker Compose are installed:
+
+```bash
+# Build and launch PostgreSQL, immudb, and VaultDB
+docker compose up --build
+```
+
+The services will initialize schemas, seed users, apply triggers, and start:
+- Web Dashboard: `http://localhost:8000`
+- OpenAPI Swagger Docs: `http://localhost:8000/docs`
+
+### Option B: Local Setup (PowerShell / Windows)
+
+#### Prerequisites
+- Python 3.11 or 3.12
+- PostgreSQL 16+ running on `localhost:5432`
+- immudb standalone server (`bin/immudb.exe`)
+
+#### 1. Activate Environment and Install Dependencies
 ```powershell
-# 1. Activate virtual environment
 .\venv\Scripts\Activate.ps1
-
-# 2. Install dependencies
 pip install -r requirements.txt
 ```
 
-### 3. Initialize Databases (PostgreSQL + immudb)
+#### 2. Initialize PostgreSQL and Apply Migrations
 ```powershell
 python scripts/init_databases.py
+python scripts/apply_auth_and_triggers.py
 ```
 
-### 4. Start immudb & Web Dashboard
+#### 3. Start immudb and Web Server
 ```powershell
-# Launches immudb service and the FastAPI dashboard server
-python scripts/start_services.py
-```
+# Launch immudb daemon
+.\bin\immudb.exe --dir data/immudb --pgsql-server=true --pgsql-server-port=5433 --port=3322
 
-* **Web Studio Console**: Open [http://localhost:8000](http://localhost:8000) in your browser.
-* **Interactive API Docs (Swagger UI)**: Open [http://localhost:8000/docs](http://localhost:8000/docs).
-
----
-
-## 🧪 Running Automated Tests
-
-All tests verify RBAC rules, immudb cryptographic proofs, and FastAPI endpoints:
-```powershell
-pytest -v
+# In a separate terminal, launch the FastAPI server
+python server.py
 ```
 
 ---
 
-## 🛡️ Verifying Cryptographic Proofs via CLI
+## 5. Automated Test Suite
 
-Verify that audit records in the immudb ledger have never been modified:
+VaultDB includes 135 automated unit, integration, and security tests covering RBAC enforcement, cryptographic proofs, auth lifecycles, and 100+ SQL attack vectors:
+
 ```powershell
-# Audit all recent logs
-python scripts/verify_integrity.py
-
-# Verify a specific audit log ID with full cryptographic details
-python scripts/verify_integrity.py --log-id 1
+.\venv\Scripts\pytest.exe -v
 ```
+
+### Test Coverage Highlights
+- **100+ Adversarial SQL Attack Vectors**: Multi-statement injections, CTE writes, `COPY PROGRAM`, `SET ROLE`, `ALTER TABLE`, and out-of-band schema drops.
+- **PostgreSQL Immutability Triggers**: Verification that `UPDATE`, `DELETE`, and `TRUNCATE` operations on `vault_audit.audit_logs` are rejected at the database engine level.
+- **Authentication Lifecycle**: Salted PBKDF2 hashing verification, RFC 7519 HS256 JWT encoding/decoding, expiration handling, and API key authentication.
+- **immudb Operations**: Cryptographic inclusion proofs, transaction state verification, and tamper detection.
+- **Dynamic Masking & RLS**: Regex PII redaction and customer row scoping.
+- **Anomaly Detection**: Evaluation of bulk thresholds (>= 1,000 rows), off-hours windows, and unprivileged access.
 
 ---
 
-## 💻 Python SDK Usage
+## 6. Pre-Seeded Demo Credentials
+
+| Role | Email | Password | API Key |
+| :--- | :--- | :--- | :--- |
+| **Admin** | `admin@bank.com` | `AdminPass123!` | `vlt_key_admin_9a8b7c6d5e4f3a2b` |
+| **Auditor** | `compliance.lead@bank.com` | `AuditorPass123!` | `vlt_key_auditor_5d6e7f8a9b0c1d2e` |
+| **Employee** | `john@bank.com` | `EmployeePass123!` | `vlt_key_employee_1a2b3c4d5e6f7a8b` |
+| **Customer** | `alice@bank.com` | `CustomerPass123!` | `vlt_key_customer_4d5e6f7a8b9c0d1e` |
+
+---
+
+## 7. Python SDK Usage
 
 ```python
-from vault_client import VaultClient
+import vaultdb
 
-client = VaultClient()
+# 1. Connect using authenticated credentials (derives identity server-side)
+conn = vaultdb.connect(
+    user="alice@bank.com",
+    password="CustomerPass123!"
+)
 
-# 1. Execute authorized query under customer identity
-results = client.execute("SELECT * FROM app_data.accounts;", app_user="alice@bank.com")
-print("Results:", results)
+# 2. Execute query (automatically scoped via RLS and masked for PII)
+results = conn.execute("SELECT * FROM app_data.accounts;")
+print("Accounts:", results)
 
-# 2. Retrieve recent audit logs from immudb
-logs = client.get_audit_logs(limit=1)
+# 3. Retrieve cryptographic audit logs
+logs = conn.get_audit_logs(limit=5)
 print("Latest Log:", logs[0])
 
-# 3. Cryptographically verify proof
-proof = client.verify_audit_log(log_id=logs[0][0])
-print("Merkle Proof Verified:", proof["verified"])
+# 4. Verify cryptographic Merkle proof against immudb
+proof = conn.verify_audit_log(log_id=logs[0]["log_id"])
+print("Cryptographically Verified:", proof["verified"])
 
-client.close()
+conn.close()
 ```
-
----
-
-## 📚 Architectural Viva Questions
-
-See **[ARCHITECTURE.md](ARCHITECTURE.md)** for in-depth explanations on:
-* Why PostgreSQL triggers/permissions are insufficient for compliance auditing.
-* How immudb implements Merkle-tree cryptographic tamper evidence.
-* Connection pooling and scalability design patterns.

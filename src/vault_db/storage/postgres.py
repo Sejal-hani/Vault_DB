@@ -58,6 +58,66 @@ class PostgresStorage:
             logger.warning(f"Error fetching role for {email}: {e}")
         return "customer"
 
+    def get_user_by_email(self, email: str) -> Optional[dict]:
+        """Fetches complete user record by email."""
+        if not self._pool:
+            return None
+        sql = "SELECT email, full_name, role, department, status, password_hash, api_key FROM app_data.users WHERE email = %s;"
+        try:
+            with self._pool.connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(sql, (email,))
+                    row = cur.fetchone()
+                    if row:
+                        return {
+                            "email": row[0],
+                            "full_name": row[1],
+                            "role": row[2],
+                            "department": row[3],
+                            "status": row[4],
+                            "password_hash": row[5],
+                            "api_key": row[6],
+                        }
+        except Exception as e:
+            logger.warning(f"Error fetching user {email}: {e}")
+        return None
+
+    def get_user_by_api_key(self, api_key: str) -> Optional[dict]:
+        """Fetches user record by API key."""
+        if not self._pool or not api_key:
+            return None
+        sql = "SELECT email, full_name, role, department, status, password_hash, api_key FROM app_data.users WHERE api_key = %s;"
+        try:
+            with self._pool.connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(sql, (api_key,))
+                    row = cur.fetchone()
+                    if row:
+                        return {
+                            "email": row[0],
+                            "full_name": row[1],
+                            "role": row[2],
+                            "department": row[3],
+                            "status": row[4],
+                            "password_hash": row[5],
+                            "api_key": row[6],
+                        }
+        except Exception as e:
+            logger.warning(f"Error fetching user by API key: {e}")
+        return None
+
+    def update_user_credentials(self, email: str, password_hash: str, api_key: str):
+        """Updates user password hash and API key."""
+        if not self._pool:
+            return
+        sql = "UPDATE app_data.users SET password_hash = %s, api_key = %s WHERE email = %s;"
+        try:
+            with self._pool.connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(sql, (password_hash, api_key, email))
+        except Exception as e:
+            logger.error(f"Error updating user credentials for {email}: {e}")
+
     def execute_query(
         self, query: str, params: Optional[Tuple[Any, ...]] = None
     ) -> Tuple[List[Any], List[str], int]:
@@ -89,6 +149,7 @@ class PostgresStorage:
         target_table: str,
         query_text: str,
         execution_status: str,
+        immudb_log_id: Optional[int] = None,
         immudb_tx_id: Optional[int] = None,
         immudb_tx_hash: Optional[str] = None
     ) -> Optional[int]:
@@ -96,16 +157,28 @@ class PostgresStorage:
         if not self._pool:
             return None
 
-        sql = """
-            INSERT INTO vault_audit.audit_logs 
-            (app_user, user_role, action, target_table, query_text, execution_status)
-            VALUES (%s, %s, %s, %s, %s, %s)
-            RETURNING log_id;
-        """
+        if immudb_log_id:
+            sql = """
+                INSERT INTO vault_audit.audit_logs 
+                (log_id, app_user, user_role, action, target_table, query_text, execution_status, immudb_tx_id, immudb_tx_hash)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (log_id) DO NOTHING
+                RETURNING log_id;
+            """
+            params = (immudb_log_id, app_user, user_role, action, target_table, query_text, execution_status, immudb_tx_id, immudb_tx_hash)
+        else:
+            sql = """
+                INSERT INTO vault_audit.audit_logs 
+                (app_user, user_role, action, target_table, query_text, execution_status, immudb_tx_id, immudb_tx_hash)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING log_id;
+            """
+            params = (app_user, user_role, action, target_table, query_text, execution_status, immudb_tx_id, immudb_tx_hash)
+
         try:
             with self._pool.connection() as conn:
                 with conn.cursor() as cur:
-                    cur.execute(sql, (app_user, user_role, action, target_table, query_text, execution_status))
+                    cur.execute(sql, params)
                     row = cur.fetchone()
                     return row[0] if row else None
         except Exception as e:

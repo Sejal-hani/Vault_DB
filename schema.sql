@@ -15,8 +15,11 @@ CREATE TABLE IF NOT EXISTS app_data.users (
     role VARCHAR(20) NOT NULL,
     department VARCHAR(50) DEFAULT 'Retail',
     status VARCHAR(20) DEFAULT 'active',
+    password_hash VARCHAR(255),
+    api_key VARCHAR(64),
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
+CREATE INDEX IF NOT EXISTS idx_users_api_key ON app_data.users(api_key);
 
 -- ------------------------------------------------------------------------------
 -- 2. Bank Accounts (Contains Sensitive PII: SSN, High-Value Balances)
@@ -75,6 +78,8 @@ CREATE TABLE IF NOT EXISTS vault_audit.audit_logs (
     immudb_tx_id INT,
     immudb_tx_hash VARCHAR(128)
 );
+ALTER TABLE vault_audit.audit_logs ADD COLUMN IF NOT EXISTS immudb_tx_id INT;
+ALTER TABLE vault_audit.audit_logs ADD COLUMN IF NOT EXISTS immudb_tx_hash VARCHAR(128);
 CREATE INDEX IF NOT EXISTS idx_audit_logged_at ON vault_audit.audit_logs(logged_at DESC);
 CREATE INDEX IF NOT EXISTS idx_audit_app_user ON vault_audit.audit_logs(app_user);
 CREATE INDEX IF NOT EXISTS idx_audit_immudb_tx ON vault_audit.audit_logs(immudb_tx_id);
@@ -98,3 +103,23 @@ GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA app_data, vault_audit TO 
 REVOKE ALL ON vault_audit.audit_logs FROM PUBLIC;
 REVOKE ALL ON vault_audit.audit_logs FROM vault_user;
 GRANT SELECT, INSERT ON vault_audit.audit_logs TO vault_user;
+
+-- ------------------------------------------------------------------------------
+-- 7. Database-Level Immutability Triggers (Zero-Trust Enforcement)
+-- ------------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION vault_audit.prevent_audit_log_tampering()
+RETURNS TRIGGER AS $$
+BEGIN
+    RAISE EXCEPTION 'VaultDB Immutability Violation: vault_audit.audit_logs is append-only. UPDATE, DELETE, and TRUNCATE are strictly prohibited.';
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_no_update_delete_audit ON vault_audit.audit_logs;
+CREATE TRIGGER trg_no_update_delete_audit
+BEFORE UPDATE OR DELETE ON vault_audit.audit_logs
+FOR EACH ROW EXECUTE FUNCTION vault_audit.prevent_audit_log_tampering();
+
+DROP TRIGGER IF EXISTS trg_no_truncate_audit ON vault_audit.audit_logs;
+CREATE TRIGGER trg_no_truncate_audit
+BEFORE TRUNCATE ON vault_audit.audit_logs
+FOR EACH STATEMENT EXECUTE FUNCTION vault_audit.prevent_audit_log_tampering();

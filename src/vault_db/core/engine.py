@@ -12,6 +12,9 @@ from src.vault_db.core.rbac import RBACManager, AccessDeniedError, QueryExecutio
 from src.vault_db.core.parser import SQLParser, QueryAnalysis
 from src.vault_db.storage.postgres import PostgresStorage
 from src.vault_db.storage.immudb_vault import ImmudbVault
+from src.vault_db.core.masking import mask_tabular_results
+from src.vault_db.core.rls import apply_row_level_security
+from src.vault_db.core.anomaly import AnomalyDetector
 
 logger = logging.getLogger(__name__)
 
@@ -34,8 +37,12 @@ class VaultEngine:
         self.rbac = rbac_manager or RBACManager()
 
     def get_user_role(self, app_user: str) -> str:
-        """Resolves user role from relational user registry."""
-        return self.postgres.get_user_role(app_user)
+        """Resolves user role from relational user registry with in-memory caching."""
+        if not hasattr(self, "_role_cache"):
+            self._role_cache = {}
+        if app_user not in self._role_cache:
+            self._role_cache[app_user] = self.postgres.get_user_role(app_user)
+        return self._role_cache[app_user]
 
     def execute(
         self,
@@ -99,6 +106,7 @@ class VaultEngine:
                     target_table=target_str,
                     query_text=query,
                     execution_status="DENIED",
+                    immudb_log_id=immudb_record.get("id"),
                     immudb_tx_id=immudb_record.get("immudb_tx_id"),
                     immudb_tx_hash=immudb_record.get("immudb_tx_hash"),
                 )
@@ -107,9 +115,12 @@ class VaultEngine:
 
             raise AccessDeniedError(f"Access Denied: {denial_reason}", immudb_record=immudb_record)
 
-        # 2. Execution on Business Database (PostgreSQL)
+        # 2. Row-Level Security (RLS) Enforcement
+        exec_query, is_scoped = apply_row_level_security(query, user_role, app_user)
+
+        # 3. Execution on Business Database (PostgreSQL)
         try:
-            results, columns, rows_affected = self.postgres.execute_query(query, params)
+            results, columns, rows_affected = self.postgres.execute_query(exec_query, params)
         except Exception as e:
             elapsed_ms = (time.perf_counter() - start_time) * 1000
             # Cryptographically record failed/bad query into immudb ledger
@@ -133,6 +144,7 @@ class VaultEngine:
                     target_table=target_str,
                     query_text=query,
                     execution_status="ERROR",
+                    immudb_log_id=immudb_record.get("id"),
                     immudb_tx_id=immudb_record.get("immudb_tx_id"),
                     immudb_tx_hash=immudb_record.get("immudb_tx_hash"),
                 )
@@ -143,7 +155,18 @@ class VaultEngine:
 
         elapsed_ms = (time.perf_counter() - start_time) * 1000
 
-        # 3. Cryptographically append successful audit record to immudb
+        # 4. Dynamic Data Masking (V2 Scope)
+        masked_results, is_masked, masked_cols = mask_tabular_results(columns, results, user_role)
+
+        # 5. Anomaly Detection (V2 Scope)
+        anomalies = AnomalyDetector.evaluate(
+            rows_affected=rows_affected,
+            execution_status="SUCCESS",
+            user_role=user_role,
+            is_sensitive=analysis.is_sensitive,
+        )
+
+        # 6. Cryptographically append successful audit record to immudb
         immudb_record = self.immudb.append_audit_log(
             app_user=app_user,
             user_role=user_role,
@@ -166,6 +189,7 @@ class VaultEngine:
                 target_table=target_str,
                 query_text=query,
                 execution_status="SUCCESS",
+                immudb_log_id=immudb_record.get("id"),
                 immudb_tx_id=immudb_record.get("immudb_tx_id"),
                 immudb_tx_hash=immudb_record.get("immudb_tx_hash"),
             )
@@ -174,12 +198,16 @@ class VaultEngine:
 
         return {
             "status": "SUCCESS",
-            "results": results,
+            "results": masked_results,
             "columns": columns,
             "rows_affected": rows_affected,
             "execution_time_ms": round(elapsed_ms, 2),
             "is_sensitive": analysis.is_sensitive,
             "sensitive_fields": analysis.sensitive_fields_found,
+            "is_masked": is_masked,
+            "masked_fields": masked_cols,
+            "is_scoped": is_scoped,
+            "anomalies": anomalies,
             "immudb_log_id": immudb_record.get("id"),
             "immudb_tx_id": immudb_record.get("immudb_tx_id"),
             "immudb_verified": immudb_record.get("immudb_verified"),
