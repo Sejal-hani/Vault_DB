@@ -337,12 +337,37 @@
       flex-direction: column;
       gap: 3px;
       cursor: pointer;
-      transition: border-color 0.12s ease, background-color 0.12s ease;
+      transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+      position: relative;
     }
 
     .kpi-card:hover {
       border-color: var(--border-hover);
       background: var(--panel-elevated);
+    }
+
+    .kpi-card.active {
+      border-color: var(--accent);
+      background: rgba(37, 99, 235, 0.08);
+      box-shadow: 0 0 0 1px var(--accent);
+    }
+
+    .kpi-card.active.card-denied {
+      border-color: var(--red);
+      background: rgba(239, 68, 68, 0.08);
+      box-shadow: 0 0 0 1px var(--red);
+    }
+
+    .kpi-card.active.card-sensitive {
+      border-color: var(--amber);
+      background: rgba(245, 158, 11, 0.08);
+      box-shadow: 0 0 0 1px var(--amber);
+    }
+
+    .kpi-card.active.card-height {
+      border-color: #60a5fa;
+      background: rgba(96, 165, 250, 0.08);
+      box-shadow: 0 0 0 1px #60a5fa;
     }
 
     .kpi-label {
@@ -1098,19 +1123,19 @@
     <div class="viewport">
       <!-- Top Stats Bar -->
       <div class="kpi-grid">
-        <div class="kpi-card" onclick="navigateToLedger('')" title="Click to view all audit records">
+        <div class="kpi-card card-total" id="kpi-card-total" onclick="navigateToLedger('', false, false, 'total')" title="Click to view all audit records">
           <span class="kpi-label">Total audited queries</span>
           <span class="kpi-value" id="kpi-total">0</span>
         </div>
-        <div class="kpi-card" onclick="navigateToLedger('DENIED')" title="Click to filter blocked violations">
+        <div class="kpi-card card-denied" id="kpi-card-denied" onclick="navigateToLedger('DENIED', false, false, 'denied')" title="Click to filter blocked violations">
           <span class="kpi-label">Policy violations blocked</span>
           <span class="kpi-value" id="kpi-denied" style="color: var(--red);">0</span>
         </div>
-        <div class="kpi-card" onclick="navigateToLedger('', true)" title="Click to filter flagged sensitive queries">
+        <div class="kpi-card card-sensitive" id="kpi-card-sensitive" onclick="navigateToLedger('', true, false, 'sensitive')" title="Click to filter flagged sensitive queries">
           <span class="kpi-label">Flagged sensitive queries</span>
           <span class="kpi-value" id="kpi-sensitive" style="color: var(--amber);">0</span>
         </div>
-        <div class="kpi-card" onclick="navigateToLedger('', false, true)" title="Click to view ledger transactions">
+        <div class="kpi-card card-height" id="kpi-card-height" onclick="navigateToLedger('', false, true, 'height')" title="Click to view ledger transactions">
           <span class="kpi-label">Ledger height</span>
           <span class="kpi-value" id="kpi-height">#0</span>
         </div>
@@ -1251,7 +1276,7 @@
                 <option value="sarah.auditor@bank.com">sarah.auditor@bank.com</option>
               </select>
 
-              <select id="ledger-status-filter" class="clean-select" onchange="loadAuditLogs()">
+              <select id="ledger-status-filter" class="clean-select" onchange="onStatusFilterChange()">
                 <option value="">All statuses</option>
                 <option value="SUCCESS">SUCCESS</option>
                 <option value="DENIED">DENIED</option>
@@ -1407,6 +1432,14 @@
     let sortColumn = 'id';
     let sortAscending = false;
 
+    function setActiveKpiCard(type) {
+      document.querySelectorAll('.kpi-grid .kpi-card').forEach(c => c.classList.remove('active'));
+      if (type) {
+        const card = document.getElementById(`kpi-card-${type}`);
+        if (card) card.classList.add('active');
+      }
+    }
+
     function showView(viewId, element) {
       document.querySelectorAll('.view-pane').forEach(v => v.classList.remove('active'));
       document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
@@ -1420,15 +1453,21 @@
       };
       document.getElementById('view-title').innerText = titles[viewId] || 'Workspace';
 
-      if (viewId === 'view-ledger') loadAuditLogs();
+      if (viewId === 'view-ledger') {
+        loadAuditLogs();
+      } else {
+        setActiveKpiCard(null);
+      }
       if (viewId === 'view-explorer') loadTableMetadata();
     }
 
-    function navigateToLedger(statusFilter = '', isSensitive = false, sortByTx = false) {
+    function navigateToLedger(statusFilter = '', isSensitive = false, sortByTx = false, cardType = 'total') {
       const navItems = document.querySelectorAll('.nav-item');
       if (navItems.length > 1) {
         showView('view-ledger', navItems[1]);
       }
+
+      setActiveKpiCard(cardType);
 
       document.getElementById('ledger-search').value = '';
       document.getElementById('ledger-user-filter').value = '';
@@ -1702,11 +1741,21 @@
       }
     }
 
+    function onStatusFilterChange() {
+      const val = document.getElementById('ledger-status-filter').value;
+      if (val === 'DENIED') setActiveKpiCard('denied');
+      else if (val === 'SENSITIVE') setActiveKpiCard('sensitive');
+      else if (val === '') setActiveKpiCard('total');
+      else setActiveKpiCard(null);
+      loadAuditLogs();
+    }
+
     function clearFilters() {
       document.getElementById('ledger-search').value = '';
       document.getElementById('ledger-user-filter').value = '';
       document.getElementById('ledger-status-filter').value = '';
       document.getElementById('ledger-date-filter').value = 'all';
+      setActiveKpiCard('total');
       loadAuditLogs();
     }
 
