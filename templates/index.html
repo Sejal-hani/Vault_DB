@@ -439,13 +439,18 @@
       flex-wrap: wrap;
     }
 
-    .persona-identity .role-badge {
+    .role-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
       font-family: var(--font-mono);
-      font-size: 10px;
-      padding: 2px 6px;
-      border-radius: 4px;
-      text-transform: uppercase;
+      font-size: 11px;
       font-weight: 500;
+      line-height: 1.2;
+      padding: 4px 10px;
+      border-radius: 5px;
+      text-transform: lowercase;
+      letter-spacing: 0.02em;
     }
 
     .role-badge.role-admin {
@@ -472,15 +477,15 @@
     .persona-btns {
       display: flex;
       align-items: center;
-      gap: 4px;
+      gap: 6px;
     }
 
     .persona-btn {
       background: transparent;
       border: 1px solid var(--border);
-      border-radius: 4px;
-      padding: 4px 8px;
-      font-size: 11.5px;
+      border-radius: 5px;
+      padding: 5px 10px;
+      font-size: 12px;
       color: var(--text-muted);
       cursor: pointer;
       font-family: var(--font-sans);
@@ -1253,11 +1258,7 @@
                 <option value="250">250</option>
                 <option value="500">500</option>
               </select>
-              <button class="btn btn-secondary btn-sm" id="btn-live-watch" onclick="toggleLiveWatch()">Live watch: off</button>
               <button class="btn btn-secondary btn-sm" onclick="loadAuditLogs()">Refresh</button>
-              <button class="btn btn-secondary btn-sm" id="btn-simulate-tamper" onclick="simulateTampering()" style="color: var(--red); border-color: var(--red-border);">
-                Simulate database tampering
-              </button>
             </div>
           </div>
           <div class="panel-body">

@@ -161,7 +161,7 @@ def test_attack_vector_denied_or_parsed(attack_query: str):
     """
     Verifies that every attack string in the 100+ attack vector suite is either:
     1. Identified as a hazardous multi-statement / DDL / admin action and rejected.
-    2. Blocked by the zero-trust RBAC policy for non-admin roles (customer/employee/writer).
+    2. Blocked by the strict RBAC policy for non-admin roles (customer/employee/writer).
     """
     parser = SQLParser()
     rbac = RBACManager()

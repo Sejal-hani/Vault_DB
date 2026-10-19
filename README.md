@@ -1,6 +1,6 @@
 # VaultDB: Cryptographically Immutable Database Middleware
 
-VaultDB is an enterprise-grade compliance and database security middleware connecting application clients to PostgreSQL and immudb. It provides server-derived authentication, zero-trust role-based access control (RBAC), row-level security (RLS), dynamic data masking, real-time anomaly detection, and dual-layer tamper-evident audit logging backed by cryptographic Merkle tree proofs (satisfying GDPR Art. 30, HIPAA §164.312, and PCI-DSS 10.2).
+VaultDB is an enterprise-grade compliance and database security middleware connecting application clients to PostgreSQL and immudb. It provides server-derived authentication, strict role-based access control (RBAC), row-level security (RLS), dynamic data masking, real-time anomaly detection, and dual-layer tamper-evident audit logging backed by cryptographic Merkle tree proofs (satisfying GDPR Art. 30, HIPAA §164.312, and PCI-DSS 10.2).
 
 ---
 
@@ -46,7 +46,7 @@ VaultDB is an enterprise-grade compliance and database security middleware conne
 |                                                   |  |                                            |
 | - ConnectionPool (psycopg-pool)                   |  | - Append-Only Merkle Tree Ledger           |
 | - Business Data:                                  |  | - Cryptographic verifiedSet / verifiedGet  |
-|     app_data.users                                |  | - Zero-Trust Inclusion Proofs              |
+|     app_data.users                                |  | - Cryptographic Inclusion Proofs           |
 |     app_data.accounts                             |  | - SHA-256 State Root Commitments           |
 |     app_data.transactions                         |  | - Immutable Audit Trail History            |
 |     app_data.compliance_policies                  |  |                                            |
@@ -103,7 +103,7 @@ sequenceDiagram
    - In prototype architectures, query clients declare their own username or role in the payload. VaultDB derives all identity strictly server-side from cryptographically signed HS256 JWTs or salted API keys.
 2. **Rogue Database Administrator (DBA) Tampering**:
    - Standard database audit logs can be wiped or modified by anyone with superuser or DBA access. VaultDB employs database-level PL/pgSQL triggers (`prevent_audit_log_tampering`) that reject `UPDATE`, `DELETE`, and `TRUNCATE` operations on `vault_audit.audit_logs`.
-   - Furthermore, even if a DBA disables database triggers out-of-band and mutates a relational record, immudb's append-only Merkle tree ledger maintains the cryptographic source of truth. Any discrepancy between PostgreSQL and immudb is immediately flagged as a critical integrity breach with field-by-field diffs.
+   - Furthermore, even if a DBA disables database triggers out-of-band and mutates a relational record, immudb's append-only Merkle tree ledger maintains the cryptographic source of truth. Any discrepancy between PostgreSQL and immudb is immediately flagged as an integrity breach with field-by-field diffs.
 3. **Multi-Statement SQL Injection & Privilege Escalation**:
    - Adversarial inputs attempting stacked queries (e.g., `SELECT 1; DROP TABLE app_data.transactions;`), CTE write vectors (`WITH x AS (DELETE ...) SELECT 1;`), `COPY PROGRAM`, or `SET ROLE` are intercepted and blocked before execution.
 4. **Unauthorized PII Exfiltration**:
@@ -124,14 +124,29 @@ sequenceDiagram
 
 ---
 
-## 3. Five-Minute Live Demo Script
+## 3. Role-Based Access Control (RBAC) Matrix
 
-Use this walkthrough to demonstrate VaultDB's compliance and cryptographic capabilities:
+| Resource / Action | Customer | Employee | Auditor | Admin |
+| :--- | :---: | :---: | :---: | :---: |
+| `accounts:SELECT` | Allowed (RLS Scoped + Masked) | Allowed | Allowed | Allowed (Unmasked) |
+| `accounts:INSERT/UPDATE/DELETE` | Denied | Denied | Denied | Allowed |
+| `transactions:SELECT` | Allowed (RLS Scoped) | Allowed | Allowed | Allowed |
+| `transactions:INSERT/UPDATE` | Denied | Allowed | Denied | Allowed |
+| `transactions:DELETE` | Denied | Denied | Denied | Allowed |
+| `users:SELECT` | Denied | Denied | Allowed | Allowed |
+| `users:INSERT/UPDATE/DELETE` | Denied | Denied | Denied | Allowed |
+| `audit_logs:SELECT` | Denied | Denied | Allowed | Allowed |
+| `audit_logs:UPDATE/DELETE/TRUNCATE` | Denied (Trigger Enforced) | Denied (Trigger Enforced) | Denied (Trigger Enforced) | Denied (Trigger Enforced) |
+| `DDL (DROP, ALTER, TRUNCATE)` | Denied | Denied | Denied | Allowed |
+
+---
+
+## 4. Five-Minute Live Walkthrough
 
 ### Step 1: Login as Employee (Unauthorized Mutation Attempt)
 1. Open the Web Console at `http://localhost:8000`.
 2. Click the **Employee** persona button on the top authentication bar.
-3. Click the preset scenario **Balance Manipulation (Violation)**.
+3. Select the preset scenario **Balance Manipulation (Violation)**.
 4. Click **Run Query**.
 5. **Outcome**: The query is blocked with an HTTP 403 Forbidden status. The rejection explanation confirms that employees cannot modify customer balances. The violation is committed to the immutable audit trail.
 
@@ -147,37 +162,52 @@ Use this walkthrough to demonstrate VaultDB's compliance and cryptographic capab
 2. Navigate down to the **Audit Ledger** section.
 3. Filter by action, user, or status.
 4. Click **Verify Proof** on any log entry.
-5. **Outcome**: A green modal displays the immudb Merkle root hash, transaction ID, timestamp, and a verification confirmation indicating zero cryptographic discrepancies.
+5. **Outcome**: A verification modal displays the immudb Merkle root hash, transaction ID, timestamp, and a verification confirmation indicating zero cryptographic discrepancies.
 
-### Step 4: The Live Tamper Demonstration
-1. In the Audit Ledger toolbar, click the button labeled **Simulate DB Tampering**.
-2. A superuser background transaction disables PostgreSQL triggers, modifies an audit record's `query_text` in PostgreSQL to simulate a rogue DBA altering records, and re-enables the trigger.
-3. Locate the row with the amber/red highlight or click **Verify Proof** on that row.
-4. **Outcome**: The modal displays a prominent RED alert:
+### Step 4: Verify Tamper Detection
+1. Tampering can be tested via the API:
+   ```bash
+   curl -X POST http://localhost:8000/api/tamper-demo/simulate
    ```
-   CRITICAL INTEGRITY BREACH: DATABASE TAMPERING DETECTED
-   Field: query_text
-   PostgreSQL Mirror: SELECT * FROM simulated_tamper_attempt;
-   immudb Ledger Truth: SELECT * FROM app_data.accounts WHERE ...
+2. Click **Verify Proof** on the modified record in the UI.
+3. **Outcome**: The verification modal flags a red integrity breach alert displaying the mismatched fields side-by-side (immudb Merkle truth vs modified PostgreSQL mirror).
+4. Restore the untampered state via the modal or API:
+   ```bash
+   curl -X POST http://localhost:8000/api/tamper-demo/restore?log_id=<ID>
    ```
-5. Click **Restore Untampered State** inside the modal.
-6. VaultDB reads the immutable cryptographic record from immudb, overwrites the corrupted PostgreSQL row, and restores integrity.
-7. Click **Verify Proof** again: The row is verified 100% INTACT.
+5. Click **Verify Proof** again: The record verifies cleanly as untampered.
 
 ### Step 5: Export Compliance Audit Report
 1. In the Audit Ledger toolbar, click **Export PDF**.
-2. Download and inspect the PDF compliance report containing the cryptographic signatures, transaction heights, and session details suitable for regulatory review.
+2. Download and inspect the PDF compliance report containing cryptographic signatures, transaction heights, and session details suitable for regulatory review.
 
 ---
 
-## 4. Quickstart Guide
+## 5. Technical Architecture & Design Rationale
+
+### Why not rely exclusively on PostgreSQL permissions and triggers for audit logging?
+Relational databases are mutable by design. Any user with database administrator (`postgres` superuser) credentials can:
+1. Temporarily disable triggers using `ALTER TABLE vault_audit.audit_logs DISABLE TRIGGER ALL;`.
+2. Alter, backdate, or delete audit entries using standard SQL.
+3. Re-enable triggers without leaving a relational trace in the audit table.
+
+By maintaining an independent append-only Merkle tree ledger in immudb, VaultDB creates a separate cryptographic root of truth. Any out-of-band alteration in PostgreSQL causes an instant hash mismatch during cross-verification.
+
+### What is the cryptographic mechanism behind immudb inclusion proofs?
+When an audit log is written, immudb commits the key-value pair and calculates a cryptographic digest (SHA-256) within an append-only Merkle tree. Every state transition advances the ledger's linear transaction height and updates the tree root hash. When queried via `verifiedGet`, immudb provides a Merkle membership proof (the path of sibling hashes up to the certified root). If any transaction is modified or deleted, the Merkle root changes, mathematically invalidating the proof.
+
+### How does VaultDB enforce server-derived identity?
+VaultDB derives user identity strictly server-side. Passwords are verified against salted PBKDF2-HMAC-SHA256 hashes. Upon successful authentication, the server issues an RFC 7519 compliant HS256 JWT stored in an HttpOnly cookie or checked via API key. In the FastAPI middleware, the `get_current_user` dependency parses and cryptographically validates the token on every request. Client payloads cannot specify or override the `app_user` or `user_role` fields.
+
+---
+
+## 6. Quickstart Guide
 
 ### Option A: Turnkey Docker Deployment (Recommended)
 
 Ensure Docker and Docker Compose are installed:
 
 ```bash
-# Build and launch PostgreSQL, immudb, and VaultDB
 docker compose up --build
 ```
 
@@ -213,7 +243,7 @@ python server.py
 
 ---
 
-## 5. Automated Test Suite
+## 7. Automated Test Suite
 
 VaultDB includes 135 automated unit, integration, and security tests covering RBAC enforcement, cryptographic proofs, auth lifecycles, and 100+ SQL attack vectors:
 
@@ -231,7 +261,7 @@ VaultDB includes 135 automated unit, integration, and security tests covering RB
 
 ---
 
-## 6. Pre-Seeded Demo Credentials
+## 8. Pre-Seeded Demo Credentials
 
 | Role | Email | Password | API Key |
 | :--- | :--- | :--- | :--- |
@@ -242,28 +272,27 @@ VaultDB includes 135 automated unit, integration, and security tests covering RB
 
 ---
 
-## 7. Python SDK Usage
+## 9. Python SDK Usage
 
 ```python
-import vaultdb
+from vault_client import VaultClient
 
 # 1. Connect using authenticated credentials (derives identity server-side)
-conn = vaultdb.connect(
-    user="alice@bank.com",
+client = VaultClient(
+    base_url="http://localhost:8000",
+    email="alice@bank.com",
     password="CustomerPass123!"
 )
 
 # 2. Execute query (automatically scoped via RLS and masked for PII)
-results = conn.execute("SELECT * FROM app_data.accounts;")
-print("Accounts:", results)
+results = client.execute_query("SELECT * FROM app_data.accounts;")
+print("Accounts:", results["data"])
 
 # 3. Retrieve cryptographic audit logs
-logs = conn.get_audit_logs(limit=5)
+logs = client.get_audit_logs(limit=5)
 print("Latest Log:", logs[0])
 
 # 4. Verify cryptographic Merkle proof against immudb
-proof = conn.verify_audit_log(log_id=logs[0]["log_id"])
+proof = client.verify_proof(log_id=logs[0]["id"])
 print("Cryptographically Verified:", proof["verified"])
-
-conn.close()
 ```

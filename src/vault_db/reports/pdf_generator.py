@@ -220,7 +220,7 @@ def generate_audit_pdf_report(
     cert_text = (
         "<b>Certification of Immutability:</b> This audit report has been extracted directly from the VaultDB "
         "cryptographic ledger engine. Each listed record is committed within an append-only Merkle tree in immudb. "
-        "The cryptographic integrity of these records can be verified against the state root hash above using zero-trust "
+        "The cryptographic integrity of these records can be verified against the state root hash above using cryptographic "
         "Merkle inclusion proofs. Records cannot be retroactively inserted, altered, or deleted without cryptographic detection."
     )
     story.append(Paragraph(cert_text, ParagraphStyle('Cert', parent=styles['Normal'], fontSize=8, leading=11, textColor=colors.HexColor('#475569'))))
