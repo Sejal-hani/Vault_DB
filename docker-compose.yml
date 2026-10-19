@@ -51,7 +51,7 @@ services:
       APP_PORT: 8000
     ports:
       - "8000:8000"
-    entrypoint: ["sh", "-c", "python scripts/init_databases.py && python scripts/apply_auth_and_triggers.py && python server.py"]
+    entrypoint: ["sh", "-c", "python scripts/init_databases.py && python server.py"]
 
 volumes:
   pg_data:

@@ -201,7 +201,6 @@ pip install -r requirements.txt
 #### 2. Initialize PostgreSQL and Apply Migrations
 ```powershell
 python scripts/init_databases.py
-python scripts/apply_auth_and_triggers.py
 ```
 
 #### 3. Start immudb and Web Server
