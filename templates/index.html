@@ -1762,6 +1762,7 @@
         if (status && status !== 'SENSITIVE') url += `&status=${encodeURIComponent(status)}`;
 
         const resp = await fetch(url);
+        cachedLedger = await resp.json();
         const sideCount = document.getElementById('sidebar-log-count');
         if (sideCount) sideCount.innerText = cachedLedger.length;
         filterLedger();
