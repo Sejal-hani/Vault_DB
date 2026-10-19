@@ -1,8 +1,4 @@
-"""
-VaultDB Row-Level Security (RLS) Engine (V2 Scope)
-Restricts retail customers to accessing solely their personal banking records.
-"""
-
+import re
 from typing import Optional, Tuple
 
 
@@ -20,16 +16,33 @@ def apply_row_level_security(query: str, user_role: str, user_email: str) -> Tup
 
     # If customer queries accounts without filtering by their own name/account
     if "accounts" in q_lower and "select" in q_lower:
-        # Resolve customer name mapping (e.g. alice@bank.com -> 'Alice Smith')
-        if "alice" in user_email.lower():
-            if "where" in q_lower:
-                return query.rstrip(";") + " AND name = 'Alice Smith';", True
+        name_filter = "Alice Smith" if "alice" in user_email.lower() else "Carlos Mendez" if "carlos" in user_email.lower() else None
+        if not name_filter:
+            return query, False
+
+        # If already filtered by this customer's name, don't duplicate
+        if f"'{name_filter.lower()}'" in q_lower:
+            return query, False
+
+        clean_q = query.strip().rstrip(";")
+
+        # Detect trailing clauses: ORDER BY, GROUP BY, HAVING, LIMIT, OFFSET
+        clause_match = re.search(r'\b(order\s+by|group\s+by|having|limit|offset)\b', clean_q, re.IGNORECASE)
+        if clause_match:
+            split_pos = clause_match.start()
+            prefix = clean_q[:split_pos].strip()
+            suffix = clean_q[split_pos:].strip()
+
+            if re.search(r'\bwhere\b', prefix, re.IGNORECASE):
+                rewritten = f"{prefix} AND name = '{name_filter}' {suffix};"
             else:
-                return query.rstrip(";") + " WHERE name = 'Alice Smith';", True
-        elif "carlos" in user_email.lower():
-            if "where" in q_lower:
-                return query.rstrip(";") + " AND name = 'Carlos Mendez';", True
+                rewritten = f"{prefix} WHERE name = '{name_filter}' {suffix};"
+            return rewritten, True
+        else:
+            if re.search(r'\bwhere\b', clean_q, re.IGNORECASE):
+                return f"{clean_q} AND name = '{name_filter}';", True
             else:
-                return query.rstrip(";") + " WHERE name = 'Carlos Mendez';", True
+                return f"{clean_q} WHERE name = '{name_filter}';", True
 
     return query, False
+

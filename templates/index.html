@@ -318,13 +318,13 @@
     /* Telemetry Stats Bar */
     .kpi-grid {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
+      grid-template-columns: repeat(3, 1fr);
       gap: 12px;
     }
 
     @media (max-width: 900px) {
       .kpi-grid {
-        grid-template-columns: repeat(2, 1fr);
+        grid-template-columns: repeat(1, 1fr);
       }
     }
 
@@ -1094,7 +1094,6 @@
           <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
         </svg>
         <span>Audit ledger</span>
-        <span class="nav-counter" id="sidebar-log-count">0</span>
       </div>
 
       <div class="nav-item" onclick="showView('view-explorer', this)">
@@ -1137,10 +1136,6 @@
           <span class="kpi-label">Flagged sensitive queries</span>
           <span class="kpi-value" id="kpi-sensitive" style="color: var(--amber);">0</span>
         </div>
-        <div class="kpi-card card-height" id="kpi-card-height" onclick="navigateToLedger('', false, true, 'height')" title="Click to view ledger transactions">
-          <span class="kpi-label">Ledger height</span>
-          <span class="kpi-value" id="kpi-height">#0</span>
-        </div>
       </div>
 
       <!-- VIEW 1: SQL Console -->
@@ -1169,28 +1164,24 @@
               </div>
             </div>
 
-            <!-- Scenarios -->
-            <div class="scenario-container">
-              <span class="scenario-label">Preset scenarios:</span>
-              <div class="chips-group" id="preset-chips">
-                <button type="button" class="chip-btn" onclick="setQueryScenario('admin', 'SELECT account_number, name, account_type, balance FROM app_data.accounts WHERE balance > 100000 ORDER BY balance DESC;', this)">
-                  High-value accounts
-                </button>
-                <button type="button" class="chip-btn" onclick="setQueryScenario('employee', 'SELECT t.id, a.name, t.transaction_type, t.amount, t.merchant, t.status FROM app_data.transactions t JOIN app_data.accounts a ON t.account_id = a.id WHERE t.amount > 100000 ORDER BY t.amount DESC LIMIT 10;', this)">
-                  Transfers over $100k
-                </button>
-                <button type="button" class="chip-btn" onclick="setQueryScenario('auditor', 'SELECT policy_code, title, standard, enforcement_level FROM app_data.compliance_policies;', this)">
-                  Compliance frameworks
-                </button>
-                <button type="button" class="chip-btn" onclick="setQueryScenario('employee', 'UPDATE app_data.accounts SET balance = 9999999 WHERE id = 1;', this)">
-                  Attempt balance update
-                </button>
-                <button type="button" class="chip-btn" onclick="setQueryScenario('customer', 'DELETE FROM app_data.transactions WHERE id = 1;', this)">
-                  Attempt delete
-                </button>
-                <button type="button" class="chip-btn" onclick="setQueryScenario('customer', 'SELECT name, ssn, balance FROM app_data.accounts WHERE id = 1;', this)">
-                  Query sensitive fields
-                </button>
+            <!-- Scenario Dropdown -->
+            <div class="scenario-selector-wrap" style="margin-bottom: 12px; display: flex; flex-direction: column; gap: 6px;">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <label for="scenario-dropdown" style="font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 500; white-space: nowrap;">
+                  Security scenario:
+                </label>
+                <select id="scenario-dropdown" class="clean-select" style="flex: 1; padding: 6px 10px; font-size: 12px; background: #18181b; border: 1px solid var(--border);" onchange="onScenarioSelect(this.value)">
+                  <option value="" disabled selected>Select a compliance scenario to test...</option>
+                  <option value="customer-personal">Customer: Personal accounts (tests RLS scoping to Alice & SSN masking)</option>
+                  <option value="employee-transfers">Employee: Transfer inspection (tests authorized operational read access)</option>
+                  <option value="employee-violation">Employee: Balance modification attempt (tests RBAC blocking unauthorized write)</option>
+                  <option value="customer-delete">Customer: Transaction deletion attempt (tests RBAC blocking customer delete)</option>
+                  <option value="injection-drop">Adversarial: Stacked injection attempt (tests multi-statement DROP rejection)</option>
+                  <option value="admin-overview">Admin: High-value account audit (tests unmasked administrative access)</option>
+                </select>
+              </div>
+              <div id="scenario-desc" style="font-size: 11.5px; color: var(--text-muted); background: #141416; padding: 7px 12px; border-radius: 4px; border: 1px solid #27272a; min-height: 28px; display: flex; align-items: center;">
+                Select a scenario above to switch personas and load the test SQL statement.
               </div>
             </div>
 
@@ -1257,6 +1248,7 @@
                 <option value="100" selected>100</option>
                 <option value="250">250</option>
                 <option value="500">500</option>
+                <option value="1000">1000 (all)</option>
               </select>
               <button class="btn btn-secondary btn-sm" onclick="loadAuditLogs()">Refresh</button>
             </div>
@@ -1265,6 +1257,12 @@
             <div class="toolbar-row">
               <input type="text" id="ledger-search" class="search-input" placeholder="Search query, user, or table..." oninput="filterLedger()">
               
+              <select id="ledger-action-filter" class="clean-select" onchange="filterLedger()">
+                <option value="sql" selected>SQL queries only</option>
+                <option value="all">All actions (incl. logins)</option>
+                <option value="auth">Authentication only</option>
+              </select>
+
               <select id="ledger-user-filter" class="clean-select" onchange="loadAuditLogs()">
                 <option value="">All users</option>
                 <option value="admin@bank.com">admin@bank.com</option>
@@ -1531,15 +1529,50 @@
       }
     }
 
+    async function onScenarioSelect(val) {
+      const scenarios = {
+        'customer-personal': {
+          persona: 'customer',
+          sql: 'SELECT account_number, name, ssn, account_type, balance FROM app_data.accounts WHERE balance > 100000 ORDER BY balance DESC;',
+          desc: 'Switches to Customer persona (alice@bank.com). Demonstrates Row-Level Security: the query is rewritten to isolate records strictly to Alice Smith, and SSN is masked (***-**-1234).'
+        },
+        'employee-transfers': {
+          persona: 'employee',
+          sql: 'SELECT t.id, a.name, t.transaction_type, t.amount, t.merchant, t.status FROM app_data.transactions t JOIN app_data.accounts a ON t.account_id = a.id WHERE t.amount > 10000 ORDER BY t.amount DESC LIMIT 10;',
+          desc: 'Switches to Employee persona (john@bank.com). Demonstrates authorized operational read access to review transactions across accounts.'
+        },
+        'employee-violation': {
+          persona: 'employee',
+          sql: 'UPDATE app_data.accounts SET balance = 9999999 WHERE id = 1;',
+          desc: 'Employee attempts to manipulate customer balances. Demonstrates strict RBAC: blocked with HTTP 403 Forbidden and logged as a violation.'
+        },
+        'customer-delete': {
+          persona: 'customer',
+          sql: 'DELETE FROM app_data.transactions WHERE id = 1;',
+          desc: 'Customer attempts to delete a transaction record. Demonstrates strict RBAC: blocked with HTTP 403 Forbidden.'
+        },
+        'injection-drop': {
+          persona: 'admin',
+          sql: 'SELECT 1; DROP TABLE app_data.transactions;',
+          desc: 'Adversary executes a stacked SQL injection attempting to drop a table. The parser detects destructive multi-statements and rejects execution.'
+        },
+        'admin-overview': {
+          persona: 'admin',
+          sql: 'SELECT account_number, name, ssn, account_type, balance FROM app_data.accounts WHERE balance > 100000 ORDER BY balance DESC;',
+          desc: 'Administrator inspects high-value accounts with unmasked sensitive fields for compliance auditing.'
+        }
+      };
+
+      const item = scenarios[val];
+      if (!item) return;
+
+      const descEl = document.getElementById('scenario-desc');
+      if (descEl) descEl.innerText = item.desc;
+      await switchPersona(item.persona);
+      document.getElementById('sql-input').value = item.sql;
+    }
+
     async function setQueryScenario(persona, sql, element) {
-      document.querySelectorAll('#preset-chips .chip-btn').forEach(b => {
-        b.classList.remove('active');
-        b.blur();
-      });
-      if (element) {
-        element.classList.add('active');
-        setTimeout(() => { element.blur(); }, 150);
-      }
       await switchPersona(persona);
       document.getElementById('sql-input').value = sql;
     }
@@ -1573,10 +1606,10 @@
     });
 
     document.getElementById('sql-input').addEventListener('input', function() {
-      document.querySelectorAll('#preset-chips .chip-btn').forEach(b => {
-        b.classList.remove('active');
-        b.blur();
-      });
+      const dd = document.getElementById('scenario-dropdown');
+      if (dd) dd.value = '';
+      const descEl = document.getElementById('scenario-desc');
+      if (descEl) descEl.innerText = 'Custom SQL statement entered.';
     });
 
     let lastQueryColumns = [];
@@ -1639,10 +1672,10 @@
           banner.className = 'alert-banner success';
           let msg = `Executed successfully. Sealed in immudb at transaction #${data.immudb_tx_id}.`;
           if (data.is_masked) {
-            msg += `<br><span style="color:#fcd34d;">Dynamic data masking applied to columns: ${(data.masked_fields||[]).join(', ')}.</span>`;
+            msg += `<br><span style="color:#fcd34d;">Data masking applied: ${(data.masked_fields||[]).join(', ')} (PII redacted).</span>`;
           }
           if (data.is_scoped) {
-            msg += `<br><span style="color:#93c5fd;">Row-level security applied to partition records.</span>`;
+            msg += `<br><span style="color:#93c5fd;">Row-level security active: scoped to personal records.</span>`;
           }
           if (data.anomalies && data.anomalies.length > 0) {
             msg += `<br><span style="color:#fca5a5;">Anomaly alert: ${escapeHtml(data.anomalies.join('; '))}.</span>`;
@@ -1731,8 +1764,8 @@
         if (status && status !== 'SENSITIVE') url += `&status=${encodeURIComponent(status)}`;
 
         const resp = await fetch(url);
-        cachedLedger = await resp.json();
-        document.getElementById('sidebar-log-count').innerText = cachedLedger.length;
+        const sideCount = document.getElementById('sidebar-log-count');
+        if (sideCount) sideCount.innerText = cachedLedger.length;
         filterLedger();
       } catch (e) {
         console.error("Error loading logs:", e);
@@ -1753,6 +1786,8 @@
       document.getElementById('ledger-user-filter').value = '';
       document.getElementById('ledger-status-filter').value = '';
       document.getElementById('ledger-date-filter').value = 'all';
+      const af = document.getElementById('ledger-action-filter');
+      if (af) af.value = 'sql';
       setActiveKpiCard('total');
       loadAuditLogs();
     }
@@ -1785,6 +1820,7 @@
       const user = document.getElementById('ledger-user-filter').value;
       const status = document.getElementById('ledger-status-filter').value;
       const timeRange = document.getElementById('ledger-date-filter').value;
+      const actionFilter = document.getElementById('ledger-action-filter') ? document.getElementById('ledger-action-filter').value : 'sql';
 
       const now = new Date();
       let cutoff = null;
@@ -1793,6 +1829,12 @@
       else if (timeRange === '30d') cutoff = new Date(now.getTime() - 30 * 24 * 3600 * 1000);
 
       let filtered = cachedLedger.filter(l => {
+        if (actionFilter === 'sql') {
+          if (l.action && l.action.startsWith('AUTH:')) return false;
+        } else if (actionFilter === 'auth') {
+          if (!l.action || !l.action.startsWith('AUTH:')) return false;
+        }
+
         const matchesSearch = !search ||
           (l.query && l.query.toLowerCase().includes(search)) ||
           (l.user && l.user.toLowerCase().includes(search)) ||
@@ -1984,31 +2026,36 @@
           </div>
         `;
 
-        // 4. Real Values with Copy Buttons
+        // 4. Collapsible Auditor Technical Details
         const metaValuesHtml = `
-          <div class="meta-key-value">
-            <div class="meta-row">
-              <span class="meta-label">Ledger key:</span>
-              <span class="meta-val">
-                <span class="mono">${escapeHtml(ledgerKey)}</span>
-                <button class="btn-copy" onclick="copyToClipboard('${escapeHtml(ledgerKey)}', this)">Copy</button>
-              </span>
-            </div>
-            <div class="meta-row">
-              <span class="meta-label">Transaction ID:</span>
-              <span class="meta-val">
-                <span class="mono">Tx #${txId}</span>
-                <button class="btn-copy" onclick="copyToClipboard('${txId}', this)">Copy</button>
-              </span>
-            </div>
-            <div style="display: flex; flex-direction: column; gap: 4px; padding-top: 4px;">
-              <div style="display: flex; justify-content: space-between; align-items: center;">
-                <span class="meta-label">Ledger state root at Tx #${txId}:</span>
-                <button class="btn-copy" onclick="copyToClipboard('${escapeHtml(rootHash)}', this)">Copy</button>
+          <details class="raw-json" style="margin-top: 6px;">
+            <summary style="font-size: 11.5px; color: var(--text-dim); cursor: pointer; user-select: none;">
+              Auditor cryptographic details (state root & transaction keys)
+            </summary>
+            <div class="meta-key-value" style="margin-top: 8px;">
+              <div class="meta-row">
+                <span class="meta-label">Ledger key:</span>
+                <span class="meta-val">
+                  <span class="mono">${escapeHtml(ledgerKey)}</span>
+                  <button class="btn-copy" onclick="copyToClipboard('${escapeHtml(ledgerKey)}', this)">Copy</button>
+                </span>
               </div>
-              <div class="hash-display">${escapeHtml(rootHash)}</div>
+              <div class="meta-row">
+                <span class="meta-label">Transaction ID:</span>
+                <span class="meta-val">
+                  <span class="mono">Tx #${txId}</span>
+                  <button class="btn-copy" onclick="copyToClipboard('${txId}', this)">Copy</button>
+                </span>
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 4px; padding-top: 4px;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <span class="meta-label">Ledger state root at Tx #${txId}:</span>
+                  <button class="btn-copy" onclick="copyToClipboard('${escapeHtml(rootHash)}', this)">Copy</button>
+                </div>
+                <div class="hash-display">${escapeHtml(rootHash)}</div>
+              </div>
             </div>
-          </div>
+          </details>
         `;
 
         // 6. Record Details
@@ -2054,9 +2101,9 @@
           ${bannerHtml}
           ${summaryHtml}
           ${checklistHtml}
-          ${metaValuesHtml}
-          ${sideBySideHtml}
           ${recordDetailsHtml}
+          ${sideBySideHtml}
+          ${metaValuesHtml}
           ${rawJsonHtml}
           ${restoreButtonHtml}
           ${footerHtml}
@@ -2194,7 +2241,8 @@
           document.getElementById('kpi-total').innerText = (s.total_audited || 0).toLocaleString();
           document.getElementById('kpi-denied').innerText = (s.denied_count || 0).toLocaleString();
           document.getElementById('kpi-sensitive').innerText = (s.sensitive_count || 0).toLocaleString();
-          document.getElementById('kpi-height').innerText = '#' + (s.ledger_height || 0).toLocaleString();
+          const hEl = document.getElementById('kpi-height');
+          if (hEl) hEl.innerText = '#' + (s.ledger_height || 0).toLocaleString();
         }
       } catch (e) {
         console.error("Error loading stats:", e);

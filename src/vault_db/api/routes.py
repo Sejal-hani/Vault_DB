@@ -498,15 +498,37 @@ async def health_check():
 async def get_dashboard_stats():
     """
     Returns high-level compliance KPI metrics for the dashboard.
+    Queries the actual full totals across all historical audit records.
     """
     eng = get_engine()
-    logs = eng.get_audit_logs(limit=100, source="immudb")
     state = eng.get_ledger_state()
 
-    total = len(logs)
-    success_count = sum(1 for l in logs if l.get("status") == "SUCCESS")
-    denied_count = sum(1 for l in logs if l.get("status") == "DENIED")
-    sensitive_count = sum(1 for l in logs if l.get("is_sensitive", False))
+    total = 0
+    success_count = 0
+    denied_count = 0
+    sensitive_count = 0
+
+    try:
+        res, _, _ = eng.postgres.execute_query("""
+            SELECT 
+                COUNT(*),
+                COUNT(*) FILTER (WHERE execution_status = 'DENIED'),
+                COUNT(*) FILTER (WHERE is_sensitive = TRUE),
+                COUNT(*) FILTER (WHERE execution_status = 'SUCCESS')
+            FROM vault_audit.audit_logs;
+        """)
+        if res and res[0]:
+            total = int(res[0][0] or 0)
+            denied_count = int(res[0][1] or 0)
+            sensitive_count = int(res[0][2] or 0)
+            success_count = int(res[0][3] or 0)
+    except Exception as e:
+        logger.warning(f"Error querying Postgres for dashboard stats: {e}")
+        logs = eng.get_audit_logs(limit=1000, source="immudb")
+        total = len(logs)
+        success_count = sum(1 for l in logs if l.get("status") == "SUCCESS")
+        denied_count = sum(1 for l in logs if l.get("status") == "DENIED")
+        sensitive_count = sum(1 for l in logs if l.get("is_sensitive", False))
 
     return {
         "total_audited": total,
