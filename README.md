@@ -183,7 +183,6 @@ docker compose up --build
 
 The services will initialize schemas, seed users, apply triggers, and start:
 - Web Dashboard: `http://localhost:8000`
-- OpenAPI Swagger Docs: `http://localhost:8000/docs`
 
 ### Option B: Local Setup (PowerShell / Windows)
 

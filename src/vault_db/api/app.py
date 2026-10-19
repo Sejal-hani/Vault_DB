@@ -31,6 +31,9 @@ def create_app() -> FastAPI:
         version=settings.VERSION,
         description=settings.DESCRIPTION,
         lifespan=lifespan,
+        docs_url=None,
+        redoc_url=None,
+        openapi_url=None,
     )
 
     # CORS configuration

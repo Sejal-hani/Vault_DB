@@ -72,7 +72,6 @@ def main():
     immudb_proc = ensure_immudb_running()
 
     print(f"[*] Starting FastAPI Web Server at http://localhost:{settings.APP_PORT} ...")
-    print(f"[*] Interactive API Docs (Swagger): http://localhost:{settings.APP_PORT}/docs")
     print(f"[*] Dashboard UI: http://localhost:{settings.APP_PORT}/")
     print("=" * 70)
 

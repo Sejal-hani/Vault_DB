@@ -10,7 +10,6 @@ from src.vault_db.api.app import app
 def main():
     print("=" * 65)
     print(f" VaultDB Dashboard running at http://localhost:{settings.APP_PORT}")
-    print(f" Interactive Swagger API Docs at http://localhost:{settings.APP_PORT}/docs")
     print("=" * 65)
 
     uvicorn.run(
