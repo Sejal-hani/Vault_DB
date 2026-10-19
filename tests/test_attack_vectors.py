@@ -15,7 +15,7 @@ from src.vault_db.auth.jwt_handler import create_access_token, decode_access_tok
 from src.vault_db.core.masking import mask_tabular_results
 from src.vault_db.core.rls import apply_row_level_security
 from src.vault_db.core.anomaly import AnomalyDetector
-from vault_client import connect, AuthenticationError
+from src.vault_db.vault_client import connect, AuthenticationError
 
 
 # ------------------------------------------------------------------------------

@@ -219,7 +219,7 @@ The services will initialize schemas, seed users, apply triggers, and start:
 #### Prerequisites
 - Python 3.11 or 3.12
 - PostgreSQL 16+ running on `localhost:5432`
-- immudb standalone server (`bin/immudb.exe`)
+- immudb server: For local runs without Docker, download immudb from the official releases page and place it in `bin/immudb.exe` (or use Docker).
 
 #### 1. Activate Environment and Install Dependencies
 ```powershell
@@ -275,7 +275,7 @@ VaultDB includes 135 automated unit, integration, and security tests covering RB
 ## 9. Python SDK Usage
 
 ```python
-from vault_client import VaultClient
+from src.vault_db import VaultClient
 
 # 1. Connect using authenticated credentials (derives identity server-side)
 client = VaultClient(

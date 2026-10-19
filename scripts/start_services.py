@@ -30,7 +30,7 @@ def ensure_immudb_running() -> subprocess.Popen | None:
 
     binary_path = BASE_DIR / "bin" / "immudb.exe"
     if not binary_path.exists():
-        print(f"[-] Warning: {binary_path} not found! Please ensure immudb server is running.")
+        print(f"[-] Warning: {binary_path} not found! For local runs without Docker, download immudb from official releases and place it in bin/ (or launch via: docker compose up --build).")
         return None
 
     data_dir = BASE_DIR / "data" / "immudb"

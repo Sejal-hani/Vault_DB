@@ -21,3 +21,7 @@ node_modules/
 .coverage
 htmlcov/
 
+# Local binaries
+bin/
+
+
