@@ -15,6 +15,7 @@ sys.path.insert(0, str(BASE_DIR))
 import psycopg
 from config.settings import settings
 from src.vault_db.auth.security import hash_password
+from src.vault_db.core.crypto import encrypt_field
 from src.vault_db.storage.immudb_vault import ImmudbVault
 
 DEMO_USERS = [
@@ -58,10 +59,26 @@ DEMO_USERS = [
         "password": "CustomerPass123!",
         "api_key": "vlt_key_customer_4d5e6f7a8b9c0d1e",
     },
+    {
+        "email": "john.customer@bank.com",
+        "full_name": "John Doe",
+        "role": "customer",
+        "department": "Retail Banking",
+        "password": "CustomerPass123!",
+        "api_key": "vlt_key_john_cust_1234",
+    },
+    {
+        "email": "sarah.customer@bank.com",
+        "full_name": "Sarah Connor",
+        "role": "customer",
+        "department": "Retail Banking",
+        "password": "CustomerPass123!",
+        "api_key": "vlt_key_sarah_cust_5678",
+    },
 ]
 
 ACCOUNTS = [
-    (1, "ACC-1001", "Alice Smith", "Private Checking", "452-98-1123", 99999.00),
+    (1, "ACC-1001", "Alice Smith", "Private Checking", "452-98-1123", 45250.75),
     (2, "ACC-1002", "Robert Ross", "High-Yield Savings", "219-54-8842", 24500.50),
     (3, "ACC-1003", "TechCorp Global Escrow", "Corporate Escrow", "981-12-3341", 1450000.00),
     (4, "ACC-1004", "Nexus Foundation Reserve", "Institutional Treasury", "764-88-2910", 3890250.75),
@@ -69,13 +86,8 @@ ACCOUNTS = [
     (6, "ACC-1006", "Franklin & Partners LLC", "Commercial Operating", "554-19-4821", 412900.25),
     (7, "ACC-1007", "Grace Hopper Endowment", "Endowment Custody", "662-34-1198", 12500000.00),
     (8, "ACC-1008", "David Kim Client Trust", "Fiduciary Trust", "882-99-3401", 670150.00),
-]
-
-POLICIES = [
-    ("GDPR-ART-30", "Records of Processing Activities", "GDPR Art. 30", "Maintains an immutable record of processing activities.", "STRICT"),
-    ("HIPAA-164-312", "Audit Controls & Technical Safeguards", "HIPAA §164.312(b)", "Mechanisms that record and examine activity in information systems.", "MANDATORY"),
-    ("PCI-DSS-REQ-10", "Log and Monitor All Access", "PCI-DSS Req 10", "Audit trails linked to individual users and tamper-proof log protection.", "STRICT"),
-    ("SOX-404", "Management Assessment of Internal Controls", "Sarbanes-Oxley 404", "Data integrity safeguards and traceability of ledger changes.", "STRICT"),
+    (901, "ACC-9001", "John Doe", "Standard Checking", "111-22-3333", 15400.00),
+    (902, "ACC-9002", "Sarah Connor", "Premier Savings", "999-88-7777", 98200.00),
 ]
 
 
@@ -110,30 +122,37 @@ def init_postgres():
                             api_key = EXCLUDED.api_key;
                     """, (u["email"], u["full_name"], u["role"], u["department"], h, u["api_key"]))
 
-                # 3. Seed Accounts
+                # 3. Seed Accounts (With foreign key user_id and AES-256-GCM encrypted SSN at rest)
+                cur.execute("SELECT id, email FROM app_data.users WHERE email IN ('alice@bank.com', 'john.customer@bank.com', 'sarah.customer@bank.com');")
+                user_rows = {row[1]: row[0] for row in cur.fetchall()}
+                alice_user_id = user_rows.get("alice@bank.com")
+                john_user_id = user_rows.get("john.customer@bank.com")
+                sarah_user_id = user_rows.get("sarah.customer@bank.com")
+
                 for acc in ACCOUNTS:
+                    aid, acc_num, name, acc_type, raw_ssn, balance = acc
+                    if name == "Alice Smith":
+                        uid = alice_user_id
+                    elif name == "John Doe":
+                        uid = john_user_id
+                    elif name == "Sarah Connor":
+                        uid = sarah_user_id
+                    else:
+                        uid = None
+                    enc_ssn = encrypt_field(raw_ssn)
                     cur.execute("""
-                        INSERT INTO app_data.accounts (id, account_number, name, account_type, ssn, balance)
-                        VALUES (%s, %s, %s, %s, %s, %s)
+                        INSERT INTO app_data.accounts (id, user_id, account_number, name, account_type, ssn, balance)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s)
                         ON CONFLICT (id) DO UPDATE SET
+                            user_id = EXCLUDED.user_id,
                             account_number = EXCLUDED.account_number,
                             name = EXCLUDED.name,
+                            ssn = EXCLUDED.ssn,
                             balance = EXCLUDED.balance;
-                    """, acc)
+                    """, (aid, uid, acc_num, name, acc_type, enc_ssn, balance))
                 cur.execute("SELECT setval(pg_get_serial_sequence('app_data.accounts', 'id'), COALESCE(max(id), 1)) FROM app_data.accounts;")
 
-                # 4. Seed Compliance Policies
-                for p in POLICIES:
-                    cur.execute("""
-                        INSERT INTO app_data.compliance_policies (policy_code, title, standard, description, enforcement_level)
-                        VALUES (%s, %s, %s, %s, %s)
-                        ON CONFLICT (policy_code) DO UPDATE SET
-                            title = EXCLUDED.title,
-                            standard = EXCLUDED.standard,
-                            description = EXCLUDED.description;
-                    """, p)
-
-                # 5. Seed Initial Transactions
+                # 4. Seed Initial Transactions
                 merchants = ["Federal Reserve Wire", "SWIFT Clearinghouse", "JPMorgan Settlement", "Euroclear Settlement"]
                 tx_types = ["TRANSFER", "WIRE", "DEPOSIT", "PAYROLL"]
                 base_time = datetime.now(timezone.utc) - timedelta(days=7)

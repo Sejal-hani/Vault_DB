@@ -4,7 +4,7 @@ Provides high-performance, concurrent access to relational business tables.
 """
 
 import logging
-from typing import Any, List, Optional, Tuple
+from typing import Any, List, Optional, Tuple, Set
 from psycopg_pool import ConnectionPool
 from config.settings import settings
 
@@ -24,7 +24,20 @@ class PostgresStorage:
         self.min_size = min_size
         self.max_size = max_size
         self._pool: Optional[ConnectionPool] = None
+        self._cached_relations: Optional[Set[str]] = None
         self._init_pool()
+
+    def get_existing_relations(self) -> Set[str]:
+        """Returns set of all existing relation names (tables, views) in PostgreSQL."""
+        if self._cached_relations is not None:
+            return self._cached_relations
+        try:
+            results, _, _ = self.execute_query("SELECT lower(relname) FROM pg_class WHERE relkind IN ('r', 'v', 'm', 'p');")
+            self._cached_relations = {r[0] for r in results}
+            return self._cached_relations
+        except Exception as e:
+            logger.warning(f"Could not load pg_class relations: {e}")
+            return {"accounts", "transactions", "users", "access_requests", "audit_logs"}
 
     def _init_pool(self):
         try:
@@ -57,6 +70,10 @@ class PostgresStorage:
         except Exception as e:
             logger.warning(f"Error fetching role for {email}: {e}")
         return "customer"
+
+    def clear_role_cache(self):
+        """Hook to clear external role and relation caches."""
+        self._cached_relations = None
 
     def get_user_by_email(self, email: str) -> Optional[dict]:
         """Fetches complete user record by email."""
@@ -151,7 +168,8 @@ class PostgresStorage:
         execution_status: str,
         immudb_log_id: Optional[int] = None,
         immudb_tx_id: Optional[int] = None,
-        immudb_tx_hash: Optional[str] = None
+        immudb_tx_hash: Optional[str] = None,
+        is_sensitive: bool = False,
     ) -> Optional[int]:
         """Writes audit entry to PostgreSQL vault_audit.audit_logs for relational redundancy."""
         if not self._pool:
@@ -160,20 +178,20 @@ class PostgresStorage:
         if immudb_log_id:
             sql = """
                 INSERT INTO vault_audit.audit_logs 
-                (log_id, app_user, user_role, action, target_table, query_text, execution_status, immudb_tx_id, immudb_tx_hash)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                (log_id, app_user, user_role, action, target_table, query_text, execution_status, immudb_tx_id, immudb_tx_hash, is_sensitive)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (log_id) DO NOTHING
                 RETURNING log_id;
             """
-            params = (immudb_log_id, app_user, user_role, action, target_table, query_text, execution_status, immudb_tx_id, immudb_tx_hash)
+            params = (immudb_log_id, app_user, user_role, action, target_table, query_text, execution_status, immudb_tx_id, immudb_tx_hash, is_sensitive)
         else:
             sql = """
                 INSERT INTO vault_audit.audit_logs 
-                (app_user, user_role, action, target_table, query_text, execution_status, immudb_tx_id, immudb_tx_hash)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                (app_user, user_role, action, target_table, query_text, execution_status, immudb_tx_id, immudb_tx_hash, is_sensitive)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING log_id;
             """
-            params = (app_user, user_role, action, target_table, query_text, execution_status, immudb_tx_id, immudb_tx_hash)
+            params = (app_user, user_role, action, target_table, query_text, execution_status, immudb_tx_id, immudb_tx_hash, is_sensitive)
 
         try:
             with self._pool.connection() as conn:
@@ -191,7 +209,7 @@ class PostgresStorage:
             return []
 
         sql = """
-            SELECT log_id, logged_at, app_user, user_role, action, target_table, execution_status, query_text
+            SELECT log_id, logged_at, app_user, user_role, action, target_table, execution_status, query_text, is_sensitive, immudb_tx_id, immudb_tx_hash
             FROM vault_audit.audit_logs
             ORDER BY log_id DESC
             LIMIT %s;
@@ -211,7 +229,10 @@ class PostgresStorage:
                             "action": r[4],
                             "table": r[5],
                             "status": r[6],
-                            "query": r[7] if len(r) > 7 else ""
+                            "query": r[7] if len(r) > 7 else "",
+                            "is_sensitive": bool(r[8]) if len(r) > 8 and r[8] is not None else False,
+                            "immudb_tx_id": r[9] if len(r) > 9 else None,
+                            "immudb_tx_hash": r[10] if len(r) > 10 else None,
                         })
                     return logs
         except Exception as e:

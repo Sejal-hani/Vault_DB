@@ -83,11 +83,22 @@ class ImmudbVault:
         self._ensure_connected()
         try:
             val_bytes = self._client.get(self.COUNTER_KEY).value
-            self._cached_counter = int(val_bytes.decode("utf-8")) + 1
-            return self._cached_counter
+            immu_counter = int(val_bytes.decode("utf-8"))
         except Exception:
-            self._cached_counter = 1
-            return 1
+            immu_counter = 0
+
+        # Synchronize with PostgreSQL to avoid sequence collisions
+        try:
+            from src.vault_db.storage.postgres import PostgresStorage
+            pg = PostgresStorage()
+            pg_res, _, _ = pg.execute_query("SELECT COALESCE(MAX(log_id), 0) FROM vault_audit.audit_logs;")
+            pg_max = pg_res[0][0] if pg_res else 0
+            base_counter = max(immu_counter, pg_max)
+        except Exception:
+            base_counter = immu_counter
+
+        self._cached_counter = base_counter + 1
+        return self._cached_counter
 
     def append_audit_log(
         self,
@@ -101,6 +112,8 @@ class ImmudbVault:
         is_sensitive: bool = False,
         sensitive_fields: Optional[List[str]] = None,
         client_ip: str = "127.0.0.1",
+        is_anomaly: bool = False,
+        anomalies: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
         """
         Cryptographically commits an audit record into immudb.
@@ -125,6 +138,8 @@ class ImmudbVault:
                 "is_sensitive": is_sensitive,
                 "sensitive_fields": sensitive_fields or [],
                 "client_ip": client_ip,
+                "is_anomaly": is_anomaly,
+                "anomalies": anomalies or [],
             }
 
             key = f"{self.KEY_PREFIX}{log_id}".encode("utf-8")
@@ -215,27 +230,48 @@ class ImmudbVault:
             start_id = max(1, total - offset)
             end_id = max(1, start_id - limit + 1)
 
-            logs = []
-            for lid in range(start_id, end_id - 1, -1):
-                key = f"{self.KEY_PREFIX}{lid}".encode("utf-8")
+            lid_list = list(range(start_id, end_id - 1, -1))
+            keys = [f"{self.KEY_PREFIX}{lid}".encode("utf-8") for lid in lid_list]
+            batch_res = {}
+            chunk_size = 1000
+            for i in range(0, len(keys), chunk_size):
+                chunk = keys[i:i + chunk_size]
                 try:
-                    res = self._client.get(key)
-                    data = json.loads(res.value.decode("utf-8"))
-                    logs.append({
-                        "id": data.get("id", lid),
-                        "time": data.get("timestamp"),
-                        "user": data.get("app_user"),
-                        "role": data.get("user_role"),
-                        "action": data.get("action"),
-                        "table": data.get("target_table"),
-                        "status": data.get("execution_status"),
-                        "query": data.get("query_text"),
-                        "is_sensitive": data.get("is_sensitive", False),
-                        "immudb_tx_id": res.tx,
-                    })
-                except Exception as e:
-                    logger.debug(f"Failed reading log {lid}: {e}")
-                    continue
+                    res = self._client.getAll(chunk)
+                    batch_res.update(res)
+                except Exception as batch_err:
+                    logger.debug(f"Batch getAll chunk failed: {batch_err}")
+
+            logs = []
+            for lid in lid_list:
+                key = f"{self.KEY_PREFIX}{lid}".encode("utf-8")
+                raw_bytes = batch_res.get(key)
+                if not raw_bytes:
+                    try:
+                        res = self._client.get(key)
+                        raw_bytes = res.value
+                    except Exception:
+                        continue
+                if raw_bytes:
+                    try:
+                        data = json.loads(raw_bytes.decode("utf-8"))
+                        logs.append({
+                            "id": data.get("id", lid),
+                            "time": data.get("timestamp"),
+                            "user": data.get("app_user"),
+                            "role": data.get("user_role"),
+                            "action": data.get("action"),
+                            "table": data.get("target_table"),
+                            "status": data.get("execution_status"),
+                            "query": data.get("query_text"),
+                            "is_sensitive": data.get("is_sensitive", False),
+                            "immudb_tx_id": data.get("immudb_tx_id", lid),
+                            "is_anomaly": data.get("is_anomaly", False),
+                            "anomalies": data.get("anomalies") or [],
+                        })
+                    except Exception as e:
+                        logger.debug(f"Failed reading log {lid}: {e}")
+                        continue
 
             return logs
 

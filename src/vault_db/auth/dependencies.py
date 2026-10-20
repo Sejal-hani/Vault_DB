@@ -46,6 +46,15 @@ async def get_current_user(
     """
     storage = get_postgres_storage()
 
+    # Normalize parameters if called directly outside FastAPI dependency injection
+    from fastapi.params import Header as HeaderParam, Cookie as CookieParam
+    if isinstance(authorization, HeaderParam):
+        authorization = request.headers.get("authorization")
+    if isinstance(x_api_key, HeaderParam):
+        x_api_key = request.headers.get("x-api-key")
+    if isinstance(vault_session, CookieParam):
+        vault_session = request.cookies.get("vault_session")
+
     # 1. API Key Authentication
     api_key = x_api_key
     if not api_key and authorization and authorization.startswith("ApiKey "):

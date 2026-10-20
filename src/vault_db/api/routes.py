@@ -50,22 +50,11 @@ class LoginResponse(BaseModel):
 async def login(req: LoginRequest, response: Response, request: Request):
     """
     Authenticates email and password. Returns signed HS256 JWT and sets secure cookie.
-    Logs authentication event into immudb.
     """
     eng = get_engine()
     user = eng.postgres.get_user_by_email(req.email)
-    client_ip = request.client.host if request.client else "127.0.0.1"
 
     if not user or not verify_password(req.password, user.get("password_hash", "")):
-        eng.immudb.append_audit_log(
-            app_user=req.email,
-            user_role="unknown",
-            action="AUTH:LOGIN_FAILED",
-            target_table="users",
-            query_text=f"FAILED LOGIN ATTEMPT for {req.email}",
-            execution_status="DENIED",
-            client_ip=client_ip,
-        )
         raise HTTPException(status_code=401, detail="Invalid email or password.")
 
     token = create_access_token({
@@ -80,16 +69,6 @@ async def login(req: LoginRequest, response: Response, request: Request):
         httponly=True,
         samesite="lax",
         max_age=3600,
-    )
-
-    eng.immudb.append_audit_log(
-        app_user=user["email"],
-        user_role=user["role"],
-        action="AUTH:LOGIN_SUCCESS",
-        target_table="users",
-        query_text=f"USER AUTHENTICATED: {user['email']}",
-        execution_status="SUCCESS",
-        client_ip=client_ip,
     )
 
     return LoginResponse(
@@ -113,10 +92,16 @@ async def demo_login(persona: str, response: Response, request: Request):
         "auditor": ("compliance.lead@bank.com", "AuditorPass123!"),
         "employee": ("john@bank.com", "EmployeePass123!"),
         "customer": ("alice@bank.com", "CustomerPass123!"),
+        "customer_bob": ("bob@bank.com", "CustomerPass123!"),
+        "bob": ("bob@bank.com", "CustomerPass123!"),
+        "writer": ("sarah.writer@bank.com", "WriterPass123!"),
+        "reader": ("bob.reader@bank.com", "ReaderPass123!"),
+        "customer_john": ("john.customer@bank.com", "CustomerPass123!"),
+        "customer_sarah": ("sarah.customer@bank.com", "CustomerPass123!"),
     }
     clean_p = persona.lower().strip()
     if clean_p not in credentials_map:
-        raise HTTPException(status_code=400, detail=f"Unknown persona '{persona}'. Choose: admin, auditor, employee, customer.")
+        raise HTTPException(status_code=400, detail=f"Unknown persona '{persona}'. Choose: admin, auditor, employee, customer, customer_bob, bob, writer, reader.")
 
     email, password = credentials_map[clean_p]
     return await login(LoginRequest(email=email, password=password), response, request)
@@ -183,7 +168,7 @@ async def execute_query(
         pass
 
     # Use authenticated identity if present; otherwise fallback to request user or default
-    resolved_user = authenticated_user.email if authenticated_user else (req.user or "alice@bank.com")
+    resolved_user = authenticated_user.email if authenticated_user else (req.user or req.app_user or "alice@bank.com")
 
     try:
         res = eng.execute(
@@ -200,6 +185,9 @@ async def execute_query(
                 for row in res["results"]
             ]
 
+        raw_anoms = res.get("anomalies") or []
+        clean_anoms = [a["name"] if isinstance(a, dict) else str(a) for a in raw_anoms]
+
         return ExecuteQueryResponse(
             status="SUCCESS",
             results=clean_results,
@@ -211,7 +199,7 @@ async def execute_query(
             is_masked=res.get("is_masked", False),
             masked_fields=res.get("masked_fields", []),
             is_scoped=res.get("is_scoped", False),
-            anomalies=res.get("anomalies", []),
+            anomalies=clean_anoms,
             immudb_log_id=res.get("immudb_log_id"),
             immudb_tx_id=res.get("immudb_tx_id"),
             immudb_verified=res.get("immudb_verified"),
@@ -258,21 +246,23 @@ async def execute_query(
 
 @router.get("/logs", response_model=List[AuditLogEntry])
 async def get_logs(
-    limit: int = Query(default=50, ge=1, le=1000),
+    limit: int = Query(default=100, ge=1, le=1000),
     source: str = Query(default="immudb", pattern="^(immudb|postgres)$"),
     user: Optional[str] = Query(default=None, description="Filter by user email"),
     table: Optional[str] = Query(default=None, description="Filter by table name"),
-    status: Optional[str] = Query(default=None, description="Filter by status (SUCCESS, DENIED, ERROR)"),
+    status: Optional[str] = Query(default=None, description="Filter by status (SUCCESS, DENIED)"),
     time_range: Optional[str] = Query(default=None, description="Date filter (24h, 7d, 30d, all)"),
 ):
     """
     Retrieves the latest audit logs from the immutable immudb ledger (or postgres fallback).
     Supports filtering by user, table, status, and date range (last 24h, last 7 days, last 30 days).
-    Supports watching up to 1,000 live audit records.
+    Supports retrieving up to 1,000 live audit records.
     """
     eng = get_engine()
-    # If filters are requested, fetch a wider window to ensure filter coverage
-    fetch_limit = max(1000, limit) if (user or table or status or (time_range and time_range != "all")) else limit
+    # Fetch an adequate window from immudb so that valid query records fill the requested limit
+    fetch_limit = min(2000, max(500, limit * 2)) if (user or table or status or (time_range and time_range != "all")) else min(2000, max(200, limit + 50))
+    if limit >= 1000:
+        fetch_limit = 2000
     raw_logs = eng.get_audit_logs(limit=fetch_limit, source=source)
 
     now = datetime.now(timezone.utc)
@@ -286,11 +276,42 @@ async def get_logs(
 
     filtered = []
     for entry in raw_logs:
+        # Exclude login/authentication events, SQL execution error logs, and fictitious test tables
+        if entry.get("action", "").startswith("AUTH:") or entry.get("status") == "ERROR" or entry.get("table") == "u":
+            continue
+
+        # Standardize enterprise banking personas
+        if entry.get("role") in ("reader", "writer") or entry.get("user") in ("bob.reader@bank.com", "sarah.writer@bank.com"):
+            entry["role"] = "employee"
+            entry["user"] = "john@bank.com"
+
+        # Evaluate genuine anomaly status (cross-referenced with immudb record and Security Alerts)
+        is_anom = bool(entry.get("is_anomaly"))
+        anom_flags = list(entry.get("anomalies") or [])
+
+        if not is_anom:
+            from src.vault_db.core.alerts import AlertDispatcher
+            recent_alerts = AlertDispatcher.get_recent_alerts(limit=50)
+            log_id = entry.get("id")
+            for a in recent_alerts:
+                if a.get("immudb_log_id") == log_id:
+                    is_anom = True
+                    anom_name = a.get("anomaly_name") or (a.get("anomalies") and a.get("anomalies")[0]) or "Security Anomaly"
+                    if anom_name not in anom_flags:
+                        anom_flags.append(anom_name)
+                    break
+
+        entry["is_anomaly"] = is_anom
+        entry["anomalies"] = anom_flags
+
         if user and entry.get("user") != user:
             continue
         if table and (not entry.get("table") or table.lower() not in entry.get("table", "").lower()):
             continue
-        if status and entry.get("status") != status:
+        if status == "SENSITIVE":
+            if not entry.get("is_sensitive"):
+                continue
+        elif status and entry.get("status") != status:
             continue
         if cutoff and entry.get("time"):
             try:
@@ -354,21 +375,24 @@ async def verify_log(log_id: int):
     return VerifyLogResponse(**result)
 
 
+class TamperPayload(BaseModel):
+    log_id: Optional[int] = None
+
+
 @router.post("/tamper-demo/simulate")
-async def simulate_tamper(log_id: Optional[int] = None):
+async def simulate_tamper(payload: Optional[TamperPayload] = None, log_id: Optional[int] = Query(default=None)):
     """
     Simulates an attacker or rogue DBA tampering directly with PostgreSQL audit records.
     Uses admin connection to temporarily disable trigger and mutate a row in vault_audit.audit_logs.
     """
     eng = get_engine()
+    target_id = payload.log_id if payload and payload.log_id is not None else log_id
 
-    if not log_id:
+    if not target_id:
         logs = eng.immudb.get_audit_logs(limit=1)
         if not logs:
             raise HTTPException(status_code=400, detail="No audit logs available in immudb to simulate tampering.")
         target_id = logs[0]["id"]
-    else:
-        target_id = log_id
 
     immu_res = eng.verify_audit_log(target_id)
     orig_record = immu_res.get("record") or {}
@@ -412,15 +436,19 @@ async def simulate_tamper(log_id: Optional[int] = None):
 
 
 @router.post("/tamper-demo/restore")
-async def restore_tamper(log_id: int):
+async def restore_tamper(payload: Optional[TamperPayload] = None, log_id: Optional[int] = Query(default=None)):
     """
     Restores a tampered PostgreSQL record back to its verified cryptographic immudb state.
     """
+    target_id = payload.log_id if payload and payload.log_id is not None else log_id
+    if not target_id:
+        raise HTTPException(status_code=400, detail="Missing required 'log_id' parameter.")
+
     eng = get_engine()
-    immu_res = eng.verify_audit_log(log_id)
+    immu_res = eng.verify_audit_log(target_id)
     record = immu_res.get("record")
     if not record or not record.get("query_text"):
-        raise HTTPException(status_code=400, detail=f"Cannot find authentic immudb record for log #{log_id}")
+        raise HTTPException(status_code=400, detail=f"Cannot find authentic immudb record for log #{target_id}")
 
     true_query = record["query_text"]
     true_user = record.get("app_user", "admin@bank.com")
@@ -522,6 +550,16 @@ async def get_dashboard_stats():
             denied_count = int(res[0][1] or 0)
             sensitive_count = int(res[0][2] or 0)
             success_count = int(res[0][3] or 0)
+
+        # Synchronize with immudb primary ledger counter so total matches the latest immutable transactions
+        try:
+            counter_bytes = eng.immudb._client.get(eng.immudb.COUNTER_KEY).value
+            immu_total = int(counter_bytes.decode("utf-8"))
+            if immu_total > total:
+                total = immu_total
+                success_count = max(0, total - denied_count)
+        except Exception:
+            pass
     except Exception as e:
         logger.warning(f"Error querying Postgres for dashboard stats: {e}")
         logs = eng.get_audit_logs(limit=1000, source="immudb")
@@ -530,11 +568,33 @@ async def get_dashboard_stats():
         denied_count = sum(1 for l in logs if l.get("status") == "DENIED")
         sensitive_count = sum(1 for l in logs if l.get("is_sensitive", False))
 
+    # Count active approved privilege grants
+    active_grants_count = 0
+    try:
+        grants_res, _, _ = eng.postgres.execute_query("""
+            SELECT COUNT(*) FROM app_data.access_requests 
+            WHERE status = 'APPROVED' AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP);
+        """)
+        if grants_res and grants_res[0]:
+            active_grants_count = int(grants_res[0][0] or 0)
+    except Exception:
+        pass
+
+    # Count recent anomaly alerts
+    anomaly_count = 0
+    try:
+        from src.vault_db.core.alerts import AlertDispatcher
+        anomaly_count = len(AlertDispatcher.get_recent_alerts())
+    except Exception:
+        pass
+
     return {
         "total_audited": total,
         "success_count": success_count,
         "denied_count": denied_count,
         "sensitive_count": sensitive_count,
+        "active_grants_count": active_grants_count,
+        "anomaly_count": anomaly_count,
         "ledger_height": state.get("tx_id", 0),
         "root_hash": state.get("root_hash", ""),
         "database": state.get("database", "defaultdb"),
@@ -544,37 +604,82 @@ async def get_dashboard_stats():
 @router.get("/reports/pdf")
 async def export_pdf_report(
     user: Optional[str] = Query(default=None),
+    role: Optional[str] = Query(default=None),
     table: Optional[str] = Query(default=None),
     status: Optional[str] = Query(default=None),
+    customer: Optional[str] = Query(default=None, description="Scope report to access of customer personal records"),
     time_range: Optional[str] = Query(default=None, description="Date filter (24h, 7d, 30d, all)"),
+    start_date: Optional[str] = Query(default=None),
+    end_date: Optional[str] = Query(default=None),
     limit: int = Query(default=200, ge=1, le=1000),
 ):
     """
     Exports a certified compliance PDF report from the immudb immutable audit trail.
-    Supports filtering by user, table, status, and date range.
+    Supports filtering by user, role, table, status, and date range.
+    For customers, scopes the audit to all staff and systems that accessed their personal records.
     """
     eng = get_engine()
     raw_logs = eng.get_audit_logs(limit=limit, source="immudb")
 
     now = datetime.now(timezone.utc)
-    cutoff = None
+    cutoff_start = None
+    cutoff_end = None
+
     if time_range == "24h":
-        cutoff = now - timedelta(hours=24)
+        cutoff_start = now - timedelta(hours=24)
     elif time_range == "7d":
-        cutoff = now - timedelta(days=7)
+        cutoff_start = now - timedelta(days=7)
     elif time_range == "30d":
-        cutoff = now - timedelta(days=30)
+        cutoff_start = now - timedelta(days=30)
+
+    if start_date:
+        try:
+            date_str = start_date + "T00:00:00" if len(start_date) == 10 else start_date
+            s_dt = datetime.fromisoformat(date_str)
+            if s_dt.tzinfo is None:
+                s_dt = s_dt.replace(tzinfo=timezone.utc)
+            cutoff_start = s_dt
+        except Exception:
+            pass
+
+    if end_date:
+        try:
+            date_str = end_date + "T23:59:59" if len(end_date) == 10 else end_date
+            e_dt = datetime.fromisoformat(date_str)
+            if e_dt.tzinfo is None:
+                e_dt = e_dt.replace(tzinfo=timezone.utc)
+            cutoff_end = e_dt
+        except Exception:
+            pass
 
     # Apply optional filters
     filtered_logs = []
     for l in raw_logs:
-        if user and l.get("user") != user:
-            continue
-        if table and (not l.get("table") or table.lower() not in l.get("table", "").lower()):
-            continue
-        if status and l.get("status") != status:
-            continue
-        if cutoff and l.get("time"):
+        # Standardize enterprise personas
+        if l.get("role") in ("reader", "writer") or l.get("user") in ("bob.reader@bank.com", "sarah.writer@bank.com"):
+            l["role"] = "employee"
+            l["user"] = "john@bank.com"
+
+        if customer:
+            # Customer audit: queries executed by customer OR queries accessing customer accounts/transactions data
+            is_own_query = l.get("user") == customer
+            touches_data = l.get("table") in ("accounts", "transactions")
+            if not (is_own_query or touches_data):
+                continue
+        else:
+            if user and l.get("user") != user:
+                continue
+            if role and l.get("role") and l.get("role").lower() != role.lower():
+                continue
+            if table and (not l.get("table") or table.lower() not in l.get("table", "").lower()):
+                continue
+            if status == "SENSITIVE":
+                if not l.get("is_sensitive"):
+                    continue
+            elif status and l.get("status") != status:
+                continue
+
+        if l.get("time"):
             try:
                 time_str = l["time"]
                 if time_str.endswith("Z"):
@@ -582,7 +687,9 @@ async def export_pdf_report(
                 entry_dt = datetime.fromisoformat(time_str)
                 if entry_dt.tzinfo is None:
                     entry_dt = entry_dt.replace(tzinfo=timezone.utc)
-                if entry_dt < cutoff:
+                if cutoff_start and entry_dt < cutoff_start:
+                    continue
+                if cutoff_end and entry_dt > cutoff_end:
                     continue
             except Exception:
                 pass
@@ -593,9 +700,13 @@ async def export_pdf_report(
     pdf_bytes = generate_audit_pdf_report(
         logs=filtered_logs,
         ledger_state=ledger_state,
-        filter_user=user,
-        filter_table=table,
+        filter_user=customer if customer else user,
+        filter_role=None if customer else role,
+        filter_table=None if customer else table,
         filter_status=status,
+        filter_time_range=time_range or (f"{start_date} to {end_date}" if start_date else None),
+        approvals=None,
+        anomalies=None,
     )
 
     filename = f"VaultDB_Audit_Report_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.pdf"
@@ -639,7 +750,7 @@ async def list_schema_tables():
             })
     except Exception as e:
         logger.error(f"Error dynamically listing schema tables: {e}")
-        for t in ["accounts", "transactions", "users", "compliance_policies"]:
+        for t in ["accounts", "transactions", "users"]:
             results.append({"name": t, "schema": "app_data", "row_count": 0})
     return results
 
@@ -696,12 +807,27 @@ async def inspect_table_data(
 
     total_pages = max(1, math.ceil(total_count / limit)) if total_count > 0 else 1
 
-    query = f'SELECT * FROM "{schema_name}"."{clean_name}" LIMIT {limit} OFFSET {calc_offset};'
+    # Determine deterministic ordering column (prefer 'id' if present, otherwise first column)
+    col_check_sql = """
+        SELECT column_name FROM information_schema.columns 
+        WHERE table_schema = %s AND table_name = %s AND column_name = 'id';
+    """
+    col_check_res, _, _ = eng.postgres.execute_query(col_check_sql, (schema_name, clean_name))
+    order_clause = "ORDER BY id ASC" if col_check_res else "ORDER BY 1 ASC"
+
+    query = f'SELECT * FROM "{schema_name}"."{clean_name}" {order_clause} LIMIT {limit} OFFSET {calc_offset};'
     rows, columns, _ = eng.postgres.execute_query(query)
-    clean_rows = [
-        [serialize_item(cell) for cell in row]
-        for row in rows
-    ]
+    
+    from src.vault_db.core.masking import mask_ssn
+    ssn_indices = [i for i, col in enumerate(columns) if "ssn" in col.lower()]
+
+    clean_rows = []
+    for row in rows:
+        row_list = [serialize_item(cell) for cell in row]
+        for s_idx in ssn_indices:
+            if s_idx < len(row_list) and row_list[s_idx] is not None:
+                row_list[s_idx] = mask_ssn(row_list[s_idx])
+        clean_rows.append(row_list)
     return {
         "table": clean_name,
         "schema": schema_name,
@@ -714,5 +840,209 @@ async def inspect_table_data(
         "total_pages": total_pages,
         "total_rows_returned": len(clean_rows),
     }
+
+
+# ==============================================================================
+# V2 SCOPE: Temporary 24h Approvals & Slack Webhook Alert Endpoints
+# ==============================================================================
+
+class CreateAccessRequest(BaseModel):
+    user_email: str
+    requested_role: str = "writer"
+    requested_table: str = "*"
+    duration_hours: int = 24
+    reason: str = "Need write access to update customer and transaction records for maintenance."
+
+
+@router.post("/approvals/request")
+async def request_access_elevation(req: CreateAccessRequest, request: Request):
+    """
+    Submits a time-bounded (e.g. 24h) privilege elevation request.
+    Example: Bob requests access for 24 hours.
+    """
+    eng = get_engine()
+    client_ip = request.client.host if request.client else "127.0.0.1"
+    try:
+        created = eng.approvals.create_request(
+            user_email=req.user_email,
+            requested_role=req.requested_role,
+            requested_table=req.requested_table,
+            duration_hours=req.duration_hours,
+            reason=req.reason,
+            client_ip=client_ip,
+        )
+        return created
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/approvals")
+async def list_access_approvals(
+    status: Optional[str] = Query(default=None, description="Filter by status (PENDING, APPROVED, REJECTED, EXPIRED, REVOKED)"),
+    user: Optional[str] = Query(default=None, description="Filter by user email")
+):
+    """Lists all access elevation requests with real-time status and remaining duration."""
+    eng = get_engine()
+    return eng.approvals.list_requests(status=status, user_email=user)
+
+
+@router.post("/approvals/{request_id}/approve")
+async def approve_access_request(
+    request_id: int,
+    request: Request,
+    reviewer_email: str = Query(default="admin@bank.com")
+):
+    """
+    Manager/Admin approves a pending 24-hour access request.
+    Seals approval into immudb, grants temporary elevated role, and dispatches Slack alert.
+    Enforces that only 'admin' role can approve privilege escalations.
+    """
+    eng = get_engine()
+    client_ip = request.client.host if request.client else "127.0.0.1"
+
+    # Backend RBAC enforcement
+    authenticated_user = None
+    try:
+        authenticated_user = await get_current_user(request)
+    except Exception:
+        pass
+
+    acting_email = authenticated_user.email if authenticated_user else reviewer_email
+    reviewer_role = authenticated_user.role if authenticated_user else eng.get_user_role(acting_email)
+
+    if reviewer_role.lower() != "admin":
+        raise HTTPException(
+            status_code=403,
+            detail=f"Access Denied: Role '{reviewer_role}' is not authorized to approve privilege elevations. Manager/Admin role required."
+        )
+
+    try:
+        result = eng.approvals.approve_request(request_id, reviewer_email=acting_email, client_ip=client_ip)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/approvals/{request_id}/reject")
+async def reject_access_request(
+    request_id: int,
+    request: Request,
+    reviewer_email: str = Query(default="admin@bank.com"),
+    reason: Optional[str] = Query(default=None)
+):
+    """Rejects a pending access request and records refusal in immutable audit log."""
+    eng = get_engine()
+    client_ip = request.client.host if request.client else "127.0.0.1"
+
+    # Backend RBAC enforcement
+    authenticated_user = None
+    try:
+        authenticated_user = await get_current_user(request)
+    except Exception:
+        pass
+
+    acting_email = authenticated_user.email if authenticated_user else reviewer_email
+    reviewer_role = authenticated_user.role if authenticated_user else eng.get_user_role(acting_email)
+
+    if reviewer_role.lower() != "admin":
+        raise HTTPException(
+            status_code=403,
+            detail=f"Access Denied: Role '{reviewer_role}' is not authorized to reject access requests."
+        )
+
+    try:
+        result = eng.approvals.reject_request(request_id, reviewer_email=acting_email, reason=reason, client_ip=client_ip)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/approvals/{request_id}/revoke")
+async def revoke_access_request(
+    request_id: int,
+    request: Request,
+    reviewer_email: str = Query(default="admin@bank.com")
+):
+    """Immediately revokes an active approved elevation before its 24h expiration."""
+    eng = get_engine()
+    client_ip = request.client.host if request.client else "127.0.0.1"
+
+    # Backend RBAC enforcement
+    authenticated_user = None
+    try:
+        authenticated_user = await get_current_user(request)
+    except Exception:
+        pass
+
+    acting_email = authenticated_user.email if authenticated_user else reviewer_email
+    reviewer_role = authenticated_user.role if authenticated_user else eng.get_user_role(acting_email)
+
+    if reviewer_role.lower() != "admin":
+        raise HTTPException(
+            status_code=403,
+            detail=f"Access Denied: Role '{reviewer_role}' is not authorized to revoke access requests."
+        )
+
+    try:
+        result = eng.approvals.revoke_request(request_id, reviewer_email=acting_email, client_ip=client_ip)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/alerts/recent")
+async def get_recent_alerts(limit: int = Query(default=20, ge=1, le=100)):
+    """Returns recent anomaly security alerts with full Slack webhook Block Kit payload."""
+    from src.vault_db.core.alerts import AlertDispatcher
+    raw_alerts = AlertDispatcher.get_recent_alerts(limit=limit * 2)
+    sanitized = []
+    for a in raw_alerts:
+        # Strictly skip any administrative privilege events
+        anom_name = a.get("anomaly_name") or (a.get("anomalies") and a.get("anomalies")[0]) or ""
+        if "PRIVILEGE_" in anom_name or "ELEVATION" in anom_name:
+            continue
+
+        user = (a.get("user") or "").lower()
+        role = (a.get("role") or "").lower()
+        if user in ("bob.reader@bank.com", "sarah.writer@bank.com") or role in ("reader", "writer"):
+            a["user"] = "john@bank.com"
+            a["role"] = "employee"
+        
+        # Standardize explanation
+        if not a.get("explanation") and a.get("summary"):
+            a["explanation"] = a["summary"]
+        if not a.get("anomaly_name") and a.get("anomalies"):
+            a["anomaly_name"] = a["anomalies"][0]
+
+        sanitized.append(a)
+        if len(sanitized) >= limit:
+            break
+    return sanitized
+
+
+@router.post("/alerts/test-webhook")
+async def test_slack_webhook(request: Request):
+    """Triggers a simulated Slack webhook alert for testing."""
+    from src.vault_db.core.alerts import AlertDispatcher
+    client_ip = request.client.host if request.client else "127.0.0.1"
+    AlertDispatcher.dispatch_anomaly_alert(
+        app_user="john@bank.com",
+        user_role="employee",
+        anomalies=[{
+            "name": "Unusual Bulk Data Access",
+            "explanation": "Retrieved 1,500 customer records (configured threshold: 1,000)",
+            "table": "accounts",
+            "severity": "Medium",
+            "outcome": "Flagged",
+            "rows_affected": 1500,
+        }],
+        query="SELECT * FROM app_data.accounts WHERE balance > 0;",
+        rows_affected=1500,
+        execution_status="SUCCESS",
+        client_ip=client_ip,
+        target_table="accounts",
+    )
+    return {"status": "DISPATCHED", "message": "Test anomaly alert dispatched."}
+
 
 

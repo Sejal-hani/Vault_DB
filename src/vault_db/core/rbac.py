@@ -24,20 +24,17 @@ class QueryExecutionError(Exception):
 DEFAULT_ROLE_PERMISSIONS: Dict[str, Dict[str, Set[str]]] = {
     "customer": {
         "accounts": {"SELECT"},
-        "transactions": {"SELECT"},
-        "compliance_policies": {"SELECT"}
+        "transactions": {"SELECT"}
     },
     "employee": {
         "accounts": {"SELECT"},
-        "transactions": {"SELECT", "UPDATE", "INSERT"},
-        "compliance_policies": {"SELECT"}
+        "transactions": {"SELECT", "UPDATE", "INSERT"}
     },
     "admin": {
         "*": {"SELECT", "INSERT", "UPDATE", "DELETE", "DDL"},
         "users": {"SELECT", "INSERT", "UPDATE", "DELETE", "DDL"},
         "accounts": {"SELECT", "INSERT", "UPDATE", "DELETE", "DDL"},
         "transactions": {"SELECT", "INSERT", "UPDATE", "DELETE", "DDL"},
-        "compliance_policies": {"SELECT", "INSERT", "UPDATE", "DELETE", "DDL"},
         "audit_logs": {"SELECT"}
     },
     "auditor": {
@@ -45,14 +42,12 @@ DEFAULT_ROLE_PERMISSIONS: Dict[str, Dict[str, Set[str]]] = {
         "users": {"SELECT"},
         "accounts": {"SELECT"},
         "transactions": {"SELECT"},
-        "compliance_policies": {"SELECT"},
         "audit_logs": {"SELECT"}
     },
     "writer": {
         "*": {"SELECT", "INSERT", "UPDATE"},
         "accounts": {"SELECT", "INSERT", "UPDATE"},
         "transactions": {"SELECT", "INSERT", "UPDATE"},
-        "compliance_policies": {"SELECT"},
         "reports": {"SELECT", "INSERT", "UPDATE"}
     },
     "reader": {
@@ -60,7 +55,6 @@ DEFAULT_ROLE_PERMISSIONS: Dict[str, Dict[str, Set[str]]] = {
         "users": {"SELECT"},
         "accounts": {"SELECT"},
         "transactions": {"SELECT"},
-        "compliance_policies": {"SELECT"},
         "reports": {"SELECT"},
         "audit_logs": {"SELECT"}
     }
@@ -79,6 +73,9 @@ class RBACManager:
         Supports explicit table names and wildcard '*' rules for arbitrary external schemas.
         Returns (is_allowed, denial_reason).
         """
+        if action == "MULTI_STATEMENT":
+            return False, "Multi-statement execution / stacked SQL injection is prohibited by security policy."
+
         role = role.lower()
         if role not in self.permissions:
             return False, f"Unknown or unauthorized role: '{role}'"

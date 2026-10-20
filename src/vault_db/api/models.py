@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 class ExecuteQueryRequest(BaseModel):
     query: str = Field(..., description="SQL statement to execute")
     user: Optional[str] = Field(default=None, description="Optional legacy fallback identity")
+    app_user: Optional[str] = Field(default=None, description="Optional application user identity")
     params: Optional[List[Any]] = Field(default=None, description="Optional parameterized arguments")
 
 
@@ -42,6 +43,8 @@ class AuditLogEntry(BaseModel):
     query: Optional[str] = None
     is_sensitive: bool = False
     immudb_tx_id: Optional[int] = None
+    is_anomaly: bool = False
+    anomalies: Optional[List[str]] = None
 
 
 class VerifyLogResponse(BaseModel):

@@ -10,7 +10,8 @@ CREATE SCHEMA IF NOT EXISTS vault_audit;
 -- 1. User Identity & Role Directory
 -- ------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS app_data.users (
-    email VARCHAR(80) PRIMARY KEY,
+    id SERIAL PRIMARY KEY,
+    email VARCHAR(80) UNIQUE NOT NULL,
     full_name VARCHAR(100) NOT NULL,
     role VARCHAR(20) NOT NULL,
     department VARCHAR(50) DEFAULT 'Retail',
@@ -26,14 +27,16 @@ CREATE INDEX IF NOT EXISTS idx_users_api_key ON app_data.users(api_key);
 -- ------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS app_data.accounts (
     id SERIAL PRIMARY KEY,
+    user_id INT REFERENCES app_data.users(id),
     account_number VARCHAR(30) UNIQUE,
     name VARCHAR(100) NOT NULL,
     account_type VARCHAR(30) DEFAULT 'Checking',
-    ssn VARCHAR(20) DEFAULT '***-**-1234',
+    ssn VARCHAR(255) DEFAULT '***-**-1234',
     balance DECIMAL(15, 2) NOT NULL,
     status VARCHAR(20) DEFAULT 'active',
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
+CREATE INDEX IF NOT EXISTS idx_accounts_user_id ON app_data.accounts(user_id);
 CREATE INDEX IF NOT EXISTS idx_accounts_balance ON app_data.accounts(balance DESC);
 
 -- ------------------------------------------------------------------------------
@@ -53,15 +56,23 @@ CREATE INDEX IF NOT EXISTS idx_transactions_amount ON app_data.transactions(amou
 CREATE INDEX IF NOT EXISTS idx_transactions_created_at ON app_data.transactions(created_at DESC);
 
 -- ------------------------------------------------------------------------------
--- 4. Regulatory Compliance Frameworks (GDPR, HIPAA, PCI-DSS, SOX, GLBA)
+-- 4. Access Requests & Temporary Approval Workflows (V2 Scope)
 -- ------------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS app_data.compliance_policies (
-    policy_code VARCHAR(30) PRIMARY KEY,
-    title VARCHAR(100) NOT NULL,
-    standard VARCHAR(50) NOT NULL,
-    description TEXT,
-    enforcement_level VARCHAR(20) DEFAULT 'STRICT'
+CREATE TABLE IF NOT EXISTS app_data.access_requests (
+    id SERIAL PRIMARY KEY,
+    user_email VARCHAR(80) NOT NULL REFERENCES app_data.users(email) ON DELETE CASCADE,
+    requested_role VARCHAR(20) NOT NULL,
+    requested_table VARCHAR(50) DEFAULT '*',
+    duration_hours INT DEFAULT 24,
+    reason TEXT NOT NULL,
+    status VARCHAR(20) DEFAULT 'PENDING',
+    requested_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    reviewed_by VARCHAR(80),
+    reviewed_at TIMESTAMPTZ,
+    expires_at TIMESTAMPTZ
 );
+CREATE INDEX IF NOT EXISTS idx_access_requests_user ON app_data.access_requests(user_email);
+CREATE INDEX IF NOT EXISTS idx_access_requests_status ON app_data.access_requests(status);
 
 -- ------------------------------------------------------------------------------
 -- 5. Relational Audit Trail Mirror (Synchronized with immudb)

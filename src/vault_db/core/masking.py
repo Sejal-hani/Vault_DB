@@ -14,9 +14,13 @@ MASK_PATTERNS = {
 }
 
 
+from src.vault_db.core.crypto import decrypt_field
+
+
 def mask_ssn(val: Any) -> str:
-    """Masks SSN to '***-**-1234' format."""
-    s = str(val).strip()
+    """Decrypts if encrypted at rest, then masks SSN to '***-**-1234' format."""
+    plain = decrypt_field(val)
+    s = str(plain).strip()
     if len(s) >= 4:
         return f"***-**-{s[-4:]}"
     return "***-**-****"
@@ -34,6 +38,26 @@ def mask_cvv(val: Any) -> str:
     return "***"
 
 
+def mask_query_text(query: str) -> str:
+    """
+    Sanitizes SQL query text by redacting embedded sensitive constants
+    (SSNs, credit card numbers, CVVs, passwords) before writing to audit logs.
+    Satisfies V2 Requirement: 'Mask in logs AND in results'.
+    """
+    if not query:
+        return query
+    q = query
+    # Redact SSNs (e.g., 123-45-6789 -> ***-**-6789)
+    q = re.sub(r'\b\d{3}-\d{2}-(\d{4})\b', r'***-**-\1', q)
+    # Redact credit card numbers (e.g., 4111-2222-3333-4444 -> ****-****-****-4444)
+    q = re.sub(r'\b(?:\d{4}[-\s]?){3}(\d{4})\b', r'****-****-****-\1', q)
+    # Redact CVVs/PINs (e.g., cvv = '123' -> cvv = '***')
+    q = re.sub(r'\b(cvv|pin)\s*=\s*[\'"]?\d{3,4}[\'"]?', r"\1='***'", q, flags=re.IGNORECASE)
+    # Redact Passwords / Secrets
+    q = re.sub(r'\b(password|pwd|secret)\s*=\s*[\'"][^\'"]+[\'"]', r"\1='[REDACTED]'", q, flags=re.IGNORECASE)
+    return q
+
+
 def mask_tabular_results(
     columns: List[str],
     rows: List[List[Any]],
@@ -42,12 +66,20 @@ def mask_tabular_results(
     """
     Evaluates result columns and dynamically masks sensitive fields
     if user role is not 'admin' or 'auditor'.
+    Also decrypts AES-256-GCM ciphertext columns stored at rest.
     Returns (masked_rows, was_masked, masked_column_names).
     """
     clean_role = user_role.lower()
     if clean_role in ("admin", "auditor"):
-        # Privileged compliance roles see unmasked business data
-        return rows, False, []
+        # Privileged roles see decrypted business data
+        new_rows = []
+        for row in rows:
+            row_copy = list(row)
+            for idx, col in enumerate(columns):
+                if "ssn" in col.lower() and idx < len(row_copy):
+                    row_copy[idx] = decrypt_field(row_copy[idx])
+            new_rows.append(row_copy)
+        return new_rows, False, []
 
     masked_cols = []
     mask_actions = {}

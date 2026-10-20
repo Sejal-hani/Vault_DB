@@ -35,27 +35,57 @@ class SQLParser:
     """Parses and analyzes SQL statements for middleware policy checking and auditing."""
 
     @staticmethod
-    def extract_action(query: str) -> str:
+    def split_statements(sql: str) -> List[str]:
+        """Splits SQL string into statements by semicolons outside of quotes."""
+        statements = []
+        current = []
+        in_single = False
+        in_double = False
+        for char in sql:
+            if char == "'" and not in_double:
+                in_single = not in_single
+            elif char == '"' and not in_single:
+                in_double = not in_double
+            elif char == ';' and not in_single and not in_double:
+                stmt = ''.join(current).strip()
+                if stmt:
+                    statements.append(stmt)
+                current = []
+                continue
+            current.append(char)
+        last = ''.join(current).strip()
+        if last:
+            statements.append(last)
+        return statements
+
+    @classmethod
+    def extract_action(cls, query: str) -> str:
         q = query.strip()
         # Remove single-line comments
-        q = re.sub(r'--.*$', '', q, flags=re.MULTILINE).strip().upper()
+        q = re.sub(r'--.*$', '', q, flags=re.MULTILINE).strip()
+
+        statements = cls.split_statements(q)
+        if len(statements) > 1:
+            return "MULTI_STATEMENT"
+
+        q_upper = q.upper()
 
         ddl_verbs = ["DROP", "TRUNCATE", "ALTER", "CREATE"]
         for verb in ddl_verbs:
-            if re.match(rf"^{verb}\b", q):
+            if re.match(rf"^{verb}\b", q_upper):
                 return f"DDL:{verb}"
 
         dml_verbs = ["SELECT", "INSERT", "UPDATE", "DELETE"]
         for verb in dml_verbs:
-            if re.match(rf"^{verb}\b", q):
+            if re.match(rf"^{verb}\b", q_upper):
                 return verb
 
         # Fallback check inside query
         for verb in ddl_verbs:
-            if f" {verb} " in q:
+            if f" {verb} " in q_upper:
                 return f"DDL:{verb}"
         for verb in dml_verbs:
-            if f" {verb} " in q:
+            if f" {verb} " in q_upper:
                 return verb
 
         return "UNKNOWN"

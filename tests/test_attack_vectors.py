@@ -91,7 +91,7 @@ ATTACK_VECTORS = [
     "DROP TABLE app_data.accounts;",
     "DROP TABLE app_data.transactions;",
     "DROP TABLE app_data.users;",
-    "DROP TABLE app_data.compliance_policies;",
+    "DROP TABLE app_data.accounts CASCADE;",
     "DROP SCHEMA app_data CASCADE;",
     "DROP SCHEMA vault_audit CASCADE;",
     "TRUNCATE app_data.accounts;",
@@ -125,7 +125,7 @@ ATTACK_VECTORS = [
     "INSERT INTO app_data.users (email, full_name, role) VALUES ('evil@hack.com', 'Evil Hacker', 'admin');",
     "UPDATE app_data.users SET role = 'admin' WHERE email = 'alice@bank.com';",
     "DELETE FROM app_data.users WHERE email = 'admin@bank.com';",
-    "INSERT INTO app_data.compliance_policies (policy_code, title, standard) VALUES ('NONE', 'No Rules', 'RELAXED');",
+    "INSERT INTO app_data.users (email, role) VALUES ('hacker@evil.com', 'admin');",
     
     # Unprivileged DML attacks by Employee
     "UPDATE app_data.accounts SET balance = balance + 1000000 WHERE id = 1;",
@@ -135,7 +135,7 @@ ATTACK_VECTORS = [
     "UPDATE app_data.users SET role = 'admin' WHERE email = 'john@bank.com';",
     "DELETE FROM app_data.users WHERE email = 'sarah.auditor@bank.com';",
     "TRUNCATE app_data.transactions;",
-    "UPDATE app_data.compliance_policies SET enforcement_level = 'DISABLED';",
+    "UPDATE app_data.users SET status = 'disabled' WHERE id = 1;",
     
     # Union-based injection to extract users and audit logs
     "SELECT account_number, name FROM app_data.accounts UNION SELECT email, password_hash FROM app_data.users;",
@@ -324,7 +324,7 @@ def test_row_level_security_scoping():
     raw_query = "SELECT * FROM app_data.accounts;"
     scoped_query, is_scoped = apply_row_level_security(raw_query, "customer", "alice@bank.com")
     assert is_scoped is True
-    assert "Alice Smith" in scoped_query or "alice" in scoped_query.lower()
+    assert "user_id" in scoped_query and "alice" in scoped_query.lower()
 
     # Admin is not scoped
     admin_query, admin_scoped = apply_row_level_security(raw_query, "admin", "admin@bank.com")

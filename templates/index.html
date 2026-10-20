@@ -7,1066 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <style>
-    :root {
-      --bg: #09090b;
-      --panel: #121215;
-      --panel-elevated: #18181b;
-      --border: #27272a;
-      --border-subtle: #1f1f23;
-      --border-hover: #3f3f46;
-      --text: #f4f4f5;
-      --text-muted: #a1a1aa;
-      --text-dim: #71717a;
-      --white: #ffffff;
-      
-      --accent: #2563eb;
-      --accent-hover: #1d4ed8;
-      
-      --green: #10b981;
-      --green-bg: rgba(16, 185, 129, 0.06);
-      --green-border: rgba(16, 185, 129, 0.2);
-      
-      --red: #ef4444;
-      --red-bg: rgba(239, 68, 68, 0.06);
-      --red-border: rgba(239, 68, 68, 0.2);
-      
-      --amber: #f59e0b;
-      --amber-bg: rgba(245, 158, 11, 0.06);
-      --amber-border: rgba(245, 158, 11, 0.2);
-      
-      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
-    }
-
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-
-    body {
-      background-color: var(--bg);
-      color: var(--text);
-      font-family: var(--font-sans);
-      font-size: 13px;
-      line-height: 1.5;
-      display: flex;
-      min-height: 100vh;
-      -webkit-font-smoothing: antialiased;
-      -moz-osx-font-smoothing: grayscale;
-    }
-
-    /* Scrollbars */
-    ::-webkit-scrollbar {
-      width: 6px;
-      height: 6px;
-    }
-    ::-webkit-scrollbar-track {
-      background: transparent;
-    }
-    ::-webkit-scrollbar-thumb {
-      background: var(--border);
-      border-radius: 3px;
-    }
-    ::-webkit-scrollbar-thumb:hover {
-      background: var(--border-hover);
-    }
-
-    /* Sidebar */
-    aside.sidebar {
-      width: 220px;
-      background: var(--panel);
-      border-right: 1px solid var(--border);
-      display: flex;
-      flex-direction: column;
-      flex-shrink: 0;
-      position: sticky;
-      top: 0;
-      height: 100vh;
-      z-index: 10;
-    }
-
-    .brand {
-      padding: 16px;
-      border-bottom: 1px solid var(--border);
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .brand-mark {
-      width: 24px;
-      height: 24px;
-      background: #18181b;
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: var(--white);
-      font-weight: 600;
-      font-size: 12px;
-      font-family: var(--font-mono);
-    }
-
-    .brand-info {
-      display: flex;
-      flex-direction: column;
-    }
-
-    .brand-name {
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--text);
-    }
-
-    .brand-meta {
-      font-size: 11px;
-      color: var(--text-dim);
-    }
-
-    .nav-group {
-      padding: 12px 8px;
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-      flex: 1;
-    }
-
-    .nav-item {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 7px 10px;
-      border-radius: 6px;
-      color: var(--text-muted);
-      text-decoration: none;
-      font-size: 12.5px;
-      font-weight: 500;
-      cursor: pointer;
-      user-select: none;
-      border: 1px solid transparent;
-    }
-
-    .nav-item:hover {
-      background: var(--panel-elevated);
-      color: var(--text);
-    }
-
-    .nav-item.active {
-      background: var(--panel-elevated);
-      color: var(--white);
-      border-color: var(--border);
-      font-weight: 600;
-    }
-
-    .nav-item svg {
-      width: 15px;
-      height: 15px;
-      stroke-width: 1.75;
-      color: var(--text-muted);
-    }
-
-    .nav-item.active svg {
-      color: var(--white);
-    }
-
-    .nav-counter {
-      margin-left: auto;
-      font-size: 11px;
-      font-family: var(--font-mono);
-      color: var(--text-dim);
-      background: var(--bg);
-      border: 1px solid var(--border);
-      padding: 1px 5px;
-      border-radius: 4px;
-    }
-
-    /* Workspace */
-    main.workspace {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      min-width: 0;
-      overflow-x: hidden;
-    }
-
-    header.topbar {
-      height: 48px;
-      border-bottom: 1px solid var(--border);
-      background: var(--panel);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0 20px;
-      position: sticky;
-      top: 0;
-      z-index: 9;
-    }
-
-    .breadcrumb {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 12.5px;
-      font-weight: 500;
-      color: var(--text);
-    }
-
-    .breadcrumb-root {
-      color: var(--text-dim);
-    }
-
-    .breadcrumb-sep {
-      color: var(--text-dim);
-    }
-
-    .topbar-actions {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    /* Standardized Buttons */
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-      font-family: var(--font-sans);
-      font-size: 12px;
-      font-weight: 500;
-      line-height: 1;
-      padding: 6px 11px;
-      border-radius: 6px;
-      cursor: pointer;
-      text-decoration: none;
-      user-select: none;
-      white-space: nowrap;
-      outline: none;
-    }
-
-    .btn:focus-visible {
-      box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
-    }
-
-    .btn-primary {
-      background: var(--accent);
-      color: var(--white);
-      border: 1px solid var(--accent);
-    }
-
-    .btn-primary:hover {
-      background: var(--accent-hover);
-      border-color: var(--accent-hover);
-    }
-
-    .btn-secondary {
-      background: transparent;
-      color: var(--text);
-      border: 1px solid var(--border);
-    }
-
-    .btn-secondary:hover {
-      background: var(--panel-elevated);
-      border-color: var(--border-hover);
-    }
-
-    .btn-ghost {
-      background: transparent;
-      color: var(--text-muted);
-      border: 1px solid transparent;
-    }
-
-    .btn-ghost:hover {
-      background: var(--panel-elevated);
-      color: var(--text);
-    }
-
-    .btn-sm {
-      padding: 4px 8px;
-      font-size: 11px;
-    }
-
-    .btn:disabled {
-      opacity: 0.45;
-      cursor: not-allowed;
-    }
-
-    /* Viewport */
-    .viewport {
-      padding: 20px;
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-      max-width: 1400px;
-      width: 100%;
-      margin: 0 auto;
-    }
-
-    .view-pane {
-      display: none;
-      flex-direction: column;
-      gap: 16px;
-    }
-
-    .view-pane.active {
-      display: flex;
-    }
-
-    /* Telemetry Stats Bar */
-    .kpi-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 12px;
-    }
-
-    @media (max-width: 900px) {
-      .kpi-grid {
-        grid-template-columns: repeat(1, 1fr);
-      }
-    }
-
-    .kpi-card {
-      background: var(--panel);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 12px 14px;
-      display: flex;
-      flex-direction: column;
-      gap: 3px;
-      cursor: pointer;
-      transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
-      position: relative;
-    }
-
-    .kpi-card:hover {
-      border-color: var(--border-hover);
-      background: var(--panel-elevated);
-    }
-
-    .kpi-card.active {
-      border-color: var(--accent);
-      background: rgba(37, 99, 235, 0.08);
-      box-shadow: 0 0 0 1px var(--accent);
-    }
-
-    .kpi-card.active.card-denied {
-      border-color: var(--red);
-      background: rgba(239, 68, 68, 0.08);
-      box-shadow: 0 0 0 1px var(--red);
-    }
-
-    .kpi-card.active.card-sensitive {
-      border-color: var(--amber);
-      background: rgba(245, 158, 11, 0.08);
-      box-shadow: 0 0 0 1px var(--amber);
-    }
-
-    .kpi-card.active.card-height {
-      border-color: #60a5fa;
-      background: rgba(96, 165, 250, 0.08);
-      box-shadow: 0 0 0 1px #60a5fa;
-    }
-
-    .kpi-label {
-      font-size: 11px;
-      color: var(--text-dim);
-    }
-
-    .kpi-value {
-      font-family: var(--font-mono);
-      font-size: 18px;
-      font-weight: 600;
-      color: var(--text);
-    }
-
-    /* Cards */
-    .panel-card {
-      background: var(--panel);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      overflow: hidden;
-    }
-
-    .panel-header {
-      padding: 10px 14px;
-      border-bottom: 1px solid var(--border);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      background: #101013;
-    }
-
-    .panel-title {
-      font-size: 12.5px;
-      font-weight: 600;
-      color: var(--text);
-    }
-
-    .panel-meta {
-      font-size: 11px;
-      color: var(--text-dim);
-      font-family: var(--font-mono);
-    }
-
-    .panel-body {
-      padding: 14px;
-      display: flex;
-      flex-direction: column;
-      gap: 14px;
-    }
-
-    /* Persona Selector Bar */
-    .persona-bar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      background: var(--panel-elevated);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 8px 12px;
-      flex-wrap: wrap;
-    }
-
-    .persona-identity {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 12px;
-      flex-wrap: wrap;
-    }
-
-    .role-badge {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      font-family: var(--font-mono);
-      font-size: 11px;
-      font-weight: 500;
-      line-height: 1.2;
-      padding: 4px 10px;
-      border-radius: 5px;
-      text-transform: lowercase;
-      letter-spacing: 0.02em;
-    }
-
-    .role-badge.role-admin {
-      background: rgba(37, 99, 235, 0.12);
-      color: #93c5fd;
-      border: 1px solid rgba(37, 99, 235, 0.3);
-    }
-    .role-badge.role-auditor {
-      background: rgba(16, 185, 129, 0.1);
-      color: #6ee7b7;
-      border: 1px solid rgba(16, 185, 129, 0.25);
-    }
-    .role-badge.role-employee {
-      background: rgba(245, 158, 11, 0.1);
-      color: #fcd34d;
-      border: 1px solid rgba(245, 158, 11, 0.25);
-    }
-    .role-badge.role-customer {
-      background: rgba(161, 161, 170, 0.1);
-      color: #d4d4d8;
-      border: 1px solid rgba(161, 161, 170, 0.25);
-    }
-
-    .persona-btns {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .persona-btn {
-      background: transparent;
-      border: 1px solid var(--border);
-      border-radius: 5px;
-      padding: 5px 10px;
-      font-size: 12px;
-      color: var(--text-muted);
-      cursor: pointer;
-      font-family: var(--font-sans);
-    }
-
-    .persona-btn:hover {
-      background: #27272a;
-      color: var(--text);
-    }
-
-    .persona-btn.active {
-      background: var(--border);
-      color: var(--white);
-      border-color: var(--border-hover);
-      font-weight: 500;
-    }
-
-    /* Scenario Selector */
-    .scenario-container {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
-
-    .scenario-label {
-      font-size: 11px;
-      color: var(--text-dim);
-      white-space: nowrap;
-    }
-
-    .chips-group {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      flex-wrap: wrap;
-    }
-
-    .chip-btn {
-      background: transparent;
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      padding: 3px 8px;
-      font-size: 11.5px;
-      color: var(--text-muted);
-      cursor: pointer;
-      font-family: var(--font-sans);
-      outline: none;
-    }
-
-    .chip-btn:hover {
-      background: var(--panel-elevated);
-      color: var(--text);
-      border-color: var(--border-hover);
-    }
-
-    .chip-btn:focus-visible {
-      box-shadow: 0 0 0 2px var(--bg), 0 0 0 3px var(--accent);
-    }
-
-    .chip-btn.active {
-      background: var(--panel-elevated);
-      color: var(--white);
-      border-color: var(--border-hover);
-    }
-
-    /* SQL Editor */
-    .editor-wrap {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-
-    .editor-label-bar {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-size: 11px;
-      color: var(--text-dim);
-    }
-
-    .sql-editor {
-      width: 100%;
-      height: 90px;
-      background: #09090b;
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 10px 12px;
-      font-family: var(--font-mono);
-      font-size: 12px;
-      line-height: 1.5;
-      color: var(--text);
-      resize: vertical;
-      outline: none;
-    }
-
-    .sql-editor:focus {
-      border-color: var(--accent);
-    }
-
-    .action-row {
-      display: flex;
-      justify-content: flex-end;
-      align-items: center;
-      gap: 8px;
-    }
-
-    /* Alert Banner */
-    .alert-banner {
-      display: none;
-      padding: 8px 12px;
-      border-radius: 6px;
-      font-size: 12px;
-      line-height: 1.4;
-      border: 1px solid transparent;
-    }
-
-    .alert-banner.success {
-      display: block;
-      background: var(--green-bg);
-      border-color: var(--green-border);
-      color: #34d399;
-    }
-
-    .alert-banner.denied {
-      display: block;
-      background: var(--red-bg);
-      border-color: var(--red-border);
-      color: #f87171;
-    }
-
-    .alert-banner.warning {
-      display: block;
-      background: var(--amber-bg);
-      border-color: var(--amber-border);
-      color: #fbbf24;
-    }
-
-    /* Data Tables */
-    .table-responsive {
-      width: 100%;
-      overflow-x: auto;
-      border: 1px solid var(--border);
-      border-radius: 6px;
-    }
-
-    .data-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 12px;
-      text-align: left;
-    }
-
-    .data-table thead {
-      background: #101013;
-      position: sticky;
-      top: 0;
-      z-index: 2;
-    }
-
-    .data-table th {
-      padding: 8px 10px;
-      font-weight: 500;
-      color: var(--text-dim);
-      border-bottom: 1px solid var(--border);
-      white-space: nowrap;
-      user-select: none;
-    }
-
-    .data-table th.sortable {
-      cursor: pointer;
-    }
-
-    .data-table th.sortable:hover {
-      color: var(--text);
-    }
-
-    .data-table td {
-      padding: 7px 10px;
-      border-bottom: 1px solid var(--border-subtle);
-      color: var(--text);
-      vertical-align: middle;
-      white-space: nowrap;
-    }
-
-    .data-table tbody tr:hover {
-      background: rgba(255, 255, 255, 0.02);
-    }
-
-    .data-table tbody tr.row-denied {
-      border-left: 3px solid var(--red);
-      background: rgba(239, 68, 68, 0.03);
-    }
-
-    .data-table tbody tr.row-sensitive {
-      border-left: 3px solid var(--amber);
-      background: rgba(245, 158, 11, 0.03);
-    }
-
-    .mono {
-      font-family: var(--font-mono);
-      font-size: 11.5px;
-    }
-
-    .sql-cell {
-      max-width: 380px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      font-family: var(--font-mono);
-      font-size: 11px;
-      color: #d4d4d8;
-    }
-
-    .tag {
-      display: inline-block;
-      font-size: 10.5px;
-      font-weight: 500;
-      padding: 1px 6px;
-      border-radius: 4px;
-      font-family: var(--font-mono);
-      text-transform: uppercase;
-    }
-
-    .tag-success {
-      color: #34d399;
-      background: var(--green-bg);
-      border: 1px solid var(--green-border);
-    }
-
-    .tag-denied {
-      color: #f87171;
-      background: var(--red-bg);
-      border: 1px solid var(--red-border);
-    }
-
-    .tag-sensitive {
-      color: #fbbf24;
-      background: var(--amber-bg);
-      border: 1px solid var(--amber-border);
-    }
-
-    /* Filters Toolbar */
-    .toolbar-row {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
-
-    .search-input {
-      background: #09090b;
-      color: var(--text);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 5px 9px;
-      font-family: var(--font-sans);
-      font-size: 12px;
-      min-width: 220px;
-      flex: 1;
-      outline: none;
-    }
-
-    .search-input:focus {
-      border-color: var(--accent);
-    }
-
-    .clean-select {
-      background: #09090b;
-      color: var(--text);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 5px 8px;
-      font-family: var(--font-sans);
-      font-size: 12px;
-      outline: none;
-    }
-
-    .clean-select:focus {
-      border-color: var(--accent);
-    }
-
-    .clear-filters-link {
-      color: var(--accent);
-      font-size: 11.5px;
-      text-decoration: none;
-      cursor: pointer;
-      margin-left: 4px;
-    }
-
-    .clear-filters-link:hover {
-      text-decoration: underline;
-    }
-
-    /* Pagination */
-    .pagination-bar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      padding: 8px 12px;
-      background: #101013;
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      flex-wrap: wrap;
-    }
-
-    .pagination-info {
-      font-size: 11.5px;
-      color: var(--text-dim);
-    }
-
-    .pagination-controls {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .page-input {
-      width: 44px;
-      background: #09090b;
-      color: var(--text);
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      padding: 3px 5px;
-      font-family: var(--font-mono);
-      font-size: 11px;
-      text-align: center;
-      outline: none;
-    }
-
-    /* Modal */
-    .modal-overlay {
-      display: none;
-      position: fixed;
-      inset: 0;
-      background: rgba(0, 0, 0, 0.7);
-      backdrop-filter: blur(2px);
-      z-index: 100;
-      align-items: center;
-      justify-content: center;
-      padding: 16px;
-    }
-
-    .modal-dialog {
-      background: var(--panel);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      width: 680px;
-      max-width: 100%;
-      overflow: hidden;
-      box-shadow: 0 16px 32px rgba(0, 0, 0, 0.5);
-      display: flex;
-      flex-direction: column;
-    }
-
-    .modal-head {
-      padding: 12px 16px;
-      border-bottom: 1px solid var(--border);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      background: #101013;
-    }
-
-    .modal-head-title {
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--text);
-    }
-
-    .modal-close-btn {
-      background: transparent;
-      border: none;
-      color: var(--text-dim);
-      font-size: 16px;
-      cursor: pointer;
-      line-height: 1;
-      padding: 2px 5px;
-      border-radius: 4px;
-    }
-
-    .modal-close-btn:hover {
-      color: var(--text);
-      background: var(--panel-elevated);
-    }
-
-    .modal-body {
-      padding: 16px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      max-height: 80vh;
-      overflow-y: auto;
-    }
-
-    /* Modal Components */
-    .verdict-banner {
-      padding: 10px 12px;
-      border-radius: 6px;
-      font-size: 12.5px;
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-    }
-
-    .verdict-banner.verified {
-      background: var(--green-bg);
-      border: 1px solid var(--green-border);
-      color: #34d399;
-    }
-
-    .verdict-banner.tampered {
-      background: var(--red-bg);
-      border: 1px solid var(--red-border);
-      color: #f87171;
-    }
-
-    .verdict-title {
-      font-weight: 600;
-      font-size: 13px;
-    }
-
-    .verdict-desc {
-      font-size: 11.5px;
-      color: var(--text-muted);
-    }
-
-    .check-list {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-      background: #09090b;
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 8px 10px;
-    }
-
-    .check-item {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 11.5px;
-    }
-
-    .check-badge {
-      font-family: var(--font-mono);
-      font-size: 10px;
-      font-weight: 600;
-      padding: 1px 4px;
-      border-radius: 3px;
-    }
-
-    .check-badge.pass {
-      background: var(--green-bg);
-      color: #34d399;
-      border: 1px solid var(--green-border);
-    }
-
-    .check-badge.fail {
-      background: var(--red-bg);
-      color: #f87171;
-      border: 1px solid var(--red-border);
-    }
-
-    .meta-key-value {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-
-    .meta-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 4px 0;
-      border-bottom: 1px solid var(--border-subtle);
-      font-size: 11.5px;
-    }
-
-    .meta-label {
-      color: var(--text-dim);
-    }
-
-    .meta-val {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .btn-copy {
-      background: transparent;
-      border: 1px solid var(--border);
-      border-radius: 3px;
-      padding: 1px 5px;
-      font-size: 10px;
-      color: var(--text-dim);
-      cursor: pointer;
-      font-family: var(--font-mono);
-    }
-
-    .btn-copy:hover {
-      color: var(--text);
-      border-color: var(--border-hover);
-    }
-
-    .hash-display {
-      background: #09090b;
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      padding: 6px 8px;
-      font-family: var(--font-mono);
-      font-size: 11px;
-      color: var(--text-muted);
-      word-break: break-all;
-    }
-
-    .side-by-side-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 11.5px;
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      overflow: hidden;
-    }
-
-    .side-by-side-table th {
-      background: #101013;
-      padding: 6px 10px;
-      font-weight: 500;
-      color: var(--text-dim);
-      border-bottom: 1px solid var(--border);
-    }
-
-    .side-by-side-table td {
-      padding: 6px 10px;
-      border-bottom: 1px solid var(--border-subtle);
-      vertical-align: top;
-    }
-
-    .side-by-side-table tr.mismatch {
-      background: rgba(239, 68, 68, 0.08);
-      color: #fca5a5;
-    }
-
-    .modal-footer-note {
-      font-size: 11px;
-      color: var(--text-dim);
-      text-align: center;
-      padding-top: 6px;
-      border-top: 1px solid var(--border);
-    }
-
-    details.raw-json {
-      background: #09090b;
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      padding: 6px 10px;
-      font-size: 11px;
-    }
-
-    details.raw-json summary {
-      cursor: pointer;
-      color: var(--text-dim);
-      font-size: 11px;
-      user-select: none;
-    }
-
-    details.raw-json summary:hover {
-      color: var(--text);
-    }
-
-    details.raw-json pre {
-      margin-top: 6px;
-      font-family: var(--font-mono);
-      font-size: 10.5px;
-      color: var(--text-muted);
-      max-height: 120px;
-      overflow-y: auto;
-    }
-  </style>
+  <link rel="stylesheet" href="/static/css/style.css?v=2.0.3">
 </head>
 
 <body>
@@ -1082,25 +23,41 @@
     </div>
 
     <nav class="nav-group">
-      <div class="nav-item active" onclick="showView('view-console', this)">
+      <div class="nav-item active" id="nav-item-console" onclick="showView('view-console', this)">
         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
         </svg>
         <span>SQL console</span>
       </div>
 
-      <div class="nav-item" onclick="showView('view-ledger', this)">
+      <div class="nav-item" id="nav-item-ledger" onclick="showView('view-ledger', this)">
         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
         </svg>
         <span>Audit ledger</span>
       </div>
 
-      <div class="nav-item" onclick="showView('view-explorer', this)">
+      <div class="nav-item" id="nav-item-explorer" onclick="showView('view-explorer', this)">
         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"/>
         </svg>
         <span>Schema</span>
+      </div>
+
+      <!-- Security Center Tab (Hidden for retail Customers) -->
+      <div class="nav-item" id="nav-item-security" onclick="showView('view-approvals', this)">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+        </svg>
+        <span>Security Center</span>
+        <span id="nav-security-alert-badge" class="nav-counter" style="display: none; background: rgba(239, 68, 68, 0.15); color: #ef4444; border-color: rgba(239, 68, 68, 0.4); font-weight: 700; margin-left: auto;">!</span>
+      </div>
+
+      <div class="nav-item" id="nav-item-reports" onclick="showView('view-reports', this)">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+        </svg>
+        <span>Compliance Reports</span>
       </div>
     </nav>
   </aside>
@@ -1108,20 +65,51 @@
   <!-- Main Workspace -->
   <main class="workspace">
     <header class="topbar">
-      <div class="breadcrumb">
+      <div class="breadcrumb" style="display: flex; align-items: center; gap: 12px;">
         <span id="view-title">SQL console</span>
       </div>
 
-      <div class="topbar-actions">
-        <a href="/api/reports/pdf" class="btn btn-secondary" target="_blank">
-          Export compliance PDF
-        </a>
+      <div class="topbar-actions" style="display: flex; align-items: center; gap: 8px;">
+        <div style="position: relative;">
+          <button type="button" class="btn btn-secondary btn-sm" id="topbar-user-btn" onclick="toggleAccountMenu(event)" style="display: flex; align-items: center; gap: 7px; padding: 5px 11px; font-size: 11.5px; border-radius: 6px; cursor: pointer;">
+            <span style="width: 7px; height: 7px; border-radius: 50%; background: #10b981; display: inline-block;"></span>
+            <span id="topbar-user-name">Chief Security Officer</span> (<span id="topbar-user-role" style="font-weight:600;">admin</span>)
+            <svg style="width: 11px; height: 11px; color: var(--text-dim);" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+
+          <!-- Dropdown Popover for Persona Switch & Quick Login -->
+          <div id="account-dropdown" style="display: none; position: absolute; right: 0; top: 38px; width: 340px; background: #141417; border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 16px 36px rgba(0,0,0,0.65); z-index: 2000; padding: 14px;">
+            <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-dim); margin-bottom: 10px;">
+              Sign in with Credentials
+            </div>
+            <form onsubmit="handleTopNavLogin(event)" style="display: flex; flex-direction: column; gap: 9px;">
+              <div>
+                <label style="font-size: 11px; color: var(--text-dim); display: block; margin-bottom: 4px;">User Account</label>
+                <select id="quick-email-select" class="clean-select" style="width: 100%; padding: 6px 8px; font-size: 11.5px;" onchange="onQuickEmailChange(this.value)">
+                  <option value="admin@bank.com" selected>admin@bank.com (Chief Security Officer - Admin)</option>
+                  <option value="compliance.lead@bank.com">compliance.lead@bank.com (Helen Vance - Auditor)</option>
+                  <option value="john@bank.com">john@bank.com (Johnathan Reed - Employee)</option>
+                  <option value="alice@bank.com">alice@bank.com (Alice Smith - Customer)</option>
+                  <option value="bob@bank.com">bob@bank.com (Bob Davis - Customer)</option>
+                </select>
+              </div>
+              <div>
+                <label style="font-size: 11px; color: var(--text-dim); display: block; margin-bottom: 4px;">Password</label>
+                <input type="password" id="quick-password-input" class="search-input" placeholder="Password" style="width: 100%; padding: 6px 8px; font-size: 11.5px;" value="AdminPass123!">
+              </div>
+              <div id="quick-login-error" style="display: none; font-size: 10.5px; color: #ef4444; background: rgba(239, 68, 68, 0.1); padding: 4px 8px; border-radius: 4px;"></div>
+              <button type="submit" class="btn btn-primary btn-sm" style="width: 100%; justify-content: center; font-weight: 600; padding: 7px; margin-top: 4px;">Sign In</button>
+            </form>
+          </div>
+        </div>
       </div>
     </header>
 
     <div class="viewport">
-      <!-- Top Stats Bar -->
-      <div class="kpi-grid">
+      <!-- Top Stats Bar: Core Security State (Real Backend Telemetry) -->
+      <div class="kpi-grid" id="top-kpi-grid">
         <div class="kpi-card card-total" id="kpi-card-total" onclick="navigateToLedger('', false, false, 'total')" title="Click to view all audit records">
           <span class="kpi-label">Total audited queries</span>
           <span class="kpi-value" id="kpi-total">0</span>
@@ -1134,6 +122,14 @@
           <span class="kpi-label">Flagged sensitive queries</span>
           <span class="kpi-value" id="kpi-sensitive" style="color: var(--amber);">0</span>
         </div>
+        <div class="kpi-card card-grants" id="kpi-card-grants" onclick="navigateToSecurityCenter('grants')" title="Click to manage 24h temporary elevation grants">
+          <span class="kpi-label">Active temporary grants</span>
+          <span class="kpi-value" id="kpi-grants" style="color: #10b981;">0</span>
+        </div>
+        <div class="kpi-card card-anomalies" id="kpi-card-anomalies" onclick="navigateToSecurityCenter('alerts')" title="Click to review live anomaly detections">
+          <span class="kpi-label">Security alerts & anomalies</span>
+          <span class="kpi-value" id="kpi-anomalies" style="color: #f97316;">0</span>
+        </div>
       </div>
 
       <!-- VIEW 1: SQL Console -->
@@ -1141,7 +137,6 @@
         <div class="panel-card">
           <div class="panel-header">
             <span class="panel-title">Query execution</span>
-            <span class="panel-meta">Server-derived authentication active</span>
           </div>
           <div class="panel-body">
             <!-- Persona Bar -->
@@ -1169,13 +164,36 @@
                   Security scenario:
                 </label>
                 <select id="scenario-dropdown" class="clean-select" style="flex: 1; padding: 6px 10px; font-size: 12px; background: #18181b; border: 1px solid var(--border);" onchange="onScenarioSelect(this.value)">
-                  <option value="" disabled selected>Select a compliance scenario to test...</option>
-                  <option value="customer-personal">Customer: Personal accounts (tests RLS scoping to Alice & SSN masking)</option>
-                  <option value="employee-transfers">Employee: Transfer inspection (tests authorized operational read access)</option>
-                  <option value="employee-violation">Employee: Balance modification attempt (tests RBAC blocking unauthorized write)</option>
-                  <option value="customer-delete">Customer: Transaction deletion attempt (tests RBAC blocking customer delete)</option>
-                  <option value="injection-drop">Adversarial: Stacked injection attempt (tests multi-statement DROP rejection)</option>
-                  <option value="admin-overview">Admin: High-value account audit (tests unmasked administrative access)</option>
+                  <option value="" disabled selected>Select a compliance scenario...</option>
+                  <optgroup label="Customer Scenarios">
+                    <option value="customer-alice-account">Customer (Alice): View personal account ACC-1001 (RLS & SSN masking)</option>
+                    <option value="customer-alice-tx">Customer (Alice): View personal transactions (RLS)</option>
+                    <option value="customer-bob-account">Customer (Bob): View personal account ACC-1002 (RLS & SSN masking)</option>
+                    <option value="customer-bob-tx">Customer (Bob): View personal transactions (RLS)</option>
+                    <option value="customer-cross-tenant">Customer (Alice): Attempt to query Bob's account ACC-1002 (Blocked)</option>
+                    <option value="customer-delete">Customer: Attempt transaction deletion (Blocked)</option>
+                    <option value="customer-users">Customer: Attempt user directory access (Blocked)</option>
+                  </optgroup>
+                  <optgroup label="Employee Scenarios">
+                    <option value="employee-transfers">Employee: Review high-value transactions</option>
+                    <option value="employee-insert-tx">Employee: Record counter deposit transaction</option>
+                    <option value="employee-violation">Employee: Attempt balance modification (Blocked)</option>
+                    <option value="employee-delete">Employee: Attempt account deletion (Blocked)</option>
+                  </optgroup>
+                  <optgroup label="Auditor Scenarios">
+                    <option value="auditor-audit-logs">Auditor: Inspect query audit records</option>
+                    <option value="auditor-users-review">Auditor: Review user access directory</option>
+                    <option value="auditor-write-blocked">Auditor: Attempt transaction modification (Blocked)</option>
+                  </optgroup>
+                  <optgroup label="Administrator Scenarios">
+                    <option value="admin-overview">Admin: High-value account audit (Unmasked)</option>
+                    <option value="admin-users-manage">Admin: Inspect user access directory</option>
+                  </optgroup>
+                  <optgroup label="Security & Threat Scenarios">
+                    <option value="injection-drop">Security: Stacked DROP TABLE injection (Blocked)</option>
+                    <option value="injection-truncate">Security: Multi-statement TRUNCATE injection (Blocked)</option>
+                    <option value="tamper-ledger-direct">Security: Direct audit ledger modification (Blocked)</option>
+                  </optgroup>
                 </select>
               </div>
               <div id="scenario-desc" style="font-size: 11.5px; color: var(--text-muted); background: #141416; padding: 7px 12px; border-radius: 4px; border: 1px solid #27272a; min-height: 28px; display: flex; align-items: center;">
@@ -1238,68 +256,49 @@
         <div class="panel-card">
           <div class="panel-header">
             <span class="panel-title">Audit ledger</span>
-            <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-              <span style="font-size: 11px; color: var(--text-dim);">Rows:</span>
-              <select id="ledger-limit-select" class="clean-select" style="padding: 2px 6px; font-size: 11px;" onchange="loadAuditLogs()">
-                <option value="25">25</option>
-                <option value="50">50</option>
-                <option value="100" selected>100</option>
-                <option value="250">250</option>
-                <option value="500">500</option>
-                <option value="1000">1000 (all)</option>
-              </select>
-              <button class="btn btn-secondary btn-sm" onclick="loadAuditLogs()">Refresh</button>
-            </div>
           </div>
           <div class="panel-body">
             <div class="toolbar-row">
               <input type="text" id="ledger-search" class="search-input" placeholder="Search query, user, or table..." oninput="filterLedger()">
               
-              <select id="ledger-action-filter" class="clean-select" onchange="filterLedger()">
-                <option value="sql" selected>SQL queries only</option>
-                <option value="all">All actions (incl. logins)</option>
-                <option value="auth">Authentication only</option>
-              </select>
-
               <select id="ledger-user-filter" class="clean-select" onchange="loadAuditLogs()">
                 <option value="">All users</option>
                 <option value="admin@bank.com">admin@bank.com</option>
                 <option value="compliance.lead@bank.com">compliance.lead@bank.com</option>
                 <option value="john@bank.com">john@bank.com</option>
                 <option value="alice@bank.com">alice@bank.com</option>
-                <option value="sarah.auditor@bank.com">sarah.auditor@bank.com</option>
+                <option value="bob@bank.com">bob@bank.com</option>
               </select>
 
               <select id="ledger-status-filter" class="clean-select" onchange="onStatusFilterChange()">
                 <option value="">All statuses</option>
                 <option value="SUCCESS">SUCCESS</option>
                 <option value="DENIED">DENIED</option>
-                <option value="ERROR">ERROR</option>
                 <option value="SENSITIVE">Flagged sensitive (PII)</option>
               </select>
 
               <select id="ledger-date-filter" class="clean-select" onchange="loadAuditLogs()">
-                <option value="all">All time</option>
+                <option value="all" selected>All time</option>
                 <option value="24h">Last 24 hours</option>
-                <option value="7d" selected>Last 7 days</option>
+                <option value="7d">Last 7 days</option>
                 <option value="30d">Last 30 days</option>
               </select>
 
               <span class="clear-filters-link" onclick="clearFilters()">Clear filters</span>
             </div>
 
-            <div class="table-responsive">
+            <div class="table-responsive" style="max-height: 520px; overflow-y: auto; overflow-x: auto; border: 1px solid var(--border); border-radius: 6px;">
               <table class="data-table">
                 <thead>
                   <tr>
-                    <th class="sortable" onclick="sortLedger('id')" style="width: 55px;">ID <span id="sort-icon-id"></span></th>
-                    <th class="sortable" onclick="sortLedger('time')" style="width: 100px;">Timestamp <span id="sort-icon-time"></span></th>
-                    <th class="sortable" onclick="sortLedger('user')" style="width: 150px;">User <span id="sort-icon-user"></span></th>
+                    <th class="sortable" onclick="sortLedger('id')" style="width: 70px; cursor: pointer;">ID <span id="sort-icon-id" style="color: var(--text-dim); margin-left: 2px;">↕</span></th>
+                    <th class="sortable" onclick="sortLedger('time')" style="width: 155px; min-width: 155px; cursor: pointer;">Timestamp (IST) <span id="sort-icon-time" style="color: var(--text-dim); margin-left: 2px;">↕</span></th>
+                    <th class="sortable" onclick="sortLedger('user')" style="width: 155px; cursor: pointer;">User <span id="sort-icon-user" style="color: var(--text-dim); margin-left: 2px;">↕</span></th>
                     <th style="width: 75px;">Role</th>
-                    <th class="sortable" onclick="sortLedger('action')" style="width: 70px;">Action <span id="sort-icon-action"></span></th>
-                    <th class="sortable" onclick="sortLedger('table')" style="width: 95px;">Table <span id="sort-icon-table"></span></th>
-                    <th class="sortable" onclick="sortLedger('status')" style="width: 85px;">Status <span id="sort-icon-status"></span></th>
-                    <th class="sortable" onclick="sortLedger('immudb_tx_id')" style="width: 85px;">Ledger Tx <span id="sort-icon-immudb_tx_id"></span></th>
+                    <th style="width: 70px;">Action</th>
+                    <th style="width: 95px;">Table</th>
+                    <th style="width: 95px;">Status</th>
+                    <th style="width: 85px;">Ledger Tx</th>
                     <th style="width: 95px;">Verification</th>
                     <th>Query</th>
                   </tr>
@@ -1308,6 +307,28 @@
                   <tr><td colspan="10" style="padding: 20px; text-align: center; color: var(--text-dim);">Loading audit records...</td></tr>
                 </tbody>
               </table>
+            </div>
+
+            <!-- Pagination Toolbar -->
+            <div class="pagination-bar" id="ledger-pagination-bar" style="margin-top: 8px;">
+              <div class="pagination-info" id="ledger-pagination-info-text">
+                Showing rows 0 - 0 of 0 in Audit Ledger
+              </div>
+              <div class="pagination-controls">
+                <select id="ledger-page-size-select" class="clean-select" style="padding: 2px 5px; font-size: 11px;" onchange="onLedgerPageSizeChange()">
+                  <option value="25">25</option>
+                  <option value="50" selected>50</option>
+                  <option value="100">100</option>
+                  <option value="250">250</option>
+                </select>
+                <button class="btn btn-secondary btn-sm" id="btn-ledger-page-first" onclick="goToLedgerPage(1)">&lt;&lt;</button>
+                <button class="btn btn-secondary btn-sm" id="btn-ledger-page-prev" onclick="prevLedgerPage()">&lt;</button>
+                <span style="font-size: 11px; color: var(--text-dim);">
+                  Page <input type="number" id="current-ledger-page-input" class="page-input" value="1" min="1" onchange="onLedgerPageInput(this.value)"> of <span id="total-ledger-pages-span">1</span>
+                </span>
+                <button class="btn btn-secondary btn-sm" id="btn-ledger-page-next" onclick="nextLedgerPage()">&gt;</button>
+                <button class="btn btn-secondary btn-sm" id="btn-ledger-page-last" onclick="goToLastLedgerPage()">&gt;&gt;</button>
+              </div>
             </div>
           </div>
         </div>
@@ -1322,42 +343,10 @@
               <button class="chip-btn active" onclick="switchTable('accounts', this)">accounts</button>
               <button class="chip-btn" onclick="switchTable('transactions', this)">transactions</button>
               <button class="chip-btn" onclick="switchTable('users', this)">users</button>
-              <button class="chip-btn" onclick="switchTable('compliance_policies', this)">compliance_policies</button>
             </div>
           </div>
 
           <div class="panel-body">
-            <!-- PDF Export Toolbar -->
-            <div class="toolbar-row" style="background: var(--panel-elevated); padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border);">
-              <span style="font-size: 11.5px; color: var(--text-dim);">PDF filter:</span>
-              <select id="report-user-filter" class="clean-select">
-                <option value="">All users</option>
-                <option value="admin@bank.com">admin@bank.com</option>
-                <option value="compliance.lead@bank.com">compliance.lead@bank.com</option>
-                <option value="john@bank.com">john@bank.com</option>
-                <option value="alice@bank.com">alice@bank.com</option>
-              </select>
-              <select id="report-status-filter" class="clean-select">
-                <option value="">All statuses</option>
-                <option value="SUCCESS">SUCCESS only</option>
-                <option value="DENIED">DENIED only</option>
-              </select>
-              <select id="report-date-filter" class="clean-select">
-                <option value="all">All time</option>
-                <option value="24h">Last 24 hours</option>
-                <option value="7d" selected>Last 7 days</option>
-                <option value="30d">Last 30 days</option>
-              </select>
-              <select id="report-limit-select" class="clean-select">
-                <option value="50">50 rows</option>
-                <option value="100" selected>100 rows</option>
-                <option value="250">250 rows</option>
-              </select>
-              <button class="btn btn-secondary btn-sm" onclick="exportTablePdf()">
-                Generate PDF report
-              </button>
-            </div>
-
             <!-- Table Header Meta -->
             <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 4px;">
               <div style="display: flex; align-items: center; gap: 8px;">
@@ -1368,7 +357,7 @@
             </div>
 
             <!-- Table View -->
-            <div class="table-responsive" style="max-height: 480px;">
+            <div class="table-responsive" style="max-height: 480px; overflow-y: auto; overflow-x: auto; border: 1px solid var(--border); border-radius: 6px;">
               <table id="explorer-table" class="data-table">
                 <thead id="explorer-thead"></thead>
                 <tbody id="explorer-tbody"></tbody>
@@ -1376,7 +365,7 @@
             </div>
 
             <!-- Pagination Toolbar -->
-            <div class="pagination-bar">
+            <div class="pagination-bar" style="margin-top: 8px;">
               <div class="pagination-info" id="pagination-info-text">
                 Showing rows 0 - 0 of 0
               </div>
@@ -1399,6 +388,198 @@
           </div>
         </div>
       </section>
+
+      <!-- VIEW 4: Security Center (Approvals & Alerts) -->
+      <section id="view-approvals" class="view-pane">
+        <div style="display: flex; flex-direction: column; gap: 20px;">
+          
+          <!-- Access Requests & Elevation Approvals -->
+          <div class="panel-card">
+            <div class="panel-header">
+              <span class="panel-title">Access Requests &amp; Approvals</span>
+            </div>
+            <div class="panel-body">
+              <!-- Request Form: Visible for Employee & Auditor; Hidden for Admin (Admin already has max privileges) -->
+              <div id="access-request-form-card" style="background: var(--panel-elevated); padding: 12px; border-radius: 6px; border: 1px solid var(--border); margin-bottom: 16px;">
+                <div style="font-size: 11.5px; font-weight: 600; color: var(--text); margin-bottom: 8px;">Submit New Access Request</div>
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                  <div style="display: flex; gap: 8px;">
+                    <div style="flex: 1;">
+                      <label style="font-size: 10.5px; color: var(--text-dim);">User Email</label>
+                      <select id="req-user-email" class="clean-select" style="width: 100%; padding: 6px;" onchange="validateReqRoles()">
+                        <option value="john@bank.com" selected>john@bank.com (Johnathan Reed - Employee)</option>
+                        <option value="compliance.lead@bank.com">compliance.lead@bank.com (Helen Vance - Auditor)</option>
+                      </select>
+                    </div>
+                    <div style="width: 130px;">
+                      <label style="font-size: 10.5px; color: var(--text-dim);">Requested Role</label>
+                      <select id="req-role-select" class="clean-select" style="width: 100%; padding: 6px;" onchange="validateReqRoles()">
+                        <option value="admin" selected>admin</option>
+                        <option value="auditor">auditor</option>
+                        <option value="employee">employee</option>
+                      </select>
+                    </div>
+                    <div style="width: 90px;">
+                      <label style="font-size: 10.5px; color: var(--text-dim);">Duration</label>
+                      <select id="req-duration-select" class="clean-select" style="width: 100%; padding: 6px;">
+                        <option value="24" selected>24 hours</option>
+                        <option value="12">12 hours</option>
+                        <option value="1">1 hour</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label style="font-size: 10.5px; color: var(--text-dim);">Business Justification / Reason</label>
+                    <input type="text" id="req-reason-input" class="search-input" value="Need temporary write access to reconcile ledger transactions" style="width: 100%;">
+                  </div>
+                  <div id="req-error-msg" style="display: none; font-size: 11px; color: #f59e0b; background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: 4px; padding: 6px 10px;"></div>
+                  <div style="display: flex; justify-content: flex-end; margin-top: 4px;">
+                    <button class="btn btn-primary btn-sm" onclick="submitAccessRequest()">
+                      Submit access request
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Requests Table -->
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <span id="approvals-table-title" style="font-size: 12px; font-weight: 600;">Actionable Requests &amp; Active Grants</span>
+              </div>
+              <div class="table-responsive" style="max-height: 320px; overflow-y: auto; overflow-x: auto; border: 1px solid var(--border); border-radius: 6px;">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th style="width: 50px;">ID</th>
+                      <th style="width: 170px;">User</th>
+                      <th style="width: 80px;">Role</th>
+                      <th>Reason</th>
+                      <th style="width: 90px;">Status</th>
+                      <th style="width: 180px;">Expires (IST)</th>
+                      <th style="width: 130px;">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody id="approvals-tbody">
+                    <tr><td colspan="7" style="padding: 16px; text-align: center; color: var(--text-dim);">Loading requests...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Security Alerts & Anomaly Telemetry -->
+          <div class="panel-card">
+            <div class="panel-header">
+              <span class="panel-title">Security Alerts</span>
+            </div>
+            <div class="panel-body">
+              <div class="table-responsive" style="max-height: 320px; overflow-y: auto; overflow-x: auto; border: 1px solid var(--border); border-radius: 6px;">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th style="width: 155px;">Timestamp (IST)</th>
+                      <th style="width: 95px;">Ledger #</th>
+                      <th style="width: 160px;">User</th>
+                      <th style="width: 90px;">Role</th>
+                      <th style="width: 190px;">Anomaly Name</th>
+                      <th style="width: 110px;">Table</th>
+                      <th>Activity Explanation</th>
+                    </tr>
+                  </thead>
+                  <tbody id="alerts-tbody">
+                    <tr><td colspan="7" style="padding: 16px; text-align: center; color: var(--text-dim);">No security alerts triggered yet.</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- VIEW 5: Compliance Reports Generator (V2 Scope) -->
+      <section id="view-reports" class="view-pane">
+        <div class="panel-card" style="margin-bottom: 16px;">
+          <div class="panel-header">
+            <span class="panel-title" id="reports-panel-title">Compliance Report Generator</span>
+          </div>
+          <div class="panel-body">
+            <!-- Staff Filters (Visible for Admin, Auditor, Employee) -->
+            <div id="reports-admin-filters" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; background: var(--panel-elevated); padding: 16px; border-radius: 6px; border: 1px solid var(--border); margin-bottom: 16px;">
+              <div>
+                <label style="font-size: 11px; color: var(--text-dim); display: block; margin-bottom: 4px;">Time Range</label>
+                <select id="report-filter-timerange" class="clean-select" style="width: 100%; padding: 6px;">
+                  <option value="all" selected>All Time</option>
+                  <option value="24h">Last 24 Hours</option>
+                  <option value="7d">Last 7 Days</option>
+                  <option value="30d">Last 30 Days</option>
+                </select>
+              </div>
+
+              <div>
+                <label style="font-size: 11px; color: var(--text-dim); display: block; margin-bottom: 4px;">User Identity</label>
+                <select id="report-filter-user" class="clean-select" style="width: 100%; padding: 6px;">
+                  <option value="" selected>All Users</option>
+                  <option value="admin@bank.com">admin@bank.com (Chief Security Officer)</option>
+                  <option value="compliance.lead@bank.com">compliance.lead@bank.com (Helen Vance)</option>
+                  <option value="john@bank.com">john@bank.com (Johnathan Reed)</option>
+                  <option value="alice@bank.com">alice@bank.com (Alice Smith)</option>
+                  <option value="bob@bank.com">bob@bank.com (Bob Davis)</option>
+                </select>
+              </div>
+
+              <div>
+                <label style="font-size: 11px; color: var(--text-dim); display: block; margin-bottom: 4px;">User Role</label>
+                <select id="report-filter-role" class="clean-select" style="width: 100%; padding: 6px;">
+                  <option value="" selected>All Roles</option>
+                  <option value="admin">admin</option>
+                  <option value="auditor">auditor</option>
+                  <option value="employee">employee</option>
+                  <option value="customer">customer</option>
+                </select>
+              </div>
+
+              <div>
+                <label style="font-size: 11px; color: var(--text-dim); display: block; margin-bottom: 4px;">Execution Status</label>
+                <select id="report-filter-status" class="clean-select" style="width: 100%; padding: 6px;">
+                  <option value="" selected>All Statuses</option>
+                  <option value="SUCCESS">SUCCESS only</option>
+                  <option value="DENIED">DENIED only</option>
+                  <option value="SENSITIVE">Flagged sensitive (PII) only</option>
+                  <option value="ERROR">ERROR only</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Customer Personal Data Access Filters (Visible ONLY for retail Customer) -->
+            <div id="reports-customer-filters" style="display: none; background: var(--panel-elevated); padding: 16px; border-radius: 6px; border: 1px solid var(--border); margin-bottom: 16px;">
+              <p style="font-size: 12.5px; color: var(--text); margin-bottom: 12px; line-height: 1.5;">
+                <strong>Subject Access Disclosure (GDPR Article 15 &amp; Banking Privacy):</strong><br>
+                Certified audit of all banking staff, compliance auditors, and automated background services that accessed your accounts and financial records.
+              </p>
+              <div style="max-width: 260px;">
+                <label style="font-size: 11px; color: var(--text-dim); display: block; margin-bottom: 4px;">Time Range</label>
+                <select id="report-customer-timerange" class="clean-select" style="width: 100%; padding: 6px;">
+                  <option value="all">All Time</option>
+                  <option value="24h">Last 24 Hours</option>
+                  <option value="7d" selected>Last 7 Days</option>
+                  <option value="30d">Last 30 Days</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Action Bar -->
+            <div style="display: flex; justify-content: flex-end; align-items: center; padding-top: 4px;">
+              <button class="btn btn-primary" onclick="downloadFilteredPdfReport()" style="padding: 10px 20px; font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; gap: 8px;">
+                <svg style="width: 16px; height: 16px;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                </svg>
+                <span id="reports-download-btn-text">Generate &amp; Download Compliance PDF</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
     </div>
   </main>
 
@@ -1415,855 +596,7 @@
     </div>
   </div>
 
-  <script>
-    const API = '';
-    let cachedLedger = [];
-    let currentTable = 'accounts';
-    let currentPage = 1;
-    let currentPageSize = 50;
-    let currentTotalPages = 1;
-    let currentTotalCount = 0;
-    let sortColumn = 'id';
-    let sortAscending = false;
-
-    function setActiveKpiCard(type) {
-      document.querySelectorAll('.kpi-grid .kpi-card').forEach(c => c.classList.remove('active'));
-      if (type) {
-        const card = document.getElementById(`kpi-card-${type}`);
-        if (card) card.classList.add('active');
-      }
-    }
-
-    function showView(viewId, element) {
-      document.querySelectorAll('.view-pane').forEach(v => v.classList.remove('active'));
-      document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-      element.classList.add('active');
-      document.getElementById(viewId).classList.add('active');
-
-      const titles = {
-        'view-console': 'SQL console',
-        'view-ledger': 'Audit ledger',
-        'view-explorer': 'Schema'
-      };
-      document.getElementById('view-title').innerText = titles[viewId] || 'Workspace';
-
-      if (viewId === 'view-ledger') {
-        loadAuditLogs();
-      } else {
-        setActiveKpiCard(null);
-      }
-      if (viewId === 'view-explorer') loadTableMetadata();
-    }
-
-    function navigateToLedger(statusFilter = '', isSensitive = false, sortByTx = false, cardType = 'total') {
-      const navItems = document.querySelectorAll('.nav-item');
-      if (navItems.length > 1) {
-        showView('view-ledger', navItems[1]);
-      }
-
-      setActiveKpiCard(cardType);
-
-      document.getElementById('ledger-search').value = '';
-      document.getElementById('ledger-user-filter').value = '';
-      document.getElementById('ledger-date-filter').value = 'all';
-
-      const statusSelect = document.getElementById('ledger-status-filter');
-      if (statusSelect) {
-        if (isSensitive) {
-          statusSelect.value = 'SENSITIVE';
-        } else {
-          statusSelect.value = statusFilter;
-        }
-      }
-
-      if (sortByTx) {
-        sortColumn = 'immudb_tx_id';
-        sortAscending = false;
-        updateSortIcons();
-      }
-
-      loadAuditLogs();
-    }
-
-    function switchTable(tableName, element) {
-      currentTable = tableName;
-      currentPage = 1;
-      document.querySelectorAll('#table-chips .chip-btn').forEach(btn => btn.classList.remove('active'));
-      if (element) element.classList.add('active');
-      exploreTableData(currentTable, currentPage, currentPageSize);
-    }
-
-    async function switchPersona(persona) {
-      document.querySelectorAll('.persona-btns .persona-btn').forEach(b => b.classList.remove('active'));
-      const activeBtn = document.getElementById(`btn-persona-${persona}`);
-      if (activeBtn) activeBtn.classList.add('active');
-
-      try {
-        const resp = await fetch(`${API}/api/auth/demo-login/${persona}`, { method: 'POST' });
-        const data = await resp.json();
-
-        document.getElementById('current-user-email').innerText = data.email;
-        document.getElementById('user-select').value = data.email;
-
-        const roleBadge = document.getElementById('identity-role-badge');
-        roleBadge.className = `role-badge role-${data.role.toLowerCase()}`;
-        roleBadge.innerText = data.role.toLowerCase();
-
-        const roleDescriptions = {
-          'admin': 'Chief Security Officer',
-          'auditor': 'Independent Auditor',
-          'employee': 'Branch Operations',
-          'customer': 'Retail Client'
-        };
-        document.getElementById('identity-desc-text').innerText = roleDescriptions[persona.toLowerCase()] || data.department;
-
-        const ledgerUserFilter = document.getElementById('ledger-user-filter');
-        if (ledgerUserFilter && ledgerUserFilter.value) {
-          ledgerUserFilter.value = data.email;
-          loadAuditLogs();
-        }
-      } catch (err) {
-        console.error('Failed to switch persona:', err);
-      }
-    }
-
-    async function onScenarioSelect(val) {
-      const scenarios = {
-        'customer-personal': {
-          persona: 'customer',
-          sql: 'SELECT account_number, name, ssn, account_type, balance FROM app_data.accounts WHERE balance > 100000 ORDER BY balance DESC;',
-          desc: 'Switches to Customer persona (alice@bank.com). Demonstrates Row-Level Security: the query is rewritten to isolate records strictly to Alice Smith, and SSN is masked (***-**-1234).'
-        },
-        'employee-transfers': {
-          persona: 'employee',
-          sql: 'SELECT t.id, a.name, t.transaction_type, t.amount, t.merchant, t.status FROM app_data.transactions t JOIN app_data.accounts a ON t.account_id = a.id WHERE t.amount > 10000 ORDER BY t.amount DESC LIMIT 10;',
-          desc: 'Switches to Employee persona (john@bank.com). Demonstrates authorized operational read access to review transactions across accounts.'
-        },
-        'employee-violation': {
-          persona: 'employee',
-          sql: 'UPDATE app_data.accounts SET balance = 9999999 WHERE id = 1;',
-          desc: 'Employee attempts to manipulate customer balances. Demonstrates strict RBAC: blocked with HTTP 403 Forbidden and logged as a violation.'
-        },
-        'customer-delete': {
-          persona: 'customer',
-          sql: 'DELETE FROM app_data.transactions WHERE id = 1;',
-          desc: 'Customer attempts to delete a transaction record. Demonstrates strict RBAC: blocked with HTTP 403 Forbidden.'
-        },
-        'injection-drop': {
-          persona: 'admin',
-          sql: 'SELECT 1; DROP TABLE app_data.transactions;',
-          desc: 'Adversary executes a stacked SQL injection attempting to drop a table. The parser detects destructive multi-statements and rejects execution.'
-        },
-        'admin-overview': {
-          persona: 'admin',
-          sql: 'SELECT account_number, name, ssn, account_type, balance FROM app_data.accounts WHERE balance > 100000 ORDER BY balance DESC;',
-          desc: 'Administrator inspects high-value accounts with unmasked sensitive fields for compliance auditing.'
-        }
-      };
-
-      const item = scenarios[val];
-      if (!item) return;
-
-      const descEl = document.getElementById('scenario-desc');
-      if (descEl) descEl.innerText = item.desc;
-      await switchPersona(item.persona);
-      document.getElementById('sql-input').value = item.sql;
-    }
-
-    async function setQueryScenario(persona, sql, element) {
-      await switchPersona(persona);
-      document.getElementById('sql-input').value = sql;
-    }
-
-    async function simulateTampering() {
-      try {
-        const resp = await fetch(`${API}/api/tamper-demo/simulate`, { method: 'POST' });
-        const data = await resp.json();
-        await loadAuditLogs();
-        verifyProof(data.log_id);
-      } catch(e) {
-        alert('Tamper simulation error: ' + e.message);
-      }
-    }
-
-    async function restoreTamperedRecord(logId) {
-      try {
-        const resp = await fetch(`${API}/api/tamper-demo/restore?log_id=${logId}`, { method: 'POST' });
-        const data = await resp.json();
-        await verifyProof(logId);
-        await loadAuditLogs();
-      } catch(e) {
-        alert('Restore error: ' + e.message);
-      }
-    }
-
-    document.getElementById('sql-input').addEventListener('keydown', function(e) {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-        runQuery();
-      }
-    });
-
-    document.getElementById('sql-input').addEventListener('input', function() {
-      const dd = document.getElementById('scenario-dropdown');
-      if (dd) dd.value = '';
-      const descEl = document.getElementById('scenario-desc');
-      if (descEl) descEl.innerText = 'Custom SQL statement entered.';
-    });
-
-    let lastQueryColumns = [];
-    let lastQueryRows = [];
-    let liveWatchInterval = null;
-
-    function renderResultTableLimited() {
-      const limitVal = document.getElementById('result-limit-select') ? document.getElementById('result-limit-select').value : '50';
-      let rowsToRender = lastQueryRows;
-      if (limitVal !== 'all') {
-        const lim = parseInt(limitVal, 10);
-        rowsToRender = lastQueryRows.slice(0, lim);
-      }
-      renderResultTable(lastQueryColumns, rowsToRender, lastQueryRows.length);
-    }
-
-    function toggleLiveWatch() {
-      const btn = document.getElementById('btn-live-watch');
-      if (liveWatchInterval) {
-        clearInterval(liveWatchInterval);
-        liveWatchInterval = null;
-        btn.innerText = 'Live watch: off';
-        btn.classList.remove('btn-primary');
-        btn.classList.add('btn-secondary');
-      } else {
-        loadAuditLogs();
-        liveWatchInterval = setInterval(loadAuditLogs, 4000);
-        btn.innerText = 'Live watch: on';
-        btn.classList.remove('btn-secondary');
-        btn.classList.add('btn-primary');
-      }
-    }
-
-    async function runQuery() {
-      document.querySelectorAll('#preset-chips .chip-btn').forEach(b => {
-        b.classList.remove('active');
-        b.blur();
-      });
-
-      const user = document.getElementById('user-select').value;
-      const query = document.getElementById('sql-input').value.trim();
-      const banner = document.getElementById('query-banner');
-      const stats = document.getElementById('exec-stats');
-      if (!query) return;
-
-      banner.style.display = 'block';
-      banner.className = 'alert-banner';
-      banner.innerText = 'Evaluating policy and executing query...';
-      stats.innerText = 'Executing...';
-
-      try {
-        const resp = await fetch(API + '/api/execute', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ user, query })
-        });
-        const data = await resp.json();
-
-        if (data.status === 'SUCCESS') {
-          banner.className = 'alert-banner success';
-          let msg = `Executed successfully. Sealed in immudb at transaction #${data.immudb_tx_id}.`;
-          if (data.is_masked) {
-            msg += `<br><span style="color:#fcd34d;">Data masking applied: ${(data.masked_fields||[]).join(', ')} (PII redacted).</span>`;
-          }
-          if (data.is_scoped) {
-            msg += `<br><span style="color:#93c5fd;">Row-level security active: scoped to personal records.</span>`;
-          }
-          if (data.anomalies && data.anomalies.length > 0) {
-            msg += `<br><span style="color:#fca5a5;">Anomaly alert: ${escapeHtml(data.anomalies.join('; '))}.</span>`;
-          }
-          banner.innerHTML = msg;
-
-          stats.innerText = `${data.execution_time_ms} ms | ${data.rows_affected} row(s) | Tx #${data.immudb_tx_id}`;
-          lastQueryColumns = data.columns || [];
-          lastQueryRows = data.results || [];
-          renderResultTableLimited();
-        } else if (data.status === 'DENIED') {
-          banner.className = 'alert-banner denied';
-          let msg = `<strong>Access denied:</strong> ${escapeHtml(data.error)}`;
-          if (data.immudb_tx_id) {
-            msg += `<br><span style="font-family:var(--font-mono); font-size:11px;">Attempt recorded in immudb at transaction #${data.immudb_tx_id} (Log #${data.immudb_log_id}).</span>`;
-          }
-          banner.innerHTML = msg;
-          stats.innerText = data.immudb_tx_id ? `Denied | Tx #${data.immudb_tx_id}` : 'Denied';
-          clearResultTable('Query blocked by access policy.');
-        } else {
-          banner.className = 'alert-banner warning';
-          let msg = `<strong>Error:</strong> ${escapeHtml(data.error)}`;
-          if (data.immudb_tx_id) {
-            msg += `<br><span style="font-family:var(--font-mono); font-size:11px;">Error recorded in immudb at transaction #${data.immudb_tx_id} (Log #${data.immudb_log_id}).</span>`;
-          }
-          banner.innerHTML = msg;
-          stats.innerText = data.immudb_tx_id ? `Error | Tx #${data.immudb_tx_id}` : 'Error';
-          clearResultTable('Database error encountered. Attempt logged.');
-        }
-      } catch (err) {
-        banner.className = 'alert-banner warning';
-        banner.innerHTML = `<strong>Network error:</strong> ${escapeHtml(err.message)}`;
-        stats.innerText = 'Failed';
-      }
-
-      loadStats();
-      loadAuditLogs();
-    }
-
-    function renderResultTable(columns, rows, totalRows) {
-      const thead = document.getElementById('result-thead');
-      const tbody = document.getElementById('result-tbody');
-
-      if (!columns || columns.length === 0) {
-        thead.innerHTML = '<tr><th>Result</th></tr>';
-        tbody.innerHTML = '<tr><td style="padding:14px; color:var(--text-dim);">0 columns returned.</td></tr>';
-        return;
-      }
-
-      thead.innerHTML = `<tr>${columns.map(c => `<th>${escapeHtml(c)}</th>`).join('')}</tr>`;
-
-      if (!rows || rows.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="${columns.length}" style="padding:14px; color:var(--text-dim);">0 records returned.</td></tr>`;
-        return;
-      }
-
-      let html = rows.map(r => `
-        <tr>${r.map(c => `<td class="mono">${escapeHtml(String(c === null ? 'NULL' : c))}</td>`).join('')}</tr>
-      `).join('');
-
-      if (totalRows !== undefined && totalRows > rows.length) {
-        html += `<tr><td colspan="${columns.length}" style="padding:8px 12px; text-align:center; font-size:11px; color:var(--text-dim); background:#101013;">Showing ${rows.length} of ${totalRows} returned records</td></tr>`;
-      }
-
-      tbody.innerHTML = html;
-    }
-
-    function clearResultTable(msg) {
-      lastQueryColumns = [];
-      lastQueryRows = [];
-      document.getElementById('result-thead').innerHTML = '<tr><th>Status</th></tr>';
-      document.getElementById('result-tbody').innerHTML = `<tr><td style="padding:14px; color:var(--text-dim);">${escapeHtml(msg)}</td></tr>`;
-    }
-
-    async function loadAuditLogs() {
-      try {
-        const timeRange = document.getElementById('ledger-date-filter').value;
-        const user = document.getElementById('ledger-user-filter').value;
-        const status = document.getElementById('ledger-status-filter').value;
-        const limitSelect = document.getElementById('ledger-limit-select');
-        const limit = limitSelect ? limitSelect.value : 100;
-
-        let url = `${API}/api/logs?limit=${limit}`;
-        if (timeRange && timeRange !== 'all') url += `&time_range=${timeRange}`;
-        if (user) url += `&user=${encodeURIComponent(user)}`;
-        if (status && status !== 'SENSITIVE') url += `&status=${encodeURIComponent(status)}`;
-
-        const resp = await fetch(url);
-        cachedLedger = await resp.json();
-        const sideCount = document.getElementById('sidebar-log-count');
-        if (sideCount) sideCount.innerText = cachedLedger.length;
-        filterLedger();
-      } catch (e) {
-        console.error("Error loading logs:", e);
-      }
-    }
-
-    function onStatusFilterChange() {
-      const val = document.getElementById('ledger-status-filter').value;
-      if (val === 'DENIED') setActiveKpiCard('denied');
-      else if (val === 'SENSITIVE') setActiveKpiCard('sensitive');
-      else if (val === '') setActiveKpiCard('total');
-      else setActiveKpiCard(null);
-      loadAuditLogs();
-    }
-
-    function clearFilters() {
-      document.getElementById('ledger-search').value = '';
-      document.getElementById('ledger-user-filter').value = '';
-      document.getElementById('ledger-status-filter').value = '';
-      document.getElementById('ledger-date-filter').value = 'all';
-      const af = document.getElementById('ledger-action-filter');
-      if (af) af.value = 'sql';
-      setActiveKpiCard('total');
-      loadAuditLogs();
-    }
-
-    function sortLedger(column) {
-      if (sortColumn === column) {
-        sortAscending = !sortAscending;
-      } else {
-        sortColumn = column;
-        sortAscending = true;
-      }
-      updateSortIcons();
-      filterLedger();
-    }
-
-    function updateSortIcons() {
-      ['id', 'time', 'user', 'action', 'table', 'status', 'immudb_tx_id'].forEach(col => {
-        const el = document.getElementById(`sort-icon-${col}`);
-        if (!el) return;
-        if (sortColumn === col) {
-          el.innerText = sortAscending ? ' \u2191' : ' \u2193';
-        } else {
-          el.innerText = '';
-        }
-      });
-    }
-
-    function filterLedger() {
-      const search = document.getElementById('ledger-search').value.toLowerCase();
-      const user = document.getElementById('ledger-user-filter').value;
-      const status = document.getElementById('ledger-status-filter').value;
-      const timeRange = document.getElementById('ledger-date-filter').value;
-      const actionFilter = document.getElementById('ledger-action-filter') ? document.getElementById('ledger-action-filter').value : 'sql';
-
-      const now = new Date();
-      let cutoff = null;
-      if (timeRange === '24h') cutoff = new Date(now.getTime() - 24 * 3600 * 1000);
-      else if (timeRange === '7d') cutoff = new Date(now.getTime() - 7 * 24 * 3600 * 1000);
-      else if (timeRange === '30d') cutoff = new Date(now.getTime() - 30 * 24 * 3600 * 1000);
-
-      let filtered = cachedLedger.filter(l => {
-        if (actionFilter === 'sql') {
-          if (l.action && l.action.startsWith('AUTH:')) return false;
-        } else if (actionFilter === 'auth') {
-          if (!l.action || !l.action.startsWith('AUTH:')) return false;
-        }
-
-        const matchesSearch = !search ||
-          (l.query && l.query.toLowerCase().includes(search)) ||
-          (l.user && l.user.toLowerCase().includes(search)) ||
-          (l.table && l.table.toLowerCase().includes(search));
-        const matchesUser = !user || l.user === user;
-        const matchesStatus = !status 
-          ? true 
-          : (status === 'SENSITIVE' ? !!l.is_sensitive : l.status === status);
-        
-        let matchesTime = true;
-        if (cutoff && l.time) {
-          try {
-            const entryDate = new Date(l.time);
-            matchesTime = entryDate >= cutoff;
-          } catch(e) { matchesTime = true; }
-        }
-
-        return matchesSearch && matchesUser && matchesStatus && matchesTime;
-      });
-
-      // Sorting
-      filtered.sort((a, b) => {
-        let valA = a[sortColumn];
-        let valB = b[sortColumn];
-        if (valA === undefined || valA === null) valA = '';
-        if (valB === undefined || valB === null) valB = '';
-        if (typeof valA === 'string') valA = valA.toLowerCase();
-        if (typeof valB === 'string') valB = valB.toLowerCase();
-
-        if (valA < valB) return sortAscending ? -1 : 1;
-        if (valA > valB) return sortAscending ? 1 : -1;
-        return 0;
-      });
-
-      renderLedgerTable(filtered);
-    }
-
-    function renderLedgerTable(logs) {
-      const tbody = document.getElementById('ledger-tbody');
-      if (!logs || logs.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="10" style="padding:20px; text-align:center; color:var(--text-dim);">No audit records match these filters.</td></tr>';
-        return;
-      }
-
-      tbody.innerHTML = logs.map(l => {
-        const isDenied = l.status === 'DENIED';
-        const isSensitive = !!l.is_sensitive;
-        const rowClass = isDenied ? 'row-denied' : (isSensitive ? 'row-sensitive' : '');
-
-        let statusTag = isDenied 
-          ? '<span class="tag tag-denied">DENIED</span>' 
-          : '<span class="tag tag-success">SUCCESS</span>';
-        
-        let sensTag = isSensitive 
-          ? '<span class="tag tag-sensitive" style="margin-left:4px;">PII</span>' 
-          : '';
-
-        return `
-          <tr class="${rowClass}">
-            <td class="mono">#${l.id}</td>
-            <td class="mono" style="font-size: 11px; color: var(--text-dim);">${l.time ? l.time.substring(11, 19) : '-'}</td>
-            <td style="color: var(--text);">${escapeHtml(l.user || 'system')}</td>
-            <td><span class="role-badge role-${(l.role||'user').toLowerCase()}">${escapeHtml(l.role || '-')}</span></td>
-            <td>${escapeHtml(l.action || '-')}</td>
-            <td><code class="mono" style="color: var(--text-muted);">${escapeHtml(l.table || '-')}</code></td>
-            <td>${statusTag}${sensTag}</td>
-            <td class="mono" style="color: #93c5fd;">#${l.immudb_tx_id || '-'}</td>
-            <td><button class="btn btn-secondary btn-sm" onclick="verifyProof(${l.id})">Verify proof</button></td>
-            <td class="sql-cell" title="${escapeHtml(l.query || '')}">${escapeHtml(l.query || '')}</td>
-          </tr>
-        `;
-      }).join('');
-    }
-
-    function copyToClipboard(text, btnElement) {
-      navigator.clipboard.writeText(text).then(() => {
-        const orig = btnElement.innerText;
-        btnElement.innerText = 'Copied';
-        setTimeout(() => { btnElement.innerText = orig; }, 1500);
-      });
-    }
-
-    async function verifyProof(logId) {
-      const modal = document.getElementById('proofModal');
-      const body = document.getElementById('modal-content');
-      modal.style.display = 'flex';
-      body.innerHTML = '<p style="color: var(--text-dim); font-size: 12px;">Querying immudb for cryptographic inclusion proof...</p>';
-
-      try {
-        const resp = await fetch(`${API}/api/verify/${logId}`);
-        const data = await resp.json();
-
-        const isTampered = data.database_tampered || !data.verified;
-        const record = data.record || {};
-        const rootHash = data.current_root_hash || '-';
-        const txId = data.tx_id || record.immudb_tx_id || '-';
-        const ledgerKey = data.immudb_key || `audit:log:${logId}`;
-
-        // 1. Verdict Banner & 2. Two-Sentence Summary
-        let bannerHtml = '';
-        let summaryHtml = '';
-        let sideBySideHtml = '';
-        let restoreButtonHtml = '';
-
-        if (isTampered) {
-          bannerHtml = `
-            <div class="verdict-banner tampered">
-              <span class="verdict-title">Tampered: Record discrepancy detected</span>
-              <span class="verdict-desc">PostgreSQL record differs from the cryptographic record sealed in immudb.</span>
-            </div>
-          `;
-          summaryHtml = `
-            <p style="font-size: 12px; color: var(--text);">
-              An out-of-band change was detected in the PostgreSQL database mirror. The fields below do not match the transaction sealed in immudb.
-            </p>
-          `;
-
-          // 5. Side-by-side Table for Mismatches
-          let rowsHtml = '';
-          if (data.mismatches && data.mismatches.length > 0) {
-            data.mismatches.forEach(m => {
-              rowsHtml += `
-                <tr class="mismatch">
-                  <td>Discrepancy</td>
-                  <td colspan="2" style="font-family: var(--font-mono);">${escapeHtml(m)}</td>
-                </tr>
-              `;
-            });
-          }
-          sideBySideHtml = `
-            <div style="display: flex; flex-direction: column; gap: 4px;">
-              <span style="font-size: 11px; color: var(--text-dim);">Comparison: Sealed in immudb vs Current in PostgreSQL</span>
-              <table class="side-by-side-table">
-                <thead>
-                  <tr>
-                    <th>Field</th>
-                    <th>Sealed in immudb</th>
-                    <th>Current in PostgreSQL</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${rowsHtml || '<tr><td colspan="3">Discrepancy detected between database and immudb.</td></tr>'}
-                </tbody>
-              </table>
-            </div>
-          `;
-
-          restoreButtonHtml = `
-            <div style="display: flex; align-items: center; justify-content: space-between; padding-top: 8px; border-top: 1px solid var(--border);">
-              <button class="btn btn-primary" onclick="restoreTamperedRecord(${logId})" style="background: var(--red); border-color: var(--red);">
-                Restore untampered state from immudb
-              </button>
-              <span style="font-size: 11px; color: var(--text-dim);">Overwrites PostgreSQL row with immudb payload.</span>
-            </div>
-          `;
-        } else {
-          bannerHtml = `
-            <div class="verdict-banner verified">
-              <span class="verdict-title">Verified: Cryptographic inclusion proof valid</span>
-              <span class="verdict-desc">Record payload matches the immudb ledger state root.</span>
-            </div>
-          `;
-          summaryHtml = `
-            <p style="font-size: 12px; color: var(--text);">
-              The record payload was hashed and verified against the Merkle tree root at transaction #${txId}. No modifications were detected in PostgreSQL or immudb.
-            </p>
-          `;
-        }
-
-        // 3. Checklist of Checks
-        const checklistHtml = `
-          <div class="check-list">
-            <div class="check-item">
-              <span class="check-badge ${isTampered ? 'fail' : 'pass'}">${isTampered ? 'FAIL' : 'PASS'}</span>
-              <span>Merkle root consistency check</span>
-            </div>
-            <div class="check-item">
-              <span class="check-badge pass">PASS</span>
-              <span>Key exists in append-only ledger (${escapeHtml(ledgerKey)})</span>
-            </div>
-            <div class="check-item">
-              <span class="check-badge ${isTampered ? 'fail' : 'pass'}">${isTampered ? 'FAIL' : 'PASS'}</span>
-              <span>PostgreSQL mirror field equality</span>
-            </div>
-            <div class="check-item">
-              <span class="check-badge pass">PASS</span>
-              <span>Linear transaction height continuity</span>
-            </div>
-          </div>
-        `;
-
-        // 4. Collapsible Auditor Technical Details
-        const metaValuesHtml = `
-          <details class="raw-json" style="margin-top: 6px;">
-            <summary style="font-size: 11.5px; color: var(--text-dim); cursor: pointer; user-select: none;">
-              Auditor cryptographic details (state root & transaction keys)
-            </summary>
-            <div class="meta-key-value" style="margin-top: 8px;">
-              <div class="meta-row">
-                <span class="meta-label">Ledger key:</span>
-                <span class="meta-val">
-                  <span class="mono">${escapeHtml(ledgerKey)}</span>
-                  <button class="btn-copy" onclick="copyToClipboard('${escapeHtml(ledgerKey)}', this)">Copy</button>
-                </span>
-              </div>
-              <div class="meta-row">
-                <span class="meta-label">Transaction ID:</span>
-                <span class="meta-val">
-                  <span class="mono">Tx #${txId}</span>
-                  <button class="btn-copy" onclick="copyToClipboard('${txId}', this)">Copy</button>
-                </span>
-              </div>
-              <div style="display: flex; flex-direction: column; gap: 4px; padding-top: 4px;">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                  <span class="meta-label">Ledger state root at Tx #${txId}:</span>
-                  <button class="btn-copy" onclick="copyToClipboard('${escapeHtml(rootHash)}', this)">Copy</button>
-                </div>
-                <div class="hash-display">${escapeHtml(rootHash)}</div>
-              </div>
-            </div>
-          </details>
-        `;
-
-        // 6. Record Details
-        const recordDetailsHtml = `
-          <table class="side-by-side-table">
-            <thead>
-              <tr>
-                <th>User</th>
-                <th>Role</th>
-                <th>Action</th>
-                <th>Target</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>${escapeHtml(record.app_user || '-')}</td>
-                <td><span class="role-badge role-${(record.user_role||'user').toLowerCase()}">${escapeHtml(record.user_role || '-')}</span></td>
-                <td>${escapeHtml(record.action || '-')}</td>
-                <td><code class="mono">${escapeHtml(record.target_table || '-')}</code></td>
-                <td>${escapeHtml(record.execution_status || '-')}</td>
-              </tr>
-            </tbody>
-          </table>
-        `;
-
-        // 7. Collapsible Raw JSON
-        const rawJsonHtml = `
-          <details class="raw-json">
-            <summary>Raw ledger payload</summary>
-            <pre>${escapeHtml(JSON.stringify(data.record || data, null, 2))}</pre>
-          </details>
-        `;
-
-        // 8. One-line Footer
-        const footerHtml = `
-          <div class="modal-footer-note">
-            Detects changes to stored records. Does not prevent them.
-          </div>
-        `;
-
-        body.innerHTML = `
-          ${bannerHtml}
-          ${summaryHtml}
-          ${checklistHtml}
-          ${recordDetailsHtml}
-          ${sideBySideHtml}
-          ${metaValuesHtml}
-          ${rawJsonHtml}
-          ${restoreButtonHtml}
-          ${footerHtml}
-        `;
-      } catch (err) {
-        body.innerHTML = `<div style="color: var(--red); font-size: 12px;">Verification request failed: ${escapeHtml(err.message)}</div>`;
-      }
-    }
-
-    function closeModal() {
-      document.getElementById('proofModal').style.display = 'none';
-    }
-
-    async function loadTableMetadata() {
-      try {
-        const resp = await fetch(`${API}/api/tables`);
-        const tables = await resp.json();
-        const chipsContainer = document.getElementById('table-chips');
-        chipsContainer.innerHTML = tables.map(t => `
-          <button class="chip-btn ${t.name === currentTable ? 'active' : ''}" onclick="switchTable('${t.name}', this)">
-            ${t.name} <span style="font-size:10.5px; color:var(--text-dim);">(${t.row_count.toLocaleString()})</span>
-          </button>
-        `).join('');
-      } catch(e) {
-        console.error("Failed loading table metadata:", e);
-      }
-      exploreTableData(currentTable, currentPage, currentPageSize);
-    }
-
-    async function exploreTableData(tableName, page, limit) {
-      document.getElementById('explorer-table-name').innerText = `app_data.${tableName}`;
-      const thead = document.getElementById('explorer-thead');
-      const tbody = document.getElementById('explorer-tbody');
-      thead.innerHTML = '<tr><th>Loading schema...</th></tr>';
-      tbody.innerHTML = '';
-
-      try {
-        const resp = await fetch(`${API}/api/tables/${tableName}?limit=${limit}&page=${page}`);
-        const data = await resp.json();
-
-        currentTotalCount = data.total_count || 0;
-        currentTotalPages = data.total_pages || 1;
-        currentPage = data.page || page;
-
-        document.getElementById('explorer-row-count').innerText = `${currentTotalCount.toLocaleString()} rows`;
-
-        const startRow = Math.min((currentPage - 1) * limit + 1, currentTotalCount);
-        const endRow = Math.min(startRow + data.total_rows_returned - 1, currentTotalCount);
-        document.getElementById('pagination-info-text').innerText = 
-          currentTotalCount > 0 
-            ? `Showing rows ${startRow.toLocaleString()} - ${endRow.toLocaleString()} of ${currentTotalCount.toLocaleString()} in app_data.${tableName}`
-            : `0 records in app_data.${tableName}`;
-
-        document.getElementById('current-page-input').value = currentPage;
-        document.getElementById('total-pages-span').innerText = currentTotalPages;
-
-        document.getElementById('btn-page-first').disabled = currentPage <= 1;
-        document.getElementById('btn-page-prev').disabled = currentPage <= 1;
-        document.getElementById('btn-page-next').disabled = currentPage >= currentTotalPages;
-        document.getElementById('btn-page-last').disabled = currentPage >= currentTotalPages;
-
-        thead.innerHTML = `<tr>${data.columns.map(c => `<th>${escapeHtml(c)}</th>`).join('')}</tr>`;
-        tbody.innerHTML = data.rows.map(r => `
-          <tr>${r.map(c => `<td class="mono">${escapeHtml(String(c === null ? 'NULL' : c))}</td>`).join('')}</tr>
-        `).join('');
-
-        filterExplorerRows();
-      } catch (err) {
-        thead.innerHTML = '<tr><th>Error</th></tr>';
-        tbody.innerHTML = `<tr><td style="color:var(--red); padding:14px;">Error: ${escapeHtml(err.message)}</td></tr>`;
-      }
-    }
-
-    function filterExplorerRows() {
-      const input = document.getElementById('explorer-row-filter');
-      const filter = input ? input.value.toLowerCase().trim() : '';
-      const tbody = document.getElementById('explorer-tbody');
-      const trs = tbody.getElementsByTagName('tr');
-      for (let i = 0; i < trs.length; i++) {
-        const rowText = trs[i].innerText.toLowerCase();
-        trs[i].style.display = (!filter || rowText.includes(filter)) ? '' : 'none';
-      }
-    }
-
-    function onPageSizeChange() {
-      currentPageSize = parseInt(document.getElementById('page-size-select').value, 10);
-      currentPage = 1;
-      exploreTableData(currentTable, currentPage, currentPageSize);
-    }
-
-    function goToPage(page) {
-      if (page < 1) page = 1;
-      if (page > currentTotalPages) page = currentTotalPages;
-      currentPage = page;
-      exploreTableData(currentTable, currentPage, currentPageSize);
-    }
-
-    function prevPage() {
-      if (currentPage > 1) goToPage(currentPage - 1);
-    }
-
-    function nextPage() {
-      if (currentPage < currentTotalPages) goToPage(currentPage + 1);
-    }
-
-    function goToLastPage() {
-      goToPage(currentTotalPages);
-    }
-
-    function onPageInput(val) {
-      const p = parseInt(val, 10);
-      if (!isNaN(p)) goToPage(p);
-    }
-
-    function exportTablePdf() {
-      const user = document.getElementById('report-user-filter').value;
-      const status = document.getElementById('report-status-filter').value;
-      const timeRange = document.getElementById('report-date-filter').value;
-      const limitSelect = document.getElementById('report-limit-select');
-      const limit = limitSelect ? limitSelect.value : '100';
-
-      let url = `${API}/api/reports/pdf?table=${encodeURIComponent(currentTable)}&limit=${limit}`;
-      if (user) url += `&user=${encodeURIComponent(user)}`;
-      if (status) url += `&status=${encodeURIComponent(status)}`;
-      if (timeRange && timeRange !== 'all') url += `&time_range=${timeRange}`;
-
-      window.open(url, '_blank');
-    }
-
-    async function loadStats() {
-      try {
-        const resp = await fetch(API + '/api/stats');
-        if (resp.ok) {
-          const s = await resp.json();
-          document.getElementById('kpi-total').innerText = (s.total_audited || 0).toLocaleString();
-          document.getElementById('kpi-denied').innerText = (s.denied_count || 0).toLocaleString();
-          document.getElementById('kpi-sensitive').innerText = (s.sensitive_count || 0).toLocaleString();
-          const hEl = document.getElementById('kpi-height');
-          if (hEl) hEl.innerText = '#' + (s.ledger_height || 0).toLocaleString();
-        }
-      } catch (e) {
-        console.error("Error loading stats:", e);
-      }
-    }
-
-    function escapeHtml(str) {
-      if (!str) return '';
-      return String(str)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#039;');
-    }
-
-    // Initialize
-    switchPersona('admin');
-    loadStats();
-    loadAuditLogs();
-    loadTableMetadata();
-    setInterval(loadStats, 10000);
-  </script>
+  <!-- Smooth External Modular JavaScript -->
+  <script src="/static/js/app.js?v=2.0.9"></script>
 </body>
 </html>
