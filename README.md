@@ -430,6 +430,7 @@ print("Cryptographically Verified:", proof["verified"])
 
 ```
 Vault_DB/
+├── ARCHITECTURE.md                 # System architecture, data flow & security design
 ├── config/
 │   ├── __init__.py
 │   └── settings.py                     # Centralized Pydantic configuration & env validation
