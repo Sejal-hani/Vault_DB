@@ -9,8 +9,24 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115%2B-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![Tests](https://img.shields.io/badge/Test%20Suite-147%20Passed-success)](tests/)
-[![Compliance](https://img.shields.io/badge/Compliance-GDPR%20|%20HIPAA%20|%20PCI--DSS-orange)](#10-regulatory-compliance-mapping)
-[![License](https://img.shields.io/badge/License-MIT-purple)](LICENSE)
+[![Compliance](https://img.shields.io/badge/Compliance-GDPR%20|%20HIPAA%20|%20PCI--DSS-orange)](#11-regulatory-compliance-mapping)
+
+---
+
+## Table of Contents
+
+- [1. Product Overview](#1-product-overview)
+- [2. Product Demonstration](#2-product-demonstration)
+- [3. System Architecture & Dual-Storage Engine](#3-system-architecture--dual-storage-engine)
+- [4. Core Capabilities](#4-core-capabilities)
+- [5. Threat Model & Defense Matrix](#5-threat-model--defense-matrix)
+- [6. Security Workstation Web Console](#6-security-workstation-web-console)
+- [7. Installation & Setup Guide](#7-installation--setup-guide)
+- [8. Enterprise Personas & Access Control](#8-enterprise-personas--access-control)
+- [9. Automated Verification & Test Suite](#9-automated-verification--test-suite)
+- [10. Python SDK Integration](#10-python-sdk-integration)
+- [11. Regulatory Compliance Mapping](#11-regulatory-compliance-mapping)
+- [12. Project Directory Structure](#12-project-directory-structure)
 
 ---
 
@@ -18,16 +34,24 @@
 
 In regulated enterprise environments such as financial services, healthcare, and fintech, proving **who accessed what data, when, and under what authority** is both an operational imperative and a strict regulatory mandate.
 
-Traditional database architectures remain vulnerable to three primary vectors:
+Traditional database architectures remain vulnerable to three primary attack vectors:
 1. **Insider Tampering**: Superusers and database administrators can alter, backdate, or delete rows directly from relational audit tables (`DELETE FROM audit_logs`).
 2. **Client-Side Identity Spoofing**: Trusting client applications to declare their identity in SQL sessions invites privilege escalation and impersonation.
 3. **Reconnaissance Blind Spots**: Denied access attempts, cross-tenant queries, and multi-statement SQL injection attempts are frequently omitted from forensic logging.
 
-**VaultDB** solves these challenges by functioning as a high-performance, transparent security middleware proxy between client applications and database infrastructure. Every query is parsed at the AST level, evaluated under server-derived zero-trust identity, dynamically scoped to tenant boundaries, masked for sensitive PII, and committed simultaneously to an append-only **immudb** cryptographic Merkle tree ledger and a PostgreSQL relational mirror.
+**VaultDB** functions as a high-performance, transparent security middleware proxy between client applications and database infrastructure. Every query is parsed at the AST level, evaluated under server-derived zero-trust identity, dynamically scoped to tenant boundaries, masked for sensitive PII, and committed simultaneously to an append-only [immudb](https://immudb.io/) cryptographic Merkle tree ledger and a [PostgreSQL](https://www.postgresql.org/) relational mirror.
 
 ---
 
-## 2. System Architecture & Dual-Storage Engine
+## 2. Product Demonstration
+
+[![Watch VaultDB Demonstration](https://img.youtube.com/vi/DEMO_VIDEO_ID/maxresdefault.jpg)](https://www.youtube.com/watch?v=DEMO_VIDEO_ID)
+
+> *Video Walkthrough: Zero-trust query interception, cryptographic Merkle tree audit verification, real-time database tampering detection, and administrative security workstation.*
+
+---
+
+## 3. System Architecture & Dual-Storage Engine
 
 ```
 +---------------------------------------------------------------------------------------------------+
@@ -135,45 +159,45 @@ sequenceDiagram
 
 ---
 
-## 3. Core Capabilities
+## 4. Core Capabilities
 
-### 🔒 Cryptographic Audit Ledger
-* **Dual-Commit Pipeline**: Every query attempt (both successful executions and rejected violations) is recorded in PostgreSQL and committed to an append-only **immudb** Merkle tree.
+### Cryptographic Audit Ledger
+* **Dual-Commit Pipeline**: Every query attempt (both successful executions and rejected violations) is recorded in PostgreSQL and committed to an append-only [immudb](https://immudb.io/) Merkle tree.
 * **Mathematical Inclusion Proofs**: Each audit entry produces a verifiable SHA-256 state root and linear transaction height. Auditors can independently verify cryptographic membership proofs directly in the web console or via API.
-* **Engine-Level Immutability**: PostgreSQL PL/pgSQL triggers reject direct `UPDATE`, `DELETE`, and `TRUNCATE` operations on `vault_audit.audit_logs`. If a DBA circumvents relational triggers out-of-band, the Merkle tree state in immudb flags the discrepancy with field-by-field verification diffs.
+* **Engine-Level Immutability**: PostgreSQL PL/pgSQL triggers in [`schema.sql`](schema.sql) reject direct `UPDATE`, `DELETE`, and `TRUNCATE` operations on `vault_audit.audit_logs`. If a DBA circumvents relational triggers out-of-band, the Merkle tree state in immudb flags the discrepancy with field-by-field verification diffs.
 
-### 🛡️ Role-Based Access Control (RBAC) & AST Parser
-* **Server-Derived Identity**: Client requests cannot dictate or override `app_user` or `user_role`. Identity is derived strictly server-side from salted PBKDF2 password hashes, RFC 7519 HS256 JWT tokens, or cryptographically verified API keys.
-* **AST-Level SQL Inspection**: Deep parsing extracts targets, actions (`SELECT`, `INSERT`, `UPDATE`, `DELETE`, `DDL:DROP`, `ALTER`), and sensitive attributes before execution.
+### Role-Based Access Control (RBAC) & AST Parser
+* **Server-Derived Identity**: Client requests cannot dictate or override `app_user` or `user_role`. Identity is derived strictly server-side from salted PBKDF2 password hashes, RFC 7519 HS256 JWT tokens, or cryptographically verified API keys in [`src/vault_db/auth/`](src/vault_db/auth/).
+* **AST-Level SQL Inspection**: Deep parsing in [`src/vault_db/core/parser.py`](src/vault_db/core/parser.py) extracts targets, actions (`SELECT`, `INSERT`, `UPDATE`, `DELETE`, `DDL:DROP`, `ALTER`), and sensitive attributes before execution.
 * **Injection Firewall**: Blocks stacked queries (multi-statement injection), CTE write attacks (`WITH x AS (DELETE ...) SELECT 1;`), `COPY PROGRAM`, and unprivileged privilege escalation (`SET ROLE`).
 
-### 👥 Tenant Isolation via Row-Level Security (RLS)
-* **Automatic Query Rewriting**: Customer queries are dynamically intercepted and constrained to personal account and transaction records at runtime.
+### Tenant Isolation via Row-Level Security (RLS)
+* **Automatic Query Rewriting**: Customer queries are dynamically intercepted in [`src/vault_db/core/rls.py`](src/vault_db/core/rls.py) and constrained to personal account and transaction records at runtime.
 * **Cross-Tenant Violation Guard**: Explicit customer attempts to query foreign account numbers (`ACC-...`) or arbitrary user records are blocked with an immediate security denial and recorded into the ledger.
 
-### 🎭 Dynamic In-Flight Data Masking
-* **In-Flight PII Redaction**: Automatically redacts sensitive identifiers (Social Security Numbers as `***-**-XXXX`, credit card numbers, CVVs, and passwords) in query responses.
+### Dynamic In-Flight Data Masking
+* **In-Flight PII Redaction**: Automatically redacts sensitive identifiers (Social Security Numbers as `***-**-XXXX`, credit card numbers, CVVs, and passwords) in query responses via [`src/vault_db/core/masking.py`](src/vault_db/core/masking.py).
 * **Masked Audit Trails**: Constants in SQL text are sanitized in both execution results and persistent audit logs, preventing PII leakage into compliance archives.
 
-### ⚡ Behavioral Anomaly Detection Engine
+### Behavioral Anomaly Detection Engine
 * **Unusual Bulk Data Access**: Flags non-admin queries attempting to retrieve large row counts (`>= 1,000` rows) exceeding baseline operational thresholds.
 * **Unusual After-Hours Access**: Flags employee or staff queries accessing sensitive customer financial records outside configured banking hours (`09:00 – 18:00 IST`). Customers accessing personal accounts 24/7 are exempt.
 * **Repeated Unauthorized Access**: Accumulates failed access attempts in a sliding time window (`>= 2` denials within 5 minutes) and updates cumulative violation tracking with cross-references to the audit ledger.
 * **Unusual Bulk Modification**: Flags high-impact `UPDATE` or `DELETE` statements affecting broad row sets (`>= 10` rows) without narrow primary key constraints.
-* **Slack Webhook Dispatcher**: Dispatches real-time Slack Block Kit alerts when critical anomalies are detected.
+* **Slack Webhook Dispatcher**: Dispatches real-time Slack Block Kit alerts via [`src/vault_db/core/alerts.py`](src/vault_db/core/alerts.py) when critical anomalies are detected.
 
-### ⏳ Just-in-Time (JIT) Temporary Privilege Elevation
-* **Self-Service Requests**: Employees and auditors can request temporary elevation (e.g. 1h, 12h, 24h) with mandatory business justifications.
+### Just-in-Time (JIT) Temporary Privilege Elevation
+* **Self-Service Requests**: Employees and auditors can request temporary elevation (e.g. 1h, 12h, 24h) with mandatory business justifications via [`src/vault_db/api/routes/approvals.py`](src/vault_db/api/routes/approvals.py).
 * **Administrative Governance**: Administrators review, approve, reject, or immediately revoke active grants with one click.
 * **Automated Expiration**: Active grants automatically expire after the granted window, reverting the user to baseline privileges.
 
-### 📄 Audit-Grade Compliance PDF Reports
-* **Filtered Audit Exports**: Compliance officers can generate certified PDF reports filtered by time range (24h, 7d, 30d, all time), user identity, role, and execution status.
+### Audit-Grade Compliance PDF Reports
+* **Filtered Audit Exports**: Compliance officers can generate certified PDF reports filtered by time range (24h, 7d, 30d, all time), user identity, role, and execution status using [`src/vault_db/reports/pdf_generator.py`](src/vault_db/reports/pdf_generator.py).
 * **Cryptographic Evidence**: Reports include cryptographic state roots, transaction IDs, client IPs, execution durations, and tamper verification status suitable for regulatory audits.
 
 ---
 
-## 4. Threat Model & Defense Matrix
+## 5. Threat Model & Defense Matrix
 
 | Threat Vector | Attack Scenario | VaultDB Defense Mechanism |
 | :--- | :--- | :--- |
@@ -186,12 +210,12 @@ sequenceDiagram
 
 ---
 
-## 5. Security Workstation Web Console
+## 6. Security Workstation Web Console
 
 VaultDB provides a unified dark-themed web workstation served at **`http://localhost:8000`**:
 
 * **SQL Execution Console**: Interactive query editor with keyboard shortcuts (`Ctrl+Enter`), preset attack scenarios, execution latency metrics, and instant result tables.
-* **Audit Ledger**: Complete historical query trail with sorting (ID, timestamp, user), search filtering, and a **sticky pagination toolbar** (`25`, `50`, `100`, `250` rows per page) permanently anchored at the bottom of the card.
+* **Audit Ledger**: Complete historical query trail with sorting (ID, timestamp, user), search filtering, and a sticky pagination toolbar (`25`, `50`, `100`, `250` rows per page) permanently anchored at the bottom of the card.
 * **Mathematical Proof Verification Modal**: Click **Verify Proof** on any ledger entry to view cryptographic state roots, transaction IDs, and live Merkle inclusion proofs.
 * **Schema Explorer**: Interactive table inspection and column structure discovery for PostgreSQL schemas with pagination.
 * **Security Center**:
@@ -201,7 +225,7 @@ VaultDB provides a unified dark-themed web workstation served at **`http://local
 
 ---
 
-## 6. Installation & Setup Guide
+## 7. Installation & Setup Guide
 
 ### System Prerequisites
 | Component | Minimum Version | Notes |
@@ -236,11 +260,11 @@ pip install -r requirements.txt
 ```
 
 #### 2. Environment Configuration (`.env`)
-Copy the environment template and verify your local settings:
+Copy the environment template from [`.env.example`](.env.example) and verify your local settings:
 ```bash
 cp .env.example .env
 ```
-Ensure connection settings match your local environment:
+Ensure connection settings in [`.env`](.env.example) match your local environment:
 ```ini
 # PostgreSQL Relational Business Store
 POSTGRES_HOST=127.0.0.1
@@ -276,7 +300,7 @@ ANOMALY_TIMEZONE=Asia/Kolkata
 ```
 
 #### 3. Initialize Database & Immutability Triggers
-Run the automated initialization script to establish database schemas, immutability triggers, and seed demo enterprise accounts:
+Run the automated initialization script in [`scripts/init_databases.py`](scripts/init_databases.py) to establish database schemas from [`schema.sql`](schema.sql), immutability triggers, and seed demo enterprise accounts:
 ```bash
 python scripts/init_databases.py
 ```
@@ -298,7 +322,7 @@ python server.py
 ```
 
 ##### Alternative: Docker Compose
-If you prefer running services via Docker:
+If you prefer running services in containers using [`docker-compose.yml`](docker-compose.yml):
 ```bash
 docker compose up -d
 ```
@@ -307,10 +331,10 @@ Open **`http://localhost:8000`** in your browser to access the live dashboard.
 
 ---
 
-## 7. Enterprise Personas & RBAC Matrix
+## 8. Enterprise Personas & Access Control
 
-### Demo Authentication Personas
-VaultDB includes 4 pre-seeded enterprise personas:
+### Pre-Configured Demo Personas
+VaultDB includes 4 pre-seeded enterprise banking personas:
 
 | Role | Email Identity | Default Password | API Key | Permissions |
 | :--- | :--- | :--- | :--- | :--- |
@@ -321,7 +345,7 @@ VaultDB includes 4 pre-seeded enterprise personas:
 
 ---
 
-### RBAC Permission Matrix
+### Role-Based Access Control (RBAC) Matrix
 
 | Resource / Action | Customer | Employee | Auditor | Admin |
 | :--- | :---: | :---: | :---: | :---: |
@@ -338,54 +362,26 @@ VaultDB includes 4 pre-seeded enterprise personas:
 
 ---
 
-## 8. Automated Test Suite
+## 9. Automated Verification & Test Suite
 
-VaultDB features an enterprise-grade automated test suite containing **147 tests** covering adversarial vectors, cryptographic validation, and role enforcement:
+VaultDB features an automated test suite containing **147 tests** in [`tests/`](tests/) covering adversarial vectors, cryptographic validation, and role enforcement:
 
 ```bash
 pytest tests/ -v
 ```
 
 ### Test Coverage Highlights
-* **100+ Adversarial SQL Vectors**: Multi-statement injection, CTE writes, `COPY PROGRAM`, `SET ROLE`, out-of-band schema drops, and comment truncation.
+* **100+ Adversarial SQL Vectors** ([`tests/test_attack_vectors.py`](tests/test_attack_vectors.py)): Multi-statement injection, CTE writes, `COPY PROGRAM`, `SET ROLE`, out-of-band schema drops, and comment truncation.
 * **Engine Immutability Triggers**: Verification that direct `UPDATE`, `DELETE`, and `TRUNCATE` operations on `vault_audit.audit_logs` are rejected by PostgreSQL.
-* **Cryptographic Merkle Proofs**: SHA-256 state root consistency and tamper detection logic.
-* **Anomaly Engine**: Evaluation of bulk thresholds (`>= 1,000` rows), after-hours windows, and repeated denial accumulation.
-* **Tenant Isolation & Masking**: Customer row scoping and in-flight PII redaction.
+* **Cryptographic Merkle Proofs** ([`tests/test_immudb.py`](tests/test_immudb.py)): SHA-256 state root consistency and tamper detection logic.
+* **Enterprise Security & Approvals** ([`tests/test_enterprise_security.py`](tests/test_enterprise_security.py)): Evaluation of bulk thresholds (`>= 1,000` rows), after-hours windows, repeated denial accumulation, temporary JIT elevation, and PDF generation.
+* **Tenant Isolation & Masking** ([`tests/test_rbac.py`](tests/test_rbac.py)): Customer row scoping and in-flight PII redaction.
 
 ---
 
-## 9. REST API & Python SDK Reference
+## 10. Python SDK Integration
 
-### Modular REST API Endpoints
-
-The API is partitioned into modular domain routers (`/api`):
-
-| Domain | Method | Endpoint | Description |
-| :--- | :--- | :--- | :--- |
-| **Auth** | `POST` | `/api/auth/login` | Authenticate with email/password; returns signed HS256 JWT cookie. |
-| **Auth** | `POST` | `/api/auth/demo-login/{persona}` | 1-Click demo authentication for evaluation. |
-| **Auth** | `POST` | `/api/auth/logout` | Invalidate active session cookie. |
-| **Auth** | `GET` | `/api/auth/me` | Retrieve current authenticated identity profile. |
-| **Query** | `POST` | `/api/execute` | Execute SQL under server-derived identity with RBAC, RLS, and immudb logging. |
-| **Audit** | `GET` | `/api/logs` | Query audit ledger entries with filtering by user, table, status, and time range. |
-| **Audit** | `GET` | `/api/verify/{log_id}` | Retrieve cryptographic Merkle proof and verify data integrity against immudb. |
-| **Audit** | `POST` | `/api/tamper-demo/simulate` | Simulate unauthorized database record modification for tamper detection demos. |
-| **Audit** | `POST` | `/api/tamper-demo/restore` | Restore tampered database records back to verified cryptographic state. |
-| **Audit** | `GET` | `/api/tables` | Dynamically discover business schemas and table row counts. |
-| **Audit** | `GET` | `/api/tables/{table_name}` | Retrieve paginated table data with PII masking. |
-| **Audit** | `GET` | `/api/reports/pdf` | Generate and download an audit-grade compliance PDF report. |
-| **Approvals** | `POST` | `/api/approvals/request` | Submit a temporary privilege elevation request. |
-| **Approvals** | `GET` | `/api/approvals` | List pending and active access elevation requests. |
-| **Approvals** | `POST` | `/api/approvals/{id}/approve` | Approve a temporary access elevation request (Admin only). |
-| **Approvals** | `POST` | `/api/approvals/{id}/reject` | Reject an access request (Admin only). |
-| **Approvals** | `POST` | `/api/approvals/{id}/revoke` | Revoke an active privilege grant immediately (Admin only). |
-| **Alerts** | `GET` | `/api/alerts/recent` | Retrieve recent behavioral security anomalies. |
-| **Alerts** | `POST` | `/api/alerts/test-webhook` | Dispatch simulated Slack webhook anomaly alert. |
-
----
-
-### Python SDK Usage Example
+Applications connect to VaultDB using the Python client SDK:
 
 ```python
 from src.vault_db import VaultClient
@@ -412,7 +408,7 @@ print("Cryptographically Verified:", proof["verified"])
 
 ---
 
-## 10. Regulatory Compliance Mapping
+## 11. Regulatory Compliance Mapping
 
 * **GDPR Article 30 (Records of Processing Activities)**: Maintains an immutable, unalterable log of every query accessing personal customer data.
 * **GDPR Article 15 (Right of Access / Subject Access Disclosure)**: Customers can view a certified audit of every internal employee, auditor, and automated service that accessed their personal records.
@@ -421,7 +417,7 @@ print("Cryptographically Verified:", proof["verified"])
 
 ---
 
-## 11. Project Directory Structure
+## 12. Project Directory Structure
 
 ```
 Vault_DB/
@@ -476,17 +472,10 @@ Vault_DB/
 │       └── app.js                      # Modular single-page application client logic
 ├── templates/
 │   └── index.html                      # Security workstation management interface
-├── tests/                              # Comprehensive Automated Test Suite
-│   ├── test_api.py                     # REST API integration tests
-│   ├── test_attack_vectors.py          # 100+ Adversarial SQL injection & exploit tests
-│   ├── test_enterprise_security.py     # Enterprise RBAC, RLS, JIT approvals & PDF tests
-│   ├── test_immudb.py                  # Cryptographic Merkle verification tests
-│   └── test_rbac.py                    # Role-based access control permission tests
-└── LICENSE                             # MIT Open Source License
+└── tests/                              # Comprehensive Automated Test Suite
+    ├── test_api.py                     # REST API integration tests
+    ├── test_attack_vectors.py          # 100+ Adversarial SQL injection & exploit tests
+    ├── test_enterprise_security.py     # Enterprise RBAC, RLS, JIT approvals & PDF tests
+    ├── test_immudb.py                  # Cryptographic Merkle verification tests
+    └── test_rbac.py                    # Role-based access control permission tests
 ```
-
----
-
-## 12. License
-
-Distributed under the **MIT License**. See [`LICENSE`](LICENSE) for complete terms.
