@@ -10,19 +10,18 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
 from config.settings import settings
-from src.vault_db.api.routes import router, get_engine
-import src.vault_db.api.routes as routes_module
+from src.vault_db.api.dependencies import get_engine, set_engine, close_engine
+from src.vault_db.api.routes import api_router
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup: initialize engine
     engine = get_engine()
-    routes_module.engine = engine
+    set_engine(engine)
     yield
     # Shutdown: clean up connection pools and sessions
-    if routes_module.engine:
-        routes_module.engine.close()
+    close_engine()
 
 
 def create_app() -> FastAPI:
@@ -45,8 +44,8 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    # Include API router
-    app.include_router(router)
+    # Include modular API router
+    app.include_router(api_router)
 
     # Static files and root UI
     base_dir = Path(__file__).resolve().parent.parent.parent.parent

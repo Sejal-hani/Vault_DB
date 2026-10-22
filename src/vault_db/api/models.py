@@ -6,6 +6,29 @@ from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 
 
+# ---------------------------------------------------------
+# Authentication Models
+# ---------------------------------------------------------
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+class LoginResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    email: str
+    role: str
+    full_name: str
+    api_key: Optional[str] = None
+    department: str = "General"
+
+
+# ---------------------------------------------------------
+# Query Execution Models
+# ---------------------------------------------------------
+
 class ExecuteQueryRequest(BaseModel):
     query: str = Field(..., description="SQL statement to execute")
     user: Optional[str] = Field(default=None, description="Optional legacy fallback identity")
@@ -31,6 +54,10 @@ class ExecuteQueryResponse(BaseModel):
     immudb_tx_hash: Optional[str] = None
     error: Optional[str] = None
 
+
+# ---------------------------------------------------------
+# Audit, Ledger & Tamper Simulation Models
+# ---------------------------------------------------------
 
 class AuditLogEntry(BaseModel):
     id: int
@@ -73,3 +100,19 @@ class SystemHealthResponse(BaseModel):
     postgres: str
     immudb: str
     version: str
+
+
+class TamperPayload(BaseModel):
+    log_id: Optional[int] = None
+
+
+# ---------------------------------------------------------
+# Access Request & Approval Models
+# ---------------------------------------------------------
+
+class CreateAccessRequest(BaseModel):
+    user_email: str
+    requested_role: str = "writer"
+    requested_table: str = "*"
+    duration_hours: int = 24
+    reason: str = "Need write access to update customer and transaction records for maintenance."

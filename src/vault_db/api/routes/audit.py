@@ -1,247 +1,31 @@
+"""
+Audit, Verification, Ledger & Table Exploration Routes
+Endpoints for audit log inspection, cryptographic Merkle tree verification,
+tampering simulations, compliance PDF generation, and table schema browsing.
+"""
+
 import logging
 import math
 import psycopg
-from decimal import Decimal
 from datetime import datetime, timezone, timedelta
-from typing import Any, List, Optional
-from pydantic import BaseModel, Field
-from fastapi import APIRouter, HTTPException, Query, Request, Response, Depends, Header, Cookie
+from typing import List, Optional
+from fastapi import APIRouter, HTTPException, Query, Response
 
 from config.settings import settings
+from src.vault_db.api.dependencies import get_engine, serialize_item
 from src.vault_db.reports.pdf_generator import generate_audit_pdf_report
-from src.vault_db.core.engine import VaultEngine
-from src.vault_db.core.rbac import AccessDeniedError, QueryExecutionError
-from src.vault_db.core.parser import SQLParser
-from src.vault_db.auth.security import verify_password
-from src.vault_db.auth.jwt_handler import create_access_token
-from src.vault_db.auth.dependencies import get_current_user, AuthenticatedUser
+from src.vault_db.core.masking import mask_ssn
 from src.vault_db.api.models import (
-    ExecuteQueryRequest,
-    ExecuteQueryResponse,
     AuditLogEntry,
     VerifyLogResponse,
     LedgerStateResponse,
     SystemHealthResponse,
+    TamperPayload,
 )
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/api", tags=["VaultDB API"])
 
-# Global engine instance attached during app startup
-engine: VaultEngine = None
-
-
-class LoginRequest(BaseModel):
-    email: str
-    password: str
-
-
-class LoginResponse(BaseModel):
-    access_token: str
-    token_type: str = "bearer"
-    email: str
-    role: str
-    full_name: str
-    api_key: Optional[str] = None
-    department: str = "General"
-
-
-@router.post("/auth/login", response_model=LoginResponse)
-async def login(req: LoginRequest, response: Response, request: Request):
-    """
-    Authenticates email and password. Returns signed HS256 JWT and sets secure cookie.
-    """
-    eng = get_engine()
-    user = eng.postgres.get_user_by_email(req.email)
-
-    if not user or not verify_password(req.password, user.get("password_hash", "")):
-        raise HTTPException(status_code=401, detail="Invalid email or password.")
-
-    token = create_access_token({
-        "sub": user["email"],
-        "role": user["role"],
-        "name": user.get("full_name", user["email"]),
-    })
-
-    response.set_cookie(
-        key="vault_session",
-        value=token,
-        httponly=True,
-        samesite="lax",
-        max_age=3600,
-    )
-
-    return LoginResponse(
-        access_token=token,
-        email=user["email"],
-        role=user["role"],
-        full_name=user.get("full_name", user["email"]),
-        api_key=user.get("api_key"),
-        department=user.get("department", "General"),
-    )
-
-
-@router.post("/auth/demo-login/{persona}", response_model=LoginResponse)
-async def demo_login(persona: str, response: Response, request: Request):
-    """
-    1-Click demo authentication for evaluation.
-    Personas: admin, auditor, employee, customer.
-    """
-    credentials_map = {
-        "admin": ("admin@bank.com", "AdminPass123!"),
-        "auditor": ("compliance.lead@bank.com", "AuditorPass123!"),
-        "employee": ("john@bank.com", "EmployeePass123!"),
-        "customer": ("alice@bank.com", "CustomerPass123!"),
-        "customer_bob": ("bob@bank.com", "CustomerPass123!"),
-        "bob": ("bob@bank.com", "CustomerPass123!"),
-        "writer": ("sarah.writer@bank.com", "WriterPass123!"),
-        "reader": ("bob.reader@bank.com", "ReaderPass123!"),
-        "customer_john": ("john.customer@bank.com", "CustomerPass123!"),
-        "customer_sarah": ("sarah.customer@bank.com", "CustomerPass123!"),
-    }
-    clean_p = persona.lower().strip()
-    if clean_p not in credentials_map:
-        raise HTTPException(status_code=400, detail=f"Unknown persona '{persona}'. Choose: admin, auditor, employee, customer, customer_bob, bob, writer, reader.")
-
-    email, password = credentials_map[clean_p]
-    return await login(LoginRequest(email=email, password=password), response, request)
-
-
-@router.post("/auth/logout")
-async def logout(response: Response, request: Request):
-    """Clears authentication session cookie."""
-    response.delete_cookie(key="vault_session")
-    return {"status": "LOGGED_OUT", "message": "Session invalidated."}
-
-
-@router.get("/auth/me")
-async def get_me(request: Request):
-    """Returns currently authenticated user profile or unauthenticated status."""
-    try:
-        user = await get_current_user(request)
-        return {
-            "authenticated": True,
-            "email": user.email,
-            "role": user.role,
-            "full_name": user.full_name,
-            "api_key": user.api_key,
-            "department": user.department,
-        }
-    except Exception:
-        return {"authenticated": False}
-
-
-def get_engine() -> VaultEngine:
-    global engine
-    if engine is None:
-        engine = VaultEngine()
-    return engine
-
-
-def serialize_item(item: Any) -> Any:
-    if isinstance(item, Decimal):
-        return float(item)
-    if isinstance(item, datetime):
-        return item.isoformat()
-    return item
-
-
-@router.post("/execute", response_model=ExecuteQueryResponse)
-async def execute_query(
-    req: ExecuteQueryRequest,
-    request: Request,
-    authorization: Optional[str] = Header(None),
-    x_api_key: Optional[str] = Header(None),
-    vault_session: Optional[str] = Cookie(None),
-):
-    """
-    Executes a SQL query under server-derived user identity context with RBAC, RLS, masking, and immudb audit trail.
-    """
-    eng = get_engine()
-    client_ip = request.client.host if request.client else "127.0.0.1"
-
-    # Derive authenticated identity from Bearer token, Cookie, or X-API-Key
-    authenticated_user = None
-    try:
-        authenticated_user = await get_current_user(request, authorization, x_api_key, vault_session)
-    except Exception:
-        pass
-
-    # Use authenticated identity if present; otherwise fallback to request user or default
-    resolved_user = authenticated_user.email if authenticated_user else (req.user or req.app_user or "alice@bank.com")
-
-    try:
-        res = eng.execute(
-            query=req.query,
-            params=tuple(req.params) if req.params else None,
-            app_user=resolved_user,
-            client_ip=client_ip,
-        )
-
-        clean_results = None
-        if res.get("results"):
-            clean_results = [
-                [serialize_item(cell) for cell in row]
-                for row in res["results"]
-            ]
-
-        raw_anoms = res.get("anomalies") or []
-        clean_anoms = [a["name"] if isinstance(a, dict) else str(a) for a in raw_anoms]
-
-        return ExecuteQueryResponse(
-            status="SUCCESS",
-            results=clean_results,
-            columns=res.get("columns", []),
-            rows_affected=res.get("rows_affected", 0),
-            execution_time_ms=res.get("execution_time_ms", 0.0),
-            is_sensitive=res.get("is_sensitive", False),
-            sensitive_fields=res.get("sensitive_fields", []),
-            is_masked=res.get("is_masked", False),
-            masked_fields=res.get("masked_fields", []),
-            is_scoped=res.get("is_scoped", False),
-            anomalies=clean_anoms,
-            immudb_log_id=res.get("immudb_log_id"),
-            immudb_tx_id=res.get("immudb_tx_id"),
-            immudb_verified=res.get("immudb_verified"),
-            immudb_tx_hash=res.get("immudb_tx_hash"),
-        )
-    except AccessDeniedError as pe:
-        analysis = SQLParser.analyze(req.query)
-        rec = getattr(pe, "immudb_record", {}) or {}
-        return ExecuteQueryResponse(
-            status="DENIED",
-            error=str(pe),
-            rows_affected=0,
-            is_sensitive=analysis.is_sensitive,
-            sensitive_fields=analysis.sensitive_fields_found,
-            immudb_log_id=rec.get("id"),
-            immudb_tx_id=rec.get("immudb_tx_id"),
-            immudb_verified=rec.get("immudb_verified", True),
-            immudb_tx_hash=rec.get("immudb_tx_hash"),
-        )
-    except QueryExecutionError as qe:
-        analysis = SQLParser.analyze(req.query)
-        rec = getattr(qe, "immudb_record", {}) or {}
-        return ExecuteQueryResponse(
-            status="ERROR",
-            error=str(qe),
-            rows_affected=0,
-            is_sensitive=analysis.is_sensitive,
-            sensitive_fields=analysis.sensitive_fields_found,
-            immudb_log_id=rec.get("id"),
-            immudb_tx_id=rec.get("immudb_tx_id"),
-            immudb_verified=rec.get("immudb_verified", True),
-            immudb_tx_hash=rec.get("immudb_tx_hash"),
-        )
-    except Exception as ex:
-        analysis = SQLParser.analyze(req.query)
-        return ExecuteQueryResponse(
-            status="ERROR",
-            error=str(ex),
-            rows_affected=0,
-            is_sensitive=analysis.is_sensitive,
-            sensitive_fields=analysis.sensitive_fields_found,
-        )
+router = APIRouter(tags=["Audit & Compliance"])
 
 
 @router.get("/logs", response_model=List[AuditLogEntry])
@@ -375,10 +159,6 @@ async def verify_log(log_id: int):
     return VerifyLogResponse(**result)
 
 
-class TamperPayload(BaseModel):
-    log_id: Optional[int] = None
-
-
 @router.post("/tamper-demo/simulate")
 async def simulate_tamper(payload: Optional[TamperPayload] = None, log_id: Optional[int] = Query(default=None)):
     """
@@ -472,14 +252,14 @@ async def restore_tamper(payload: Optional[TamperPayload] = None, log_id: Option
                     execution_status = %s,
                     immudb_tx_id = %s
                 WHERE log_id = %s;
-            """, (true_query, true_user, true_role, true_action, true_table, true_status, tx_id, log_id))
+            """, (true_query, true_user, true_role, true_action, true_table, true_status, tx_id, target_id))
             cur.execute("ALTER TABLE vault_audit.audit_logs ENABLE TRIGGER trg_no_update_delete_audit;")
 
     return {
         "status": "RESTORED",
-        "log_id": log_id,
+        "log_id": target_id,
         "restored_query": true_query,
-        "message": f"Log #{log_id} has been restored to its authentic cryptographic immudb state."
+        "message": f"Log #{target_id} has been restored to its authentic cryptographic immudb state."
     }
 
 
@@ -817,8 +597,7 @@ async def inspect_table_data(
 
     query = f'SELECT * FROM "{schema_name}"."{clean_name}" {order_clause} LIMIT {limit} OFFSET {calc_offset};'
     rows, columns, _ = eng.postgres.execute_query(query)
-    
-    from src.vault_db.core.masking import mask_ssn
+
     ssn_indices = [i for i, col in enumerate(columns) if "ssn" in col.lower()]
 
     clean_rows = []
@@ -828,6 +607,7 @@ async def inspect_table_data(
             if s_idx < len(row_list) and row_list[s_idx] is not None:
                 row_list[s_idx] = mask_ssn(row_list[s_idx])
         clean_rows.append(row_list)
+
     return {
         "table": clean_name,
         "schema": schema_name,
@@ -840,209 +620,3 @@ async def inspect_table_data(
         "total_pages": total_pages,
         "total_rows_returned": len(clean_rows),
     }
-
-
-# ==============================================================================
-# V2 SCOPE: Temporary 24h Approvals & Slack Webhook Alert Endpoints
-# ==============================================================================
-
-class CreateAccessRequest(BaseModel):
-    user_email: str
-    requested_role: str = "writer"
-    requested_table: str = "*"
-    duration_hours: int = 24
-    reason: str = "Need write access to update customer and transaction records for maintenance."
-
-
-@router.post("/approvals/request")
-async def request_access_elevation(req: CreateAccessRequest, request: Request):
-    """
-    Submits a time-bounded (e.g. 24h) privilege elevation request.
-    Example: Bob requests access for 24 hours.
-    """
-    eng = get_engine()
-    client_ip = request.client.host if request.client else "127.0.0.1"
-    try:
-        created = eng.approvals.create_request(
-            user_email=req.user_email,
-            requested_role=req.requested_role,
-            requested_table=req.requested_table,
-            duration_hours=req.duration_hours,
-            reason=req.reason,
-            client_ip=client_ip,
-        )
-        return created
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-@router.get("/approvals")
-async def list_access_approvals(
-    status: Optional[str] = Query(default=None, description="Filter by status (PENDING, APPROVED, REJECTED, EXPIRED, REVOKED)"),
-    user: Optional[str] = Query(default=None, description="Filter by user email")
-):
-    """Lists all access elevation requests with real-time status and remaining duration."""
-    eng = get_engine()
-    return eng.approvals.list_requests(status=status, user_email=user)
-
-
-@router.post("/approvals/{request_id}/approve")
-async def approve_access_request(
-    request_id: int,
-    request: Request,
-    reviewer_email: str = Query(default="admin@bank.com")
-):
-    """
-    Manager/Admin approves a pending 24-hour access request.
-    Seals approval into immudb, grants temporary elevated role, and dispatches Slack alert.
-    Enforces that only 'admin' role can approve privilege escalations.
-    """
-    eng = get_engine()
-    client_ip = request.client.host if request.client else "127.0.0.1"
-
-    # Backend RBAC enforcement
-    authenticated_user = None
-    try:
-        authenticated_user = await get_current_user(request)
-    except Exception:
-        pass
-
-    acting_email = authenticated_user.email if authenticated_user else reviewer_email
-    reviewer_role = authenticated_user.role if authenticated_user else eng.get_user_role(acting_email)
-
-    if reviewer_role.lower() != "admin":
-        raise HTTPException(
-            status_code=403,
-            detail=f"Access Denied: Role '{reviewer_role}' is not authorized to approve privilege elevations. Manager/Admin role required."
-        )
-
-    try:
-        result = eng.approvals.approve_request(request_id, reviewer_email=acting_email, client_ip=client_ip)
-        return result
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-@router.post("/approvals/{request_id}/reject")
-async def reject_access_request(
-    request_id: int,
-    request: Request,
-    reviewer_email: str = Query(default="admin@bank.com"),
-    reason: Optional[str] = Query(default=None)
-):
-    """Rejects a pending access request and records refusal in immutable audit log."""
-    eng = get_engine()
-    client_ip = request.client.host if request.client else "127.0.0.1"
-
-    # Backend RBAC enforcement
-    authenticated_user = None
-    try:
-        authenticated_user = await get_current_user(request)
-    except Exception:
-        pass
-
-    acting_email = authenticated_user.email if authenticated_user else reviewer_email
-    reviewer_role = authenticated_user.role if authenticated_user else eng.get_user_role(acting_email)
-
-    if reviewer_role.lower() != "admin":
-        raise HTTPException(
-            status_code=403,
-            detail=f"Access Denied: Role '{reviewer_role}' is not authorized to reject access requests."
-        )
-
-    try:
-        result = eng.approvals.reject_request(request_id, reviewer_email=acting_email, reason=reason, client_ip=client_ip)
-        return result
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-@router.post("/approvals/{request_id}/revoke")
-async def revoke_access_request(
-    request_id: int,
-    request: Request,
-    reviewer_email: str = Query(default="admin@bank.com")
-):
-    """Immediately revokes an active approved elevation before its 24h expiration."""
-    eng = get_engine()
-    client_ip = request.client.host if request.client else "127.0.0.1"
-
-    # Backend RBAC enforcement
-    authenticated_user = None
-    try:
-        authenticated_user = await get_current_user(request)
-    except Exception:
-        pass
-
-    acting_email = authenticated_user.email if authenticated_user else reviewer_email
-    reviewer_role = authenticated_user.role if authenticated_user else eng.get_user_role(acting_email)
-
-    if reviewer_role.lower() != "admin":
-        raise HTTPException(
-            status_code=403,
-            detail=f"Access Denied: Role '{reviewer_role}' is not authorized to revoke access requests."
-        )
-
-    try:
-        result = eng.approvals.revoke_request(request_id, reviewer_email=acting_email, client_ip=client_ip)
-        return result
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-@router.get("/alerts/recent")
-async def get_recent_alerts(limit: int = Query(default=20, ge=1, le=100)):
-    """Returns recent anomaly security alerts with full Slack webhook Block Kit payload."""
-    from src.vault_db.core.alerts import AlertDispatcher
-    raw_alerts = AlertDispatcher.get_recent_alerts(limit=limit * 2)
-    sanitized = []
-    for a in raw_alerts:
-        # Strictly skip any administrative privilege events
-        anom_name = a.get("anomaly_name") or (a.get("anomalies") and a.get("anomalies")[0]) or ""
-        if "PRIVILEGE_" in anom_name or "ELEVATION" in anom_name:
-            continue
-
-        user = (a.get("user") or "").lower()
-        role = (a.get("role") or "").lower()
-        if user in ("bob.reader@bank.com", "sarah.writer@bank.com") or role in ("reader", "writer"):
-            a["user"] = "john@bank.com"
-            a["role"] = "employee"
-        
-        # Standardize explanation
-        if not a.get("explanation") and a.get("summary"):
-            a["explanation"] = a["summary"]
-        if not a.get("anomaly_name") and a.get("anomalies"):
-            a["anomaly_name"] = a["anomalies"][0]
-
-        sanitized.append(a)
-        if len(sanitized) >= limit:
-            break
-    return sanitized
-
-
-@router.post("/alerts/test-webhook")
-async def test_slack_webhook(request: Request):
-    """Triggers a simulated Slack webhook alert for testing."""
-    from src.vault_db.core.alerts import AlertDispatcher
-    client_ip = request.client.host if request.client else "127.0.0.1"
-    AlertDispatcher.dispatch_anomaly_alert(
-        app_user="john@bank.com",
-        user_role="employee",
-        anomalies=[{
-            "name": "Unusual Bulk Data Access",
-            "explanation": "Retrieved 1,500 customer records (configured threshold: 1,000)",
-            "table": "accounts",
-            "severity": "Medium",
-            "outcome": "Flagged",
-            "rows_affected": 1500,
-        }],
-        query="SELECT * FROM app_data.accounts WHERE balance > 0;",
-        rows_affected=1500,
-        execution_status="SUCCESS",
-        client_ip=client_ip,
-        target_table="accounts",
-    )
-    return {"status": "DISPATCHED", "message": "Test anomaly alert dispatched."}
-
-
-
