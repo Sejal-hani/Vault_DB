@@ -78,29 +78,44 @@
             </svg>
           </button>
 
-          <!-- Dropdown Popover for Persona Switch & Quick Login -->
-          <div id="account-dropdown" style="display: none; position: absolute; right: 0; top: 38px; width: 340px; background: #141417; border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 16px 36px rgba(0,0,0,0.65); z-index: 2000; padding: 14px;">
-            <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-dim); margin-bottom: 10px;">
-              Sign in with Credentials
+          <!-- Dropdown Popover for 1-Click User Switching -->
+          <div id="account-dropdown" style="display: none; position: absolute; right: 0; top: 38px; width: 310px; background: #141417; border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 16px 36px rgba(0,0,0,0.65); z-index: 2000; padding: 10px;">
+            <div style="font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-dim); padding: 4px 8px 8px 8px; border-bottom: 1px solid var(--border); margin-bottom: 8px;">
+              Switch Active User
             </div>
-            <form onsubmit="handleTopNavLogin(event)" style="display: flex; flex-direction: column; gap: 9px;">
-              <div>
-                <label style="font-size: 11px; color: var(--text-dim); display: block; margin-bottom: 4px;">User Account</label>
-                <select id="quick-email-select" class="clean-select" style="width: 100%; padding: 6px 8px; font-size: 11.5px;" onchange="onQuickEmailChange(this.value)">
-                  <option value="admin@bank.com" selected>admin@bank.com (Chief Security Officer - Admin)</option>
-                  <option value="compliance.lead@bank.com">compliance.lead@bank.com (Helen Vance - Auditor)</option>
-                  <option value="john@bank.com">john@bank.com (Johnathan Reed - Employee)</option>
-                  <option value="alice@bank.com">alice@bank.com (Alice Smith - Customer)</option>
-                  <option value="bob@bank.com">bob@bank.com (Bob Davis - Customer)</option>
-                </select>
-              </div>
-              <div>
-                <label style="font-size: 11px; color: var(--text-dim); display: block; margin-bottom: 4px;">Password</label>
-                <input type="password" id="quick-password-input" class="search-input" placeholder="Password" style="width: 100%; padding: 6px 8px; font-size: 11.5px;" value="AdminPass123!">
-              </div>
-              <div id="quick-login-error" style="display: none; font-size: 10.5px; color: #ef4444; background: rgba(239, 68, 68, 0.1); padding: 4px 8px; border-radius: 4px;"></div>
-              <button type="submit" class="btn btn-primary btn-sm" style="width: 100%; justify-content: center; font-weight: 600; padding: 7px; margin-top: 4px;">Sign In</button>
-            </form>
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+              <button type="button" class="user-item-btn" onclick="selectAccountItem('admin')" style="display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 7px 10px; background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 6px; color: var(--text); cursor: pointer; text-align: left; transition: all 0.15s ease;">
+                <div>
+                  <div style="font-weight: 600; font-size: 12px;">Chief Security Officer</div>
+                  <div class="mono" style="font-size: 10.5px; color: var(--text-dim);">admin@bank.com</div>
+                </div>
+                <span class="role-badge role-admin">admin</span>
+              </button>
+
+              <button type="button" class="user-item-btn" onclick="selectAccountItem('auditor')" style="display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 7px 10px; background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 6px; color: var(--text); cursor: pointer; text-align: left; transition: all 0.15s ease;">
+                <div>
+                  <div style="font-weight: 600; font-size: 12px;">Helen Vance</div>
+                  <div class="mono" style="font-size: 10.5px; color: var(--text-dim);">compliance.lead@bank.com</div>
+                </div>
+                <span class="role-badge role-auditor">auditor</span>
+              </button>
+
+              <button type="button" class="user-item-btn" onclick="selectAccountItem('employee')" style="display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 7px 10px; background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 6px; color: var(--text); cursor: pointer; text-align: left; transition: all 0.15s ease;">
+                <div>
+                  <div style="font-weight: 600; font-size: 12px;">Johnathan Reed</div>
+                  <div class="mono" style="font-size: 10.5px; color: var(--text-dim);">john@bank.com</div>
+                </div>
+                <span class="role-badge role-employee">employee</span>
+              </button>
+
+              <button type="button" class="user-item-btn" onclick="selectAccountItem('customer')" style="display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 7px 10px; background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 6px; color: var(--text); cursor: pointer; text-align: left; transition: all 0.15s ease;">
+                <div>
+                  <div style="font-weight: 600; font-size: 12px;">Alice Smith</div>
+                  <div class="mono" style="font-size: 10.5px; color: var(--text-dim);">alice@bank.com</div>
+                </div>
+                <span class="role-badge role-customer">customer</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -124,10 +139,6 @@
         <div class="kpi-card card-grants" id="kpi-card-grants" onclick="navigateToSecurityCenter('grants')" title="Click to manage 24h temporary elevation grants">
           <span class="kpi-label">Active temporary grants</span>
           <span class="kpi-value" id="kpi-grants" style="color: #10b981;">0</span>
-        </div>
-        <div class="kpi-card card-anomalies" id="kpi-card-anomalies" onclick="navigateToSecurityCenter('alerts')" title="Click to review live anomaly detections">
-          <span class="kpi-label">Security alerts & anomalies</span>
-          <span class="kpi-value" id="kpi-anomalies" style="color: #f97316;">0</span>
         </div>
       </div>
 
@@ -479,13 +490,12 @@
                       <th style="width: 95px;">Ledger #</th>
                       <th style="width: 160px;">User</th>
                       <th style="width: 90px;">Role</th>
-                      <th style="width: 190px;">Anomaly Name</th>
-                      <th style="width: 110px;">Table</th>
-                      <th>Activity Explanation</th>
+                      <th style="width: 220px;">Anomaly Name</th>
+                      <th>Table</th>
                     </tr>
                   </thead>
                   <tbody id="alerts-tbody">
-                    <tr><td colspan="7" style="padding: 16px; text-align: center; color: var(--text-dim);">No security alerts triggered yet.</td></tr>
+                    <tr><td colspan="6" style="padding: 16px; text-align: center; color: var(--text-dim);">No security alerts triggered yet.</td></tr>
                   </tbody>
                 </table>
               </div>

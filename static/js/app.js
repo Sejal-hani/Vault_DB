@@ -143,14 +143,6 @@
       exploreTableData(currentTable, currentPage, currentPageSize);
     }
 
-    const USER_PASSWORDS = {
-      'admin@bank.com': 'AdminPass123!',
-      'compliance.lead@bank.com': 'AuditorPass123!',
-      'john@bank.com': 'EmployeePass123!',
-      'alice@bank.com': 'CustomerPass123!',
-      'bob@bank.com': 'CustomerPass123!'
-    };
-
     const USER_ROLES = {
       'admin@bank.com': 'admin',
       'compliance.lead@bank.com': 'auditor',
@@ -193,71 +185,6 @@
       switchPersona(persona);
       const drop = document.getElementById('account-dropdown');
       if (drop) drop.style.display = 'none';
-    }
-
-    function onQuickEmailChange(email) {
-      const passInput = document.getElementById('quick-password-input');
-      if (passInput && USER_PASSWORDS[email]) {
-        passInput.value = USER_PASSWORDS[email];
-      }
-    }
-
-    async function handleTopNavLogin(e) {
-      e.preventDefault();
-      const email = document.getElementById('quick-email-select').value.trim();
-      const password = document.getElementById('quick-password-input').value;
-      const errBox = document.getElementById('quick-login-error');
-      if (errBox) errBox.style.display = 'none';
-
-      try {
-        const resp = await fetch(`${API}/api/auth/login`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password })
-        });
-        if (!resp.ok) {
-          const err = await resp.json();
-          throw new Error(err.detail || 'Invalid email or password');
-        }
-        const data = await resp.json();
-        currentAuth = {
-          token: data.access_token,
-          email: data.email,
-          role: data.role.toLowerCase(),
-          full_name: data.full_name || data.email,
-          department: data.department || 'General'
-        };
-        sessionStorage.setItem('vault_auth', JSON.stringify(currentAuth));
-
-        document.getElementById('current-user-email').innerText = data.email;
-        document.getElementById('user-select').value = data.email;
-        const roleBadge = document.getElementById('identity-role-badge');
-        roleBadge.className = `role-badge role-${data.role.toLowerCase()}`;
-        roleBadge.innerText = data.role.toLowerCase();
-        document.getElementById('identity-desc-text').innerText = `${currentAuth.full_name} (${currentAuth.department})`;
-
-        const topName = document.getElementById('topbar-user-name');
-        if (topName) topName.innerText = currentAuth.full_name;
-        const topRole = document.getElementById('topbar-user-role');
-        if (topRole) topRole.innerText = currentAuth.role;
-
-        document.querySelectorAll('.persona-btns .persona-btn').forEach(b => b.classList.remove('active'));
-        const activeBtn = document.getElementById(`btn-persona-${currentAuth.role}`);
-        if (activeBtn) activeBtn.classList.add('active');
-
-        // Also update the access request user dropdown to the logged in user
-        const reqUserSelect = document.getElementById('req-user-email');
-        if (reqUserSelect) reqUserSelect.value = data.email;
-
-        applyRoleUiPermissions(currentAuth.role);
-        const drop = document.getElementById('account-dropdown');
-        if (drop) drop.style.display = 'none';
-      } catch (err) {
-        if (errBox) {
-          errBox.innerText = err.message;
-          errBox.style.display = 'block';
-        }
-      }
     }
 
     document.addEventListener('click', (e) => {
@@ -377,12 +304,6 @@
         if (topName) topName.innerText = currentAuth.full_name;
         const topRole = document.getElementById('topbar-user-role');
         if (topRole) topRole.innerText = currentAuth.role;
-
-        // Sync dropdown selectors
-        const quickSelect = document.getElementById('quick-email-select');
-        if (quickSelect) quickSelect.value = data.email;
-        const quickPass = document.getElementById('quick-password-input');
-        if (quickPass && USER_PASSWORDS[data.email]) quickPass.value = USER_PASSWORDS[data.email];
 
         const reqUserSelect = document.getElementById('req-user-email');
         if (reqUserSelect) reqUserSelect.value = data.email;
@@ -1548,13 +1469,12 @@
         });
 
         if (alerts.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="7" style="padding: 24px; text-align: center; color: var(--text-dim);">No security anomalies detected. System operating within normal behavioral baseline.</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="6" style="padding: 24px; text-align: center; color: var(--text-dim);">No security anomalies detected. System operating within normal behavioral baseline.</td></tr>';
           return;
         }
         tbody.innerHTML = alerts.map(a => {
           const timeStr = a.timestamp ? formatIST(a.timestamp) : '-';
           const anomName = a.anomaly_name || (a.anomalies && a.anomalies[0]) || 'Security Anomaly';
-          const explanation = a.explanation || a.summary || '-';
           const table = a.table || 'accounts';
           const userStr = a.user || 'unknown';
           const roleStr = a.role || '-';
@@ -1571,12 +1491,11 @@
               <td><span class="role-badge role-${roleStr.toLowerCase()}">${escapeHtml(roleStr)}</span></td>
               <td style="font-weight: 600; color: #f97316;">${escapeHtml(anomName)}</td>
               <td><code class="mono" style="color: var(--text-muted);">${escapeHtml(table)}</code></td>
-              <td style="font-size: 11.5px; color: var(--text);">${escapeHtml(explanation)}</td>
             </tr>
           `;
         }).join('');
       } catch (e) {
-        tbody.innerHTML = `<tr><td colspan="7" style="padding: 16px; color: #f87171;">Error loading alerts: ${escapeHtml(e.message)}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" style="padding: 16px; color: #f87171;">Error loading alerts: ${escapeHtml(e.message)}</td></tr>`;
       }
     }
 
