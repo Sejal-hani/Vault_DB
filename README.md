@@ -45,7 +45,7 @@ Traditional database architectures remain vulnerable to three primary attack vec
 
 ## 2. Product Demonstration
 
-[![Watch VaultDB Demonstration](https://img.youtube.com/vi/DEMO_VIDEO_ID/maxresdefault.jpg)](https://www.youtube.com/watch?v=DEMO_VIDEO_ID)
+[![Watch VaultDB Demonstration]([https://img.youtube.com/vi/DEMO_VIDEO_ID/maxresdefault.jpg)](https://www.youtube.com/watch?v=DEMO_VIDEO_ID](https://youtu.be/njkgwQVWpks?si=lDAf5tUK6LdcAbkd)](https://youtu.be/njkgwQVWpks?si=lDAf5tUK6LdcAbkd))
 
 > *Video Walkthrough: Zero-trust query interception, cryptographic Merkle tree audit verification, real-time database tampering detection, and administrative security workstation.*
 
