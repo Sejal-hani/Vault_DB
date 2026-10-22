@@ -236,6 +236,8 @@ VaultDB provides a unified dark-themed web workstation served at **`http://local
 
 ## 7. Installation & Setup Guide
 
+> For quick setup instructions, see [SETUP.md](SETUP.md).
+
 ### System Prerequisites
 | Component | Minimum Version | Notes |
 | :--- | :--- | :--- |
@@ -430,7 +432,6 @@ print("Cryptographically Verified:", proof["verified"])
 
 ```
 Vault_DB/
-├── ARCHITECTURE.md                 # System architecture, data flow & security design
 ├── config/
 │   ├── __init__.py
 │   └── settings.py                     # Centralized Pydantic configuration & env validation
@@ -440,8 +441,10 @@ Vault_DB/
 ├── docker-compose.yml                  # Multi-container orchestration (PostgreSQL, immudb, VaultDB)
 ├── Dockerfile                          # Production container image specification
 ├── pyproject.toml                      # PEP 621 package metadata & project build configuration
+├── README.md                           # Master architectural and compliance documentation
 ├── requirements.txt                    # Python runtime package dependencies
 ├── server.py                           # Application web server entry point
+├── SETUP.md                            # Step-by-step installation & environment configuration
 ├── scripts/
 │   ├── init_databases.py               # Database setup, schema generation & persona seeding
 │   ├── seed_transactions.py            # High-volume transactional data generator
