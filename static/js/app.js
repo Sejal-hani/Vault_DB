@@ -1004,100 +1004,100 @@
         const resp = await fetch(`${API}/api/verify/${logId}`);
         const data = await resp.json();
 
-        const isTampered = data.database_tampered || !data.verified;
         const record = data.record || {};
+        const isTampered = data.database_tampered || (data.mirror_match === false) || !data.verified;
+        const ledgerPassed = data.ledger_integrity !== undefined ? !!data.ledger_integrity : !!data.verified;
+        const mirrorPassed = data.mirror_match !== undefined ? !!data.mirror_match : !data.database_tampered;
         const rootHash = data.current_root_hash || '-';
         const txId = data.tx_id || record.immudb_tx_id || '-';
         const ledgerKey = data.immudb_key || `audit:log:${logId}`;
 
-        // 1. Verdict Banner & 2. Two-Sentence Summary
-        let bannerHtml = '';
-        let summaryHtml = '';
-        let sideBySideHtml = '';
+        const userStr = record.app_user || '-';
+        const roleStr = record.user_role || '-';
+        const actionStr = record.action || '-';
+        const tableStr = record.target_table || '-';
+        const timeStr = record.timestamp ? formatIST(record.timestamp) : '-';
 
+        // 1. One big verdict banner with single sentence
+        let bannerHtml = '';
         if (isTampered) {
           bannerHtml = `
             <div class="verdict-banner tampered">
-              <span class="verdict-title">Tampered: Record discrepancy detected</span>
+              <span class="verdict-title">TAMPERED</span>
               <span class="verdict-desc">PostgreSQL record differs from the cryptographic record sealed in immudb.</span>
-            </div>
-          `;
-          summaryHtml = `
-            <p style="font-size: 12px; color: var(--text);">
-              An out-of-band change was detected in the PostgreSQL database mirror. The fields below do not match the transaction sealed in immudb.
-            </p>
-          `;
-
-          // 5. Side-by-side Table for Mismatches
-          let rowsHtml = '';
-          if (data.mismatches && data.mismatches.length > 0) {
-            data.mismatches.forEach(m => {
-              rowsHtml += `
-                <tr class="mismatch">
-                  <td>Discrepancy</td>
-                  <td colspan="2" style="font-family: var(--font-mono);">${escapeHtml(m)}</td>
-                </tr>
-              `;
-            });
-          }
-          sideBySideHtml = `
-            <div style="display: flex; flex-direction: column; gap: 4px;">
-              <span style="font-size: 11px; color: var(--text-dim);">Comparison: Sealed in immudb vs Current in PostgreSQL</span>
-              <table class="side-by-side-table">
-                <thead>
-                  <tr>
-                    <th>Field</th>
-                    <th>Sealed in immudb</th>
-                    <th>Current in PostgreSQL</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${rowsHtml || '<tr><td colspan="3">Discrepancy detected between database and immudb.</td></tr>'}
-                </tbody>
-              </table>
             </div>
           `;
         } else {
           bannerHtml = `
             <div class="verdict-banner verified">
-              <span class="verdict-title">Verified: Cryptographic inclusion proof valid</span>
-              <span class="verdict-desc">Record payload matches the immudb ledger state root.</span>
+              <span class="verdict-title">VERIFIED</span>
+              <span class="verdict-desc">Cryptographic inclusion proof valid and database mirror matches sealed ledger.</span>
             </div>
-          `;
-          summaryHtml = `
-            <p style="font-size: 12px; color: var(--text);">
-              The record payload was hashed and verified against the Merkle tree root at transaction #${txId}. No modifications were detected in PostgreSQL or immudb.
-            </p>
           `;
         }
 
-        // 3. Checklist of Checks
+        // 2. Two independent checks: Ledger integrity (immudb Merkle proof) and PostgreSQL mirror match
         const checklistHtml = `
           <div class="check-list">
             <div class="check-item">
-              <span class="check-badge ${isTampered ? 'fail' : 'pass'}">${isTampered ? 'FAIL' : 'PASS'}</span>
-              <span>Merkle root consistency check</span>
+              <span class="check-badge ${ledgerPassed ? 'pass' : 'fail'}">${ledgerPassed ? 'PASS' : 'FAIL'}</span>
+              <span>Ledger integrity (immudb Merkle proof)</span>
             </div>
             <div class="check-item">
-              <span class="check-badge pass">PASS</span>
-              <span>Key exists in append-only ledger (${escapeHtml(ledgerKey)})</span>
-            </div>
-            <div class="check-item">
-              <span class="check-badge ${isTampered ? 'fail' : 'pass'}">${isTampered ? 'FAIL' : 'PASS'}</span>
-              <span>PostgreSQL mirror field equality</span>
-            </div>
-            <div class="check-item">
-              <span class="check-badge pass">PASS</span>
-              <span>Linear transaction height continuity</span>
+              <span class="check-badge ${mirrorPassed ? 'pass' : 'fail'}">${mirrorPassed ? 'PASS' : 'FAIL'}</span>
+              <span>PostgreSQL mirror match</span>
             </div>
           </div>
         `;
 
-        // 4. Collapsible Auditor Technical Details
-        const metaValuesHtml = `
-          <details class="raw-json" style="margin-top: 6px;">
+        // 3. Who and when in one line
+        const whoWhenHtml = `
+          <div style="font-size: 11.5px; color: var(--text-dim); background: #09090b; border: 1px solid var(--border); border-radius: 4px; padding: 6px 10px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
+            <span>User: <strong style="color: var(--text);">${escapeHtml(userStr)}</strong></span>
+            <span>&bull;</span>
+            <span>Role: <span class="role-badge role-${roleStr.toLowerCase()}" style="font-size: 10px; padding: 1px 5px;">${escapeHtml(roleStr)}</span></span>
+            <span>&bull;</span>
+            <span>Action: <strong style="color: var(--text);">${escapeHtml(actionStr)}</strong></span>
+            <span>&bull;</span>
+            <span>Table: <code class="mono" style="color: var(--text-muted);">${escapeHtml(tableStr)}</code></span>
+            <span>&bull;</span>
+            <span>Time: <span class="mono" style="color: var(--text-muted);">${timeStr}</span></span>
+          </div>
+        `;
+
+        // 4. Diff table of only the fields that differ
+        let diffTableHtml = '';
+        if (data.diffs && data.diffs.length > 0) {
+          diffTableHtml = `
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+              <span style="font-size: 11px; font-weight: 600; color: #f87171;">Field-Level Discrepancies:</span>
+              <table class="side-by-side-table">
+                <thead>
+                  <tr>
+                    <th style="width: 120px;">Field</th>
+                    <th>Sealed in immudb (trusted)</th>
+                    <th>Current in PostgreSQL</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${data.diffs.map(d => `
+                    <tr class="mismatch">
+                      <td class="mono" style="font-weight: 600; color: #f87171;">${escapeHtml(d.field)}</td>
+                      <td class="mono" style="word-break: break-all; color: #34d399;">${escapeHtml(d.sealed || '-')}</td>
+                      <td class="mono" style="word-break: break-all; color: #f87171;">${escapeHtml(d.current || '-')}</td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+          `;
+        }
+
+        // 5. Technical details toggle (key, tx, root, raw sealed JSON)
+        const technicalDetailsHtml = `
+          <details class="raw-json" style="margin-top: 4px;">
             <summary style="font-size: 11.5px; color: var(--text-dim); cursor: pointer; user-select: none;">
-              Auditor cryptographic details (state root & transaction keys)
+              Technical details (key, transaction, Merkle root, raw JSON)
             </summary>
             <div class="meta-key-value" style="margin-top: 8px;">
               <div class="meta-row">
@@ -1121,57 +1121,27 @@
                 </div>
                 <div class="hash-display">${escapeHtml(rootHash)}</div>
               </div>
+              <div style="margin-top: 8px;">
+                <span class="meta-label">Raw sealed ledger record:</span>
+                <pre style="margin-top: 4px; max-height: 160px; overflow-y: auto; background: #09090b; border: 1px solid var(--border); border-radius: 4px; padding: 8px; font-size: 11px; font-family: var(--font-mono); color: var(--text);">${escapeHtml(JSON.stringify(record, null, 2))}</pre>
+              </div>
             </div>
           </details>
         `;
 
-        // 6. Record Details
-        const recordDetailsHtml = `
-          <table class="side-by-side-table">
-            <thead>
-              <tr>
-                <th>User</th>
-                <th>Role</th>
-                <th>Action</th>
-                <th>Target</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>${escapeHtml(record.app_user || '-')}</td>
-                <td><span class="role-badge role-${(record.user_role||'user').toLowerCase()}">${escapeHtml(record.user_role || '-')}</span></td>
-                <td>${escapeHtml(record.action || '-')}</td>
-                <td><code class="mono">${escapeHtml(record.target_table || '-')}</code></td>
-                <td>${escapeHtml(record.execution_status || '-')}</td>
-              </tr>
-            </tbody>
-          </table>
-        `;
-
-        // 7. Collapsible Raw JSON
-        const rawJsonHtml = `
-          <details class="raw-json">
-            <summary>Raw ledger payload</summary>
-            <pre>${escapeHtml(JSON.stringify(data.record || data, null, 2))}</pre>
-          </details>
-        `;
-
-        // 8. One-line Footer
+        // 6. Footer Note
         const footerHtml = `
           <div class="modal-footer-note">
-            Detects changes to stored records. Does not prevent them.
+            Detects changes to stored records. Does not prevent direct database tampering.
           </div>
         `;
 
         body.innerHTML = `
           ${bannerHtml}
-          ${summaryHtml}
           ${checklistHtml}
-          ${recordDetailsHtml}
-          ${sideBySideHtml}
-          ${metaValuesHtml}
-          ${rawJsonHtml}
+          ${whoWhenHtml}
+          ${diffTableHtml}
+          ${technicalDetailsHtml}
           ${footerHtml}
         `;
       } catch (err) {

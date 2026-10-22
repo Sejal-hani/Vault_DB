@@ -126,35 +126,70 @@ async def verify_log(log_id: int):
     eng = get_engine()
     result = eng.verify_audit_log(log_id)
 
-    # Cross-verify with PostgreSQL mirror record
+    # 1. Independent immudb cryptographic Merkle inclusion proof
+    ledger_integrity = bool(result.get("verified", True))
+    result["ledger_integrity"] = ledger_integrity
+
+    # 2. Independent cross-verification with PostgreSQL mirror record
+    mirror_match = True
+    diffs = []
+    mismatches = []
+
     try:
         pg_res, _, _ = eng.postgres.execute_query(
-            "SELECT query_text, execution_status, app_user FROM vault_audit.audit_logs WHERE log_id = %s;",
+            "SELECT query_text, execution_status, app_user, user_role, target_table, action FROM vault_audit.audit_logs WHERE log_id = %s;",
             (log_id,)
         )
         if pg_res:
-            pg_query, pg_status, pg_user = pg_res[0]
+            pg_query, pg_status, pg_user, pg_role, pg_table, pg_action = pg_res[0]
             immudb_record = result.get("record", {}) or {}
-            immu_query = immudb_record.get("query_text")
-            immu_status = immudb_record.get("execution_status")
-            immu_user = immudb_record.get("app_user")
+            immu_query = immudb_record.get("query_text") or immudb_record.get("query")
+            immu_status = immudb_record.get("execution_status") or immudb_record.get("status")
+            immu_user = immudb_record.get("app_user") or immudb_record.get("user")
+            immu_role = immudb_record.get("user_role") or immudb_record.get("role")
+            immu_table = immudb_record.get("target_table") or immudb_record.get("table")
+            immu_action = immudb_record.get("action")
 
-            mismatches = []
-            if immu_query and pg_query != immu_query:
-                mismatches.append(f"SQL Statement Mismatch (PostgreSQL has: '{pg_query}' vs immudb sealed: '{immu_query}')")
-            if immu_status and pg_status != immu_status:
-                mismatches.append(f"Execution Status Mismatch (PostgreSQL: '{pg_status}' vs immudb: '{immu_status}')")
-            if immu_user and pg_user != immu_user:
-                mismatches.append(f"Identity Mismatch (PostgreSQL: '{pg_user}' vs immudb: '{immu_user}')")
+            fields_to_check = [
+                ("app_user", immu_user, pg_user),
+                ("query_text", immu_query, pg_query),
+                ("execution_status", immu_status, pg_status),
+                ("user_role", immu_role, pg_role),
+                ("target_table", immu_table, pg_table),
+                ("action", immu_action, pg_action),
+            ]
 
-            if mismatches:
-                result["verified"] = False
-                result["tamper_detected"] = True
+            for field_name, sealed_val, current_val in fields_to_check:
+                if sealed_val is not None and str(current_val) != str(sealed_val):
+                    mirror_match = False
+                    diffs.append({
+                        "field": field_name,
+                        "sealed": str(sealed_val),
+                        "current": str(current_val),
+                    })
+                    mismatches.append(f"{field_name} mismatch (PostgreSQL: '{current_val}' vs immudb: '{sealed_val}')")
+
+            if not mirror_match:
                 result["database_tampered"] = True
-                result["mismatches"] = mismatches
+                result["tamper_detected"] = True
+                result["verified"] = False
                 result["message"] = f"CRITICAL DATABASE TAMPERING DETECTED: PostgreSQL mirror does not match the immutable immudb Merkle root! {'; '.join(mismatches)}"
+            else:
+                result["database_tampered"] = False
+                result["tamper_detected"] = not ledger_integrity
+                result["verified"] = ledger_integrity
+        else:
+            mirror_match = False
+            result["database_tampered"] = True
+            result["tamper_detected"] = True
+            result["verified"] = False
+            result["message"] = f"Record #{log_id} exists in immudb but is missing from PostgreSQL relational mirror!"
     except Exception as e:
         logger.warning(f"Could not cross-verify PostgreSQL mirror for log #{log_id}: {e}")
+
+    result["mirror_match"] = mirror_match
+    result["diffs"] = diffs
+    result["mismatches"] = mismatches
 
     return VerifyLogResponse(**result)
 
@@ -227,15 +262,15 @@ async def restore_tamper(payload: Optional[TamperPayload] = None, log_id: Option
     eng = get_engine()
     immu_res = eng.verify_audit_log(target_id)
     record = immu_res.get("record")
-    if not record or not record.get("query_text"):
+    true_query = record.get("query_text") or record.get("query") if record else None
+    if not record or not true_query:
         raise HTTPException(status_code=400, detail=f"Cannot find authentic immudb record for log #{target_id}")
 
-    true_query = record["query_text"]
-    true_user = record.get("app_user", "admin@bank.com")
-    true_role = record.get("user_role", "admin")
+    true_user = record.get("app_user") or record.get("user") or "admin@bank.com"
+    true_role = record.get("user_role") or record.get("role") or "admin"
     true_action = record.get("action", "SELECT")
-    true_table = record.get("target_table", "accounts")
-    true_status = record.get("execution_status", "SUCCESS")
+    true_table = record.get("target_table") or record.get("table") or "accounts"
+    true_status = record.get("execution_status") or record.get("status") or "SUCCESS"
     tx_id = immu_res.get("tx_id", 1)
 
     admin_conninfo = settings.postgres_admin_conninfo

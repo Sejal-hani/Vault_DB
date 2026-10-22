@@ -74,6 +74,12 @@ class AuditLogEntry(BaseModel):
     anomalies: Optional[List[str]] = None
 
 
+class FieldDiff(BaseModel):
+    field: str
+    sealed: Optional[str] = None
+    current: Optional[str] = None
+
+
 class VerifyLogResponse(BaseModel):
     log_id: int
     immudb_key: Optional[str] = None
@@ -81,6 +87,9 @@ class VerifyLogResponse(BaseModel):
     verified: bool
     tamper_detected: bool
     database_tampered: bool = False
+    ledger_integrity: bool = True
+    mirror_match: bool = True
+    diffs: Optional[List[FieldDiff]] = None
     mismatches: Optional[List[str]] = None
     current_root_hash: Optional[str] = None
     record: Optional[Dict[str, Any]] = None
