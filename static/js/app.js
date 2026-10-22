@@ -1014,7 +1014,6 @@
         let bannerHtml = '';
         let summaryHtml = '';
         let sideBySideHtml = '';
-        let restoreButtonHtml = '';
 
         if (isTampered) {
           bannerHtml = `
@@ -1056,15 +1055,6 @@
                   ${rowsHtml || '<tr><td colspan="3">Discrepancy detected between database and immudb.</td></tr>'}
                 </tbody>
               </table>
-            </div>
-          `;
-
-          restoreButtonHtml = `
-            <div style="display: flex; align-items: center; justify-content: space-between; padding-top: 8px; border-top: 1px solid var(--border);">
-              <button class="btn btn-primary" onclick="restoreTamperedRecord(${logId})" style="background: var(--red); border-color: var(--red);">
-                Restore untampered state from immudb
-              </button>
-              <span style="font-size: 11px; color: var(--text-dim);">Overwrites PostgreSQL row with immudb payload.</span>
             </div>
           `;
         } else {
@@ -1182,7 +1172,6 @@
           ${sideBySideHtml}
           ${metaValuesHtml}
           ${rawJsonHtml}
-          ${restoreButtonHtml}
           ${footerHtml}
         `;
       } catch (err) {
