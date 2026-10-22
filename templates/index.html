@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/css/style.css?v=2.1.0">
+  <link rel="stylesheet" href="/static/css/style.css?v=2.2.0">
 </head>
 
 <body>
@@ -123,7 +123,7 @@
 
     <div class="viewport">
       <!-- Top Stats Bar: Core Security State (Real Backend Telemetry) -->
-      <div class="kpi-grid" id="top-kpi-grid">
+      <div class="kpi-grid" id="top-kpi-grid" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px;">
         <div class="kpi-card card-total" id="kpi-card-total" onclick="navigateToLedger('', false, false, 'total')" title="Click to view all audit records">
           <span class="kpi-label">Total audited queries</span>
           <span class="kpi-value" id="kpi-total">0</span>
