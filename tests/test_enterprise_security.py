@@ -4,6 +4,7 @@ Validates role-based access control, customer RLS on transactions,
 sensitive column detection on SELECT *, and query-text masking in logs.
 """
 
+import re
 import pytest
 from fastapi.testclient import TestClient
 from src.vault_db.api.app import app
@@ -292,5 +293,74 @@ def test_compliance_pdf_report_with_role_and_date_filters():
     assert resp.status_code == 200
     assert resp.headers["content-type"] == "application/pdf"
     assert resp.content.startswith(b"%PDF")
+
+
+ROLE_USERS = {
+    "customer": "alice@bank.com",
+    "employee": "john@bank.com",
+    "auditor": "compliance.lead@bank.com",
+    "admin": "admin@bank.com",
+}
+
+
+@pytest.mark.parametrize("role", ["customer", "employee", "auditor", "admin"])
+@pytest.mark.parametrize("table", ["users", "accounts", "transactions"])
+def test_no_secrets_in_results(role, table):
+    """
+    Validates that password_hash and api_key are NEVER leaked in query results
+    or column lists for ANY role, and that non-admin queries never reveal raw SSNs.
+    """
+    user_email = ROLE_USERS[role]
+    try:
+        res = engine.execute(f"SELECT * FROM app_data.{table} LIMIT 10;", app_user=user_email)
+    except AccessDeniedError:
+        # Table access denied by RBAC policy (e.g. customer/employee cannot SELECT users)
+        return
+
+    assert res["status"] == "SUCCESS"
+    columns = res.get("columns", [])
+    results = res.get("results", [])
+    text = str(results) + " " + str(columns)
+
+    # 1. Credentials must NEVER appear in column headers or row values for any role
+    assert "password_hash" not in text
+    assert "api_key" not in text
+
+    # 2. Non-admin roles (customer, employee, auditor) must NEVER see raw unmasked SSNs
+    if role != "admin":
+        assert not re.search(r"\b\d{3}-\d{2}-\d{4}\b", text)
+        if "ssn" in [c.lower() for c in columns]:
+            ssn_idx = [i for i, c in enumerate(columns) if c.lower() == "ssn"][0]
+            for row in results:
+                if row[ssn_idx]:
+                    assert str(row[ssn_idx]).startswith("***-**-")
+
+
+def test_schema_explorer_secrets_and_status_hidden():
+    """
+    Validates that the Schema Explorer endpoint (/api/tables/{table}):
+    - Never leaks password_hash or api_key
+    - Hides the 'status' column on the 'users' table
+    - Dynamically masks SSNs for all table previews
+    """
+    # 1. Check users table
+    resp_users = client.get("/api/tables/users")
+    assert resp_users.status_code == 200
+    data_users = resp_users.json()
+    assert "password_hash" not in data_users["columns"]
+    assert "api_key" not in data_users["columns"]
+    assert "status" not in data_users["columns"]
+    assert "password_hash" not in str(data_users["rows"])
+    assert "api_key" not in str(data_users["rows"])
+
+    # 2. Check accounts table
+    resp_accs = client.get("/api/tables/accounts")
+    assert resp_accs.status_code == 200
+    data_accs = resp_accs.json()
+    assert "password_hash" not in str(data_accs)
+    assert "api_key" not in str(data_accs)
+    # Raw SSN pattern must never appear in table inspection
+    assert not re.search(r"\b\d{3}-\d{2}-\d{4}\b", str(data_accs["rows"]))
+
 
 

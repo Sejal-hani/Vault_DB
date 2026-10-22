@@ -14,7 +14,7 @@ from fastapi import APIRouter, HTTPException, Query, Response
 from config.settings import settings
 from src.vault_db.api.dependencies import get_engine, serialize_item
 from src.vault_db.reports.pdf_generator import generate_audit_pdf_report
-from src.vault_db.core.masking import mask_ssn
+from src.vault_db.core.masking import mask_ssn, strip_hidden_columns
 from src.vault_db.api.models import (
     AuditLogEntry,
     VerifyLogResponse,
@@ -632,6 +632,10 @@ async def inspect_table_data(
 
     query = f'SELECT * FROM "{schema_name}"."{clean_name}" {order_clause} LIMIT {limit} OFFSET {calc_offset};'
     rows, columns, _ = eng.postgres.execute_query(query)
+
+    # Strip hidden authentication secrets (password_hash, api_key) and display-hidden columns (status on users)
+    extra_hidden = {"status"} if clean_name == "users" else None
+    columns, rows = strip_hidden_columns(columns, rows, extra_hidden=extra_hidden)
 
     ssn_indices = [i for i, col in enumerate(columns) if "ssn" in col.lower()]
 

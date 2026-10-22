@@ -1,12 +1,15 @@
 """
 VaultDB Dynamic Data Masking Module (V2 Scope)
 Redacts sensitive PII attributes (SSN, payment card numbers, CVVs)
-for unprivileged roles while preserving unmasked access for authorized admins/auditors.
+for unprivileged roles and strips credential secrets (password_hash, api_key)
+from all query results and schema explorations.
 """
 
 import re
-from typing import Any, List, Set, Tuple
+from typing import Any, List, Optional, Set, Tuple
 
+
+HIDDEN_COLUMNS: Set[str] = {"password_hash", "api_key"}
 
 MASK_PATTERNS = {
     "ssn": re.compile(r"^\d{3}-\d{2}-\d{4}$"),
@@ -15,6 +18,29 @@ MASK_PATTERNS = {
 
 
 from src.vault_db.core.crypto import decrypt_field
+
+
+def strip_hidden_columns(
+    columns: List[str],
+    rows: List[List[Any]],
+    extra_hidden: Optional[Set[str]] = None,
+) -> Tuple[List[str], List[List[Any]]]:
+    """
+    Strips security-sensitive credential columns (e.g. password_hash, api_key)
+    and optional display-hidden columns (e.g. status) from both columns and rows.
+    """
+    deny_set = HIDDEN_COLUMNS | {s.lower() for s in (extra_hidden or set())}
+    keep_indices = [i for i, col in enumerate(columns) if col.lower() not in deny_set]
+    if len(keep_indices) == len(columns):
+        return columns, rows
+
+    new_columns = [columns[i] for i in keep_indices]
+    new_rows = [[row[i] for i in keep_indices if i < len(row)] for row in rows]
+
+    if isinstance(columns, list):
+        columns[:] = new_columns
+
+    return new_columns, new_rows
 
 
 def mask_ssn(val: Any) -> str:
@@ -64,14 +90,17 @@ def mask_tabular_results(
     user_role: str,
 ) -> Tuple[List[List[Any]], bool, List[str]]:
     """
-    Evaluates result columns and dynamically masks sensitive fields
-    if user role is not 'admin' or 'auditor'.
-    Also decrypts AES-256-GCM ciphertext columns stored at rest.
+    Evaluates result columns, strips hidden credential columns (password_hash, api_key),
+    and dynamically masks sensitive fields (SSN, card numbers, CVVs) for unprivileged roles.
+    Only authorized 'admin' role receives decrypted business data.
     Returns (masked_rows, was_masked, masked_column_names).
     """
+    # 1. Strip hidden credentials (password_hash, api_key) for ALL roles
+    columns, rows = strip_hidden_columns(columns, rows)
+
     clean_role = user_role.lower()
-    if clean_role in ("admin", "auditor"):
-        # Privileged roles see decrypted business data
+    if clean_role == "admin":
+        # Privileged admin role sees decrypted business data
         new_rows = []
         for row in rows:
             row_copy = list(row)

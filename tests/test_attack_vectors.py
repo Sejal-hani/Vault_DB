@@ -313,10 +313,15 @@ def test_dynamic_data_masking():
     assert masked_rows[0][2] == "***-**-6789"
     assert masked_rows[1][2] == "***-**-4321"
 
-    # Auditor role: Unmasked for compliance reviews
-    unmasked_rows, is_masked_aud, _ = mask_tabular_results(columns, rows, "auditor")
-    assert is_masked_aud is False
+    # Admin role: Privileged access to decrypted business data
+    unmasked_rows, is_masked_adm, _ = mask_tabular_results(columns, rows, "admin")
+    assert is_masked_adm is False
     assert unmasked_rows[0][2] == "123-45-6789"
+
+    # Auditor role: Non-admin role receives dynamically masked PII
+    aud_rows, is_masked_aud, _ = mask_tabular_results(columns, rows, "auditor")
+    assert is_masked_aud is True
+    assert aud_rows[0][2] == "***-**-6789"
 
 
 def test_row_level_security_scoping():
