@@ -221,7 +221,7 @@ def generate_audit_pdf_report(
         if is_sensitive:
             status_html += '<br/><font color="#d97706"><b>[SENSITIVE]</b></font>'
         if is_anomaly:
-            status_html += '<br/><font color="#ea580c"><b>[ANOMALY]</b></font>'
+            status_html += '<br/><font color="#ea580c"><b>ANOMALY</b></font>'
 
         status_para = Paragraph(status_html, cell_style)
 

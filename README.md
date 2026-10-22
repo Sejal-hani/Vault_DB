@@ -1,84 +1,33 @@
 # VaultDB
 
-### Zero-Trust Database Security Middleware & Cryptographic Audit Ledger
+### Enterprise Zero-Trust Database Security Middleware & Cryptographic Audit Ledger
 
-> **Mathematically prove who accessed your data, enforce zero-trust access policies, and eliminate database audit tampering.**
+> **Mathematically prove database access authenticity, enforce zero-trust access controls, and eliminate audit trail tampering.**
 
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16%2B-blue?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![immudb](https://img.shields.io/badge/immudb-Cryptographic%20Merkle%20Ledger-green?logo=database)](https://immudb.io/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115%2B-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![Tests](https://img.shields.io/badge/Test%20Suite-147%20Passed-success)](tests/)
-[![Compliance](https://img.shields.io/badge/Compliance-GDPR%20|%20HIPAA%20|%20PCI--DSS-orange)](#11-regulatory-compliance-mapping)
+[![Compliance](https://img.shields.io/badge/Compliance-GDPR%20|%20HIPAA%20|%20PCI--DSS-orange)](#10-regulatory-compliance-mapping)
 [![License](https://img.shields.io/badge/License-MIT-purple)](LICENSE)
 
 ---
 
-## 1. Overview & Problem Space
+## 1. Product Overview
 
-In regulated enterprise environments (financial services, healthcare, fintech), proving **who accessed what data, when, and under what authority** is both an operational necessity and a strict legal requirement.
+In regulated enterprise environments such as financial services, healthcare, and fintech, proving **who accessed what data, when, and under what authority** is both an operational imperative and a strict regulatory mandate.
 
-Traditional database architectures suffer from three critical security vulnerabilities:
+Traditional database architectures remain vulnerable to three primary vectors:
+1. **Insider Tampering**: Superusers and database administrators can alter, backdate, or delete rows directly from relational audit tables (`DELETE FROM audit_logs`).
+2. **Client-Side Identity Spoofing**: Trusting client applications to declare their identity in SQL sessions invites privilege escalation and impersonation.
+3. **Reconnaissance Blind Spots**: Denied access attempts, cross-tenant queries, and multi-statement SQL injection attempts are frequently omitted from forensic logging.
 
-1. **Mutable Audit Trails**: Anyone with database administrator (`postgres` superuser or DBA) privileges can modify, backdate, or truncate standard SQL audit tables (`DELETE FROM audit_logs`), eliminating forensic evidence of insider breaches.
-2. **Client-Side Identity Spoofing**: Traditional query middleware often trusts the client application to declare its username or role in the payload, allowing attackers to impersonate higher-privileged actors.
-3. **Reconnaissance Blind Spots**: Denied access attempts, cross-tenant probing, and multi-statement SQL injection attacks are frequently discarded without generating cryptographic audit records.
-
-**VaultDB** solves these challenges by acting as a transparent, high-performance security proxy between client applications and relational storage. Every query is parsed, authorized under server-derived identity, sanitized against SQL injection, scoped to tenant boundaries, masked for sensitive PII, and permanently sealed into an immutable **immudb** cryptographic Merkle tree ledger.
-
-```
-+-------------------+      SQL Query + JWT / API Key      +----------------------+
-|    Application    | ----------------------------------> |       VaultDB        |
-|      Clients      | <---------------------------------- |      Middleware      |
-+-------------------+    Masked Results + Ledger Receipt  +----------------------+
-                                                              |              |
-                                               Relational DB  |              | Cryptographic Ledger
-                                                              v              v
-                                                       +------------+  +------------+
-                                                       | PostgreSQL |  |   immudb   |
-                                                       +------------+  +------------+
-```
+**VaultDB** solves these challenges by functioning as a high-performance, transparent security middleware proxy between client applications and database infrastructure. Every query is parsed at the AST level, evaluated under server-derived zero-trust identity, dynamically scoped to tenant boundaries, masked for sensitive PII, and committed simultaneously to an append-only **immudb** cryptographic Merkle tree ledger and a PostgreSQL relational mirror.
 
 ---
 
-## 2. Core Product Capabilities
-
-### 🔒 Immutable Cryptographic Audit Ledger
-* **Dual-Storage Synchronized Pipeline**: Every query attempt (both successful executions and rejected violations) is simultaneously recorded into a PostgreSQL relational mirror and committed to an append-only **immudb** Merkle tree.
-* **Mathematical Inclusion Proofs**: Each audit entry produces a verifiable SHA-256 state root and linear transaction height. Auditors can independently verify cryptographic membership proofs directly in the web console or via API.
-* **Engine-Level Immutability**: PostgreSQL PL/pgSQL triggers reject direct `UPDATE`, `DELETE`, and `TRUNCATE` operations on `vault_audit.audit_logs`. If a DBA circumvents relational triggers out-of-band, the Merkle tree state in immudb flags the discrepancy with field-by-field verification diffs.
-
-### 🛡️ Role-Based Access Control (RBAC) & AST Parser
-* **Server-Derived Identity**: Client requests cannot dictate or override `app_user` or `user_role`. Identity is derived strictly server-side from salted PBKDF2 password hashes, RFC 7519 HS256 JWT tokens, or cryptographically verified API keys.
-* **AST-Level SQL Inspection**: Deep parsing extracts targets, actions (`SELECT`, `INSERT`, `UPDATE`, `DELETE`, `DDL:DROP`, `ALTER`), and sensitive attributes before execution.
-* **Injection Firewall**: Blocks stacked queries (multi-statement injection), CTE write attacks (`WITH x AS (DELETE ...) SELECT 1;`), `COPY PROGRAM`, and unprivileged privilege escalation (`SET ROLE`).
-
-### 👥 Tenant Isolation via Row-Level Security (RLS)
-* **Automatic Query Rewriting**: Customer queries are dynamically intercepted and constrained to personal account and transaction records at runtime.
-* **Cross-Tenant Violation Guard**: Explicit customer attempts to query foreign account numbers (`ACC-...`) or arbitrary user records are blocked with an immediate security denial and recorded into the ledger.
-
-### 🎭 Dynamic In-Flight Data Masking
-* **In-Flight PII Redaction**: Automatically redacts sensitive identifiers (Social Security Numbers as `***-**-XXXX`, credit card numbers, CVVs, and passwords) in query responses.
-* **Masked Audit Trails**: Constants in SQL text are sanitized in both execution results and persistent audit logs, preventing PII leakage into compliance archives.
-
-### ⚡ Behavioral Anomaly Detection Engine
-* **Unusual Bulk Data Access**: Flags non-admin queries attempting to retrieve large row counts (`>= 1,000` rows) exceeding baseline operational thresholds.
-* **Unusual After-Hours Access**: Flags employee or staff queries accessing sensitive customer financial records outside configured banking hours (`09:00 – 18:00 IST`). Customers accessing personal accounts 24/7 are exempt.
-* **Repeated Unauthorized Access**: Accumulates failed access attempts in a sliding time window (`>= 2` denials within 5 minutes) and updates cumulative violation tracking with cross-references to the audit ledger.
-* **Unusual Bulk Modification**: Flags high-impact `UPDATE` or `DELETE` statements affecting broad row sets (`>= 10` rows) without narrow primary key constraints.
-* **Slack Webhook Dispatcher**: Dispatches real-time Slack Block Kit alerts when critical anomalies are detected.
-
-### ⏳ Just-in-Time (JIT) Temporary Privilege Elevation
-* **Self-Service Requests**: Employees and auditors can request temporary elevation (e.g. 1h, 12h, 24h) with mandatory business justifications.
-* **Administrative Governance**: Administrators review, approve, reject, or immediately revoke active grants with one click.
-* **Automated Expiration**: Active grants automatically expire after the granted window, reverting the user to baseline privileges.
-
-### 📄 Audit-Grade Compliance PDF Reports
-* **Filtered Audit Exports**: Compliance officers can generate certified PDF reports filtered by time range (24h, 7d, 30d, all time), user identity, role, and execution status.
-* **Cryptographic Evidence**: Reports include cryptographic state roots, transaction IDs, client IPs, execution durations, and tamper verification status suitable for regulatory audits.
-
----
-
-## 3. System Architecture & Lifecycle
+## 2. System Architecture & Dual-Storage Engine
 
 ```
 +---------------------------------------------------------------------------------------------------+
@@ -94,24 +43,24 @@ Traditional database architectures suffer from three critical security vulnerabi
 |    - Salted PBKDF2-HMAC-SHA256 Password Verification                                              |
 |    - RFC 7519 Compliant HS256 JWT (HttpOnly Cookie / Bearer Token)                                |
 |    - Cryptographic API Key Verification (X-API-Key Header)                                        |
-|    - Zero Client Trust: User and Role are resolved strictly server-side                          |
+|    - Zero Client Trust: User identity and roles are resolved strictly on the server               |
 |                                                                                                   |
 |  [SQL Security & AST Parser Engine]                                                               |
 |    - Action Extraction (SELECT, INSERT, UPDATE, DELETE, DDL:DROP, ALTER, TRUNCATE)                |
-|    - Stacked Query & Multi-Statement SQL Injection Check                                          |
+|    - Stacked Query & Multi-Statement SQL Injection Firewall                                       |
 |    - Table & Schema Resolution with Real-Relation Validation                                      |
 |    - Sensitive Column & PII Attribute Detection                                                   |
 |                                                                                                   |
 |  [Policy, Isolation & Enforcement Layer]                                                          |
-|    - Role-Based Access Control (RBAC) across 4 Enterprise Personas                                |
-|    - Row-Level Security (RLS) Query Rewriter (Personal Record Scoping)                            |
-|    - Dynamic Data Masking Engine (Redacts SSN, Cards, Passwords in Results & Logs)                |
+|    - Role-Based Access Control (RBAC) across Enterprise Personas                                  |
+|    - Row-Level Security (RLS) Dynamic Query Rewriter (Personal Record Scoping)                    |
+|    - Dynamic Data Masking Engine (Redacts SSN, Cards, and Passwords in Results & Logs)            |
 |    - Real-Time Behavioral Anomaly Detector (Bulk Rows, After-Hours Access, Repeated Denials)      |
 |                                                                                                   |
 |  [Dual-Storage Cryptographic Ledger Orchestrator]                                                 |
 |    - Synchronous in-memory & disk buffering to eliminate UI race conditions                       |
-|    - Synchronized dual-commit (PostgreSQL Relational Mirror + immudb Merkle Tree)                 |
-|    - Cross-Verification Engine (Calculates Merkle Root Consistency & Field-Level Diff Tracking)   |
+|    - Synchronized Dual-Commit (PostgreSQL Relational Mirror + immudb Merkle Tree)                 |
+|    - Cross-Verification Engine (Merkle Root Consistency & Field-Level Diff Tracking)               |
 +----------------------------------+------------------------------------+---------------------------+
                                    |                                    |
                                    v                                    v
@@ -131,7 +80,22 @@ Traditional database architectures suffer from three critical security vulnerabi
 +---------------------------------------------------+  +--------------------------------------------+
 ```
 
-### Query Execution Sequence
+### Dual-Storage Architecture
+VaultDB couples two complementary storage technologies:
+1. **PostgreSQL Relational Mirror (`vault_audit.audit_logs`)**:
+   - Stores fast, indexable relational records with B-tree indexes for dashboard search, pagination, and multi-field filtering.
+   - Enforced by database-level triggers (`trg_no_update_delete_audit`) that reject `UPDATE`, `DELETE`, and `TRUNCATE` operations directly at the database engine.
+2. **immudb Append-Only Merkle Ledger**:
+   - Commits each audit log entry (`audit:log:{log_id}`) into an append-only Merkle tree.
+   - Every write calculates a SHA-256 digest, advances the linear transaction height, and updates the state root hash.
+   - Provides mathematical cryptographic inclusion proofs (`verifiedSet`, `verifiedGet`).
+3. **Dual-Store Cross-Verification**:
+   - When an audit record is verified, the middleware fetches both copies (PostgreSQL and immudb).
+   - If an unauthorized out-of-band modification occurs in PostgreSQL, the Merkle root mismatch is detected immediately, displaying the altered fields side-by-side against the immudb root truth.
+
+---
+
+### Query Lifecycle & Execution Sequence
 
 ```mermaid
 sequenceDiagram
@@ -171,7 +135,45 @@ sequenceDiagram
 
 ---
 
-## 4. Threat Model & Security Defenses
+## 3. Core Capabilities
+
+### 🔒 Cryptographic Audit Ledger
+* **Dual-Commit Pipeline**: Every query attempt (both successful executions and rejected violations) is recorded in PostgreSQL and committed to an append-only **immudb** Merkle tree.
+* **Mathematical Inclusion Proofs**: Each audit entry produces a verifiable SHA-256 state root and linear transaction height. Auditors can independently verify cryptographic membership proofs directly in the web console or via API.
+* **Engine-Level Immutability**: PostgreSQL PL/pgSQL triggers reject direct `UPDATE`, `DELETE`, and `TRUNCATE` operations on `vault_audit.audit_logs`. If a DBA circumvents relational triggers out-of-band, the Merkle tree state in immudb flags the discrepancy with field-by-field verification diffs.
+
+### 🛡️ Role-Based Access Control (RBAC) & AST Parser
+* **Server-Derived Identity**: Client requests cannot dictate or override `app_user` or `user_role`. Identity is derived strictly server-side from salted PBKDF2 password hashes, RFC 7519 HS256 JWT tokens, or cryptographically verified API keys.
+* **AST-Level SQL Inspection**: Deep parsing extracts targets, actions (`SELECT`, `INSERT`, `UPDATE`, `DELETE`, `DDL:DROP`, `ALTER`), and sensitive attributes before execution.
+* **Injection Firewall**: Blocks stacked queries (multi-statement injection), CTE write attacks (`WITH x AS (DELETE ...) SELECT 1;`), `COPY PROGRAM`, and unprivileged privilege escalation (`SET ROLE`).
+
+### 👥 Tenant Isolation via Row-Level Security (RLS)
+* **Automatic Query Rewriting**: Customer queries are dynamically intercepted and constrained to personal account and transaction records at runtime.
+* **Cross-Tenant Violation Guard**: Explicit customer attempts to query foreign account numbers (`ACC-...`) or arbitrary user records are blocked with an immediate security denial and recorded into the ledger.
+
+### 🎭 Dynamic In-Flight Data Masking
+* **In-Flight PII Redaction**: Automatically redacts sensitive identifiers (Social Security Numbers as `***-**-XXXX`, credit card numbers, CVVs, and passwords) in query responses.
+* **Masked Audit Trails**: Constants in SQL text are sanitized in both execution results and persistent audit logs, preventing PII leakage into compliance archives.
+
+### ⚡ Behavioral Anomaly Detection Engine
+* **Unusual Bulk Data Access**: Flags non-admin queries attempting to retrieve large row counts (`>= 1,000` rows) exceeding baseline operational thresholds.
+* **Unusual After-Hours Access**: Flags employee or staff queries accessing sensitive customer financial records outside configured banking hours (`09:00 – 18:00 IST`). Customers accessing personal accounts 24/7 are exempt.
+* **Repeated Unauthorized Access**: Accumulates failed access attempts in a sliding time window (`>= 2` denials within 5 minutes) and updates cumulative violation tracking with cross-references to the audit ledger.
+* **Unusual Bulk Modification**: Flags high-impact `UPDATE` or `DELETE` statements affecting broad row sets (`>= 10` rows) without narrow primary key constraints.
+* **Slack Webhook Dispatcher**: Dispatches real-time Slack Block Kit alerts when critical anomalies are detected.
+
+### ⏳ Just-in-Time (JIT) Temporary Privilege Elevation
+* **Self-Service Requests**: Employees and auditors can request temporary elevation (e.g. 1h, 12h, 24h) with mandatory business justifications.
+* **Administrative Governance**: Administrators review, approve, reject, or immediately revoke active grants with one click.
+* **Automated Expiration**: Active grants automatically expire after the granted window, reverting the user to baseline privileges.
+
+### 📄 Audit-Grade Compliance PDF Reports
+* **Filtered Audit Exports**: Compliance officers can generate certified PDF reports filtered by time range (24h, 7d, 30d, all time), user identity, role, and execution status.
+* **Cryptographic Evidence**: Reports include cryptographic state roots, transaction IDs, client IPs, execution durations, and tamper verification status suitable for regulatory audits.
+
+---
+
+## 4. Threat Model & Defense Matrix
 
 | Threat Vector | Attack Scenario | VaultDB Defense Mechanism |
 | :--- | :--- | :--- |
@@ -186,12 +188,12 @@ sequenceDiagram
 
 ## 5. Security Workstation Web Console
 
-VaultDB provides a unified dark-themed web workstation served on `http://localhost:8000`:
+VaultDB provides a unified dark-themed web workstation served at **`http://localhost:8000`**:
 
 * **SQL Execution Console**: Interactive query editor with keyboard shortcuts (`Ctrl+Enter`), preset attack scenarios, execution latency metrics, and instant result tables.
 * **Audit Ledger**: Complete historical query trail with sorting (ID, timestamp, user), search filtering, and a **sticky pagination toolbar** (`25`, `50`, `100`, `250` rows per page) permanently anchored at the bottom of the card.
 * **Mathematical Proof Verification Modal**: Click **Verify Proof** on any ledger entry to view cryptographic state roots, transaction IDs, and live Merkle inclusion proofs.
-* **Schema Explorer**: Interactive table inspection and column structure discovery for PostgreSQL schemas with sticky pagination.
+* **Schema Explorer**: Interactive table inspection and column structure discovery for PostgreSQL schemas with pagination.
 * **Security Center**:
   - *Access Requests & Approvals*: Self-service elevation submission, admin approval, and one-click revocation.
   - *Security Alerts*: Real-time feed of detected behavioral anomalies with direct links (`#<ID>`) to the corresponding ledger record.
@@ -199,31 +201,46 @@ VaultDB provides a unified dark-themed web workstation served on `http://localho
 
 ---
 
-## 6. Getting Started & Installation
+## 6. Installation & Setup Guide
 
-### Prerequisites
-* **Python**: 3.10, 3.11, or 3.12
-* **PostgreSQL**: Version 14+ running on `localhost:5432`
-* **immudb**: Local binary in `bin/immudb.exe` (Windows) or `bin/immudb` (Linux/macOS)
+### System Prerequisites
+| Component | Minimum Version | Notes |
+| :--- | :--- | :--- |
+| **Python** | 3.10+ (Recommended: 3.12) | Core middleware runtime |
+| **PostgreSQL** | 14+ (Recommended: 16) | Underlying relational database |
+| **immudb** | 1.5+ | Append-only cryptographic Merkle tree ledger |
+| **Git** | 2.30+ | Source code version control |
 
-### 1. Clone & Set Up Environment
-```powershell
+---
+
+### Step-by-Step Installation
+
+#### 1. Clone Repository & Setup Virtual Environment
+```bash
 # Clone the repository
 git clone https://github.com/Sejal-hani/Vault_DB.git
 cd Vault_DB
 
-# Create and activate virtual environment
+# Create Python virtual environment
 python -m venv venv
-.\venv\Scripts\Activate.ps1   # Windows PowerShell
-# source venv/bin/activate    # Linux / macOS
 
-# Install dependencies
+# Activate virtual environment
+# Windows PowerShell:
+.\venv\Scripts\Activate.ps1
+# Linux / macOS:
+# source venv/bin/activate
+
+# Upgrade package manager and install dependencies
 pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-### 2. Configure Environment (`.env`)
-Verify or adjust your `.env` configuration file in the project root:
+#### 2. Environment Configuration (`.env`)
+Copy the environment template and verify your local settings:
+```bash
+cp .env.example .env
+```
+Ensure connection settings match your local environment:
 ```ini
 # PostgreSQL Relational Business Store
 POSTGRES_HOST=127.0.0.1
@@ -232,7 +249,7 @@ POSTGRES_DB=vaultdb
 POSTGRES_USER=vault_user
 POSTGRES_PASSWORD=vault123
 
-# PostgreSQL Admin (for DDL & trigger installation)
+# PostgreSQL Admin (for DDL, schema, and trigger setup)
 POSTGRES_ADMIN_USER=postgres
 POSTGRES_ADMIN_PASSWORD=postgres
 
@@ -247,43 +264,64 @@ IMMUDB_DATABASE=defaultdb
 SECRET_KEY=vlt_sec_8f93e2b10a4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0
 ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=60
+
+# Anomaly Detection Baseline Thresholds
+ANOMALY_BULK_QUERY_THRESHOLD=1000
+ANOMALY_BULK_MUTATION_THRESHOLD=10
+ANOMALY_CONSECUTIVE_DENIALS_THRESHOLD=2
+ANOMALY_DENIAL_WINDOW_SECONDS=300
+ANOMALY_BUSINESS_HOURS_START=9
+ANOMALY_BUSINESS_HOURS_END=18
+ANOMALY_TIMEZONE=Asia/Kolkata
 ```
 
-### 3. Initialize Databases & Immutability Triggers
-```powershell
+#### 3. Initialize Database & Immutability Triggers
+Run the automated initialization script to establish database schemas, immutability triggers, and seed demo enterprise accounts:
+```bash
 python scripts/init_databases.py
 ```
-*Creates application schemas, establishes the `vault_audit.audit_logs` mirror, configures PostgreSQL immutability triggers, and seeds enterprise demo personas.*
 
-### 4. Start Services
-In Terminal 1 (Start immudb):
+#### 4. Start Services
+
+##### Terminal 1: Start immudb Ledger
 ```powershell
+# Windows
 .\bin\immudb.exe --dir data/immudb --pgsql-server=true --pgsql-server-port=5433 --port=3322
+
+# Linux / macOS
+./bin/immudb --dir data/immudb --pgsql-server=true --pgsql-server-port=5433 --port=3322
 ```
 
-In Terminal 2 (Start FastAPI Web Application):
-```powershell
+##### Terminal 2: Start VaultDB Application Server
+```bash
 python server.py
 ```
-Open **`http://localhost:8000`** in your browser.
+
+##### Alternative: Docker Compose
+If you prefer running services via Docker:
+```bash
+docker compose up -d
+```
+
+Open **`http://localhost:8000`** in your browser to access the live dashboard.
 
 ---
 
-## 7. Pre-Configured Enterprise Personas
+## 7. Enterprise Personas & RBAC Matrix
 
-VaultDB comes pre-seeded with 4 enterprise banking personas:
+### Demo Authentication Personas
+VaultDB includes 4 pre-seeded enterprise personas:
 
 | Role | Email Identity | Default Password | API Key | Permissions |
 | :--- | :--- | :--- | :--- | :--- |
 | **Admin** | `admin@bank.com` | `AdminPass123!` | `vlt_key_admin_9a8b7c6d5e4f3a2b` | Full read, write, DDL execution, access approvals, security alerts. |
 | **Auditor** | `compliance.lead@bank.com` | `AuditorPass123!` | `vlt_key_auditor_5d6e7f8a9b0c1d2e` | Read-only ledger audit, proof verification, report generation. |
 | **Employee** | `john@bank.com` | `EmployeePass123!` | `vlt_key_employee_1a2b3c4d5e6f7a8b` | Standard business transactions, temporary elevation requests. |
-| **Customer** | `jane.smith@email.com` | `CustomerPass123!` | `vlt_key_customer_4d5e6f7a8b9c0d1e` | Self-service banking, personal account access (RLS-scoped). |
-| **Customer** | `rajesh.kumar@email.com` | `CustomerPass123!` | `vlt_key_customer_5e6f7a8b9c0d1e2f` | Self-service banking, personal account access (RLS-scoped). |
+| **Customer** | `alice@bank.com` | `CustomerPass123!` | `vlt_key_customer_4d5e6f7a8b9c0d1e` | Self-service banking, personal account access (RLS-scoped). |
 
 ---
 
-## 8. Role-Based Access Control (RBAC) Matrix
+### RBAC Permission Matrix
 
 | Resource / Action | Customer | Employee | Auditor | Admin |
 | :--- | :---: | :---: | :---: | :---: |
@@ -300,26 +338,54 @@ VaultDB comes pre-seeded with 4 enterprise banking personas:
 
 ---
 
-## 9. Automated Test Suite
+## 8. Automated Test Suite
 
-VaultDB includes **147 automated unit, integration, and security tests**:
+VaultDB features an enterprise-grade automated test suite containing **147 tests** covering adversarial vectors, cryptographic validation, and role enforcement:
 
-```powershell
-.\venv\Scripts\pytest.exe -v
+```bash
+pytest tests/ -v
 ```
 
 ### Test Coverage Highlights
 * **100+ Adversarial SQL Vectors**: Multi-statement injection, CTE writes, `COPY PROGRAM`, `SET ROLE`, out-of-band schema drops, and comment truncation.
 * **Engine Immutability Triggers**: Verification that direct `UPDATE`, `DELETE`, and `TRUNCATE` operations on `vault_audit.audit_logs` are rejected by PostgreSQL.
-* **Cryptographic Merkle Proofs**: Verifies SHA-256 state root consistency and tamper detection logic.
-* **Anomaly Engine**: Validates evaluation of bulk thresholds (`>= 1,000` rows), after-hours windows, and repeated denial accumulation.
-* **Tenant Isolation & Masking**: Asserts customer row scoping and in-flight PII redaction.
+* **Cryptographic Merkle Proofs**: SHA-256 state root consistency and tamper detection logic.
+* **Anomaly Engine**: Evaluation of bulk thresholds (`>= 1,000` rows), after-hours windows, and repeated denial accumulation.
+* **Tenant Isolation & Masking**: Customer row scoping and in-flight PII redaction.
 
 ---
 
-## 10. Python SDK & REST API Reference
+## 9. REST API & Python SDK Reference
 
-### Python SDK Example
+### Modular REST API Endpoints
+
+The API is partitioned into modular domain routers (`/api`):
+
+| Domain | Method | Endpoint | Description |
+| :--- | :--- | :--- | :--- |
+| **Auth** | `POST` | `/api/auth/login` | Authenticate with email/password; returns signed HS256 JWT cookie. |
+| **Auth** | `POST` | `/api/auth/demo-login/{persona}` | 1-Click demo authentication for evaluation. |
+| **Auth** | `POST` | `/api/auth/logout` | Invalidate active session cookie. |
+| **Auth** | `GET` | `/api/auth/me` | Retrieve current authenticated identity profile. |
+| **Query** | `POST` | `/api/execute` | Execute SQL under server-derived identity with RBAC, RLS, and immudb logging. |
+| **Audit** | `GET` | `/api/logs` | Query audit ledger entries with filtering by user, table, status, and time range. |
+| **Audit** | `GET` | `/api/verify/{log_id}` | Retrieve cryptographic Merkle proof and verify data integrity against immudb. |
+| **Audit** | `POST` | `/api/tamper-demo/simulate` | Simulate unauthorized database record modification for tamper detection demos. |
+| **Audit** | `POST` | `/api/tamper-demo/restore` | Restore tampered database records back to verified cryptographic state. |
+| **Audit** | `GET` | `/api/tables` | Dynamically discover business schemas and table row counts. |
+| **Audit** | `GET` | `/api/tables/{table_name}` | Retrieve paginated table data with PII masking. |
+| **Audit** | `GET` | `/api/reports/pdf` | Generate and download an audit-grade compliance PDF report. |
+| **Approvals** | `POST` | `/api/approvals/request` | Submit a temporary privilege elevation request. |
+| **Approvals** | `GET` | `/api/approvals` | List pending and active access elevation requests. |
+| **Approvals** | `POST` | `/api/approvals/{id}/approve` | Approve a temporary access elevation request (Admin only). |
+| **Approvals** | `POST` | `/api/approvals/{id}/reject` | Reject an access request (Admin only). |
+| **Approvals** | `POST` | `/api/approvals/{id}/revoke` | Revoke an active privilege grant immediately (Admin only). |
+| **Alerts** | `GET` | `/api/alerts/recent` | Retrieve recent behavioral security anomalies. |
+| **Alerts** | `POST` | `/api/alerts/test-webhook` | Dispatch simulated Slack webhook anomaly alert. |
+
+---
+
+### Python SDK Usage Example
 
 ```python
 from src.vault_db import VaultClient
@@ -327,7 +393,7 @@ from src.vault_db import VaultClient
 # 1. Initialize client using authenticated credentials
 client = VaultClient(
     base_url="http://localhost:8000",
-    email="jane.smith@email.com",
+    email="alice@bank.com",
     password="CustomerPass123!"
 )
 
@@ -344,26 +410,9 @@ proof = client.verify_proof(log_id=logs[0]["id"])
 print("Cryptographically Verified:", proof["verified"])
 ```
 
-### Core REST API Endpoints
-
-| Method | Endpoint | Description |
-| :--- | :--- | :--- |
-| `POST` | `/api/auth/login` | Authenticate with email and password to receive an HS256 JWT cookie. |
-| `POST` | `/api/execute` | Execute a SQL statement under server-derived identity with RBAC, RLS, and immudb logging. |
-| `GET` | `/api/logs` | Query audit ledger entries with filtering by user, table, status, and time range. |
-| `GET` | `/api/verify/{log_id}` | Retrieve cryptographic Merkle proof and verify data integrity against immudb. |
-| `POST` | `/api/tamper-demo/simulate` | Simulate unauthorized out-of-band database record modification for tamper detection demos. |
-| `POST` | `/api/tamper-demo/restore` | Restore tampered database records back to their authentic cryptographic state. |
-| `GET` | `/api/reports/pdf` | Generate and download an audit-grade compliance PDF report. |
-| `POST` | `/api/approvals/request` | Submit a temporary privilege elevation request. |
-| `GET` | `/api/approvals` | List pending and active access elevation requests. |
-| `POST` | `/api/approvals/{id}/approve` | Approve a temporary access elevation request (Admin only). |
-| `POST` | `/api/approvals/{id}/revoke` | Revoke an active privilege grant immediately (Admin only). |
-| `GET` | `/api/alerts/recent` | Retrieve recent behavioral security anomalies. |
-
 ---
 
-## 11. Regulatory Compliance Mapping
+## 10. Regulatory Compliance Mapping
 
 * **GDPR Article 30 (Records of Processing Activities)**: Maintains an immutable, unalterable log of every query accessing personal customer data.
 * **GDPR Article 15 (Right of Access / Subject Access Disclosure)**: Customers can view a certified audit of every internal employee, auditor, and automated service that accessed their personal records.
@@ -372,6 +421,72 @@ print("Cryptographically Verified:", proof["verified"])
 
 ---
 
+## 11. Project Directory Structure
+
+```
+Vault_DB/
+├── config/
+│   ├── __init__.py
+│   └── settings.py                     # Centralized Pydantic configuration & env validation
+├── data/                               # Local persistent storage (immudb ledger & alerts buffer)
+├── docker-compose.yml                  # Multi-container orchestration (PostgreSQL, immudb, VaultDB)
+├── Dockerfile                          # Production container image specification
+├── pyproject.toml                      # PEP 621 package metadata & project build configuration
+├── requirements.txt                    # Python runtime package dependencies
+├── schema.sql                          # Database DDL, triggers, and immutability procedures
+├── server.py                           # Application web server entry point
+├── scripts/
+│   ├── init_databases.py               # Database setup, schema generation & persona seeding
+│   ├── seed_transactions.py            # High-volume transactional data generator
+│   └── start_services.py               # Standalone daemon process launcher
+├── src/
+│   └── vault_db/
+│       ├── api/                        # FastAPI Web Layer
+│       │   ├── app.py                  # Application factory, CORS, static mounting & lifecycle
+│       │   ├── dependencies.py         # Shared engine singleton & serialization utilities
+│       │   ├── models.py               # Pydantic request & response schemas
+│       │   └── routes/                 # Modular Domain APIRouters
+│       │       ├── __init__.py         # Router aggregation under /api prefix
+│       │       ├── alerts.py           # Behavioral anomaly alert endpoints
+│       │       ├── approvals.py        # Temporary privilege elevation workflow
+│       │       ├── audit.py            # Audit ledger, Merkle proof verification & tables
+│       │       ├── auth.py             # User login, persona demos, session lifecycle
+│       │       └── query.py            # SQL query execution with zero-trust RBAC
+│       ├── auth/                       # Security & Identity Modules
+│       │   ├── dependencies.py         # Server-derived authentication dependencies
+│       │   ├── jwt_handler.py          # RFC 7519 HS256 token encoding/decoding
+│       │   └── security.py             # Salted PBKDF2-HMAC-SHA256 password hashing
+│       ├── core/                       # Core Security & Governance Engines
+│       │   ├── alerts.py               # Slack Block Kit notification dispatcher
+│       │   ├── anomaly.py              # Behavioral anomaly detector (bulk, off-hours, denials)
+│       │   ├── engine.py               # VaultEngine middleware orchestrator
+│       │   ├── masking.py              # In-flight PII masking engine (SSN, cards, passwords)
+│       │   ├── parser.py               # AST SQL inspection & injection firewall
+│       │   ├── rbac.py                 # Role-based access control engine
+│       │   └── rls.py                  # Row-level security dynamic query rewriter
+│       ├── reports/                    # Compliance Reporting
+│       │   └── pdf_generator.py        # Certified PDF compliance report generator
+│       └── storage/                    # Database Connectors & Interfaces
+│           ├── immudb_storage.py       # Append-only Merkle ledger interface
+│           └── postgres.py             # PostgreSQL ConnectionPool interface
+├── static/                             # Frontend Web Console Assets
+│   ├── css/
+│   │   └── style.css                   # Enterprise dark-themed workstation stylesheet
+│   └── js/
+│       └── app.js                      # Modular single-page application client logic
+├── templates/
+│   └── index.html                      # Security workstation management interface
+├── tests/                              # Comprehensive Automated Test Suite
+│   ├── test_api.py                     # REST API integration tests
+│   ├── test_attack_vectors.py          # 100+ Adversarial SQL injection & exploit tests
+│   ├── test_enterprise_security.py     # Enterprise RBAC, RLS, JIT approvals & PDF tests
+│   ├── test_immudb.py                  # Cryptographic Merkle verification tests
+│   └── test_rbac.py                    # Role-based access control permission tests
+└── LICENSE                             # MIT Open Source License
+```
+
+---
+
 ## 12. License
 
-Distributed under the **MIT License**. See `LICENSE` for details.
+Distributed under the **MIT License**. See [`LICENSE`](LICENSE) for complete terms.

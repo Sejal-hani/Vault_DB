@@ -966,7 +966,7 @@
           : '';
 
         let anomalyTag = isAnomaly 
-          ? `<span class="tag tag-anomaly" style="margin-left:4px; font-weight:700; cursor:pointer;" onclick="navigateToSecurityCenter('alerts')" title="Security Anomaly Triggered (Click to cross-reference with Security Alerts)">[ANOMALY]</span>` 
+          ? `<span class="tag tag-anomaly" style="margin-left:4px; font-weight:700; cursor:pointer;" onclick="navigateToSecurityCenter('alerts')" title="Security Anomaly Triggered (Click to cross-reference with Security Alerts)">ANOMALY</span>` 
           : '';
 
         return `
