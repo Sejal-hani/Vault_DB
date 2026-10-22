@@ -53,43 +53,64 @@ Traditional database architectures remain vulnerable to three primary attack vec
 
 ## 3. System Architecture & Dual-Storage Engine
 
+### High-Level Architecture
+
 ```mermaid
 flowchart TD
     subgraph Clients ["Client Applications"]
         UI["Web Management Console"]
-        SDK["Python Client SDK (VaultClient)"]
+        SDK["Python Client SDK"]
     end
 
     subgraph Middleware ["VaultDB Security Middleware"]
-        Auth["Authentication & Server-Derived Identity<br/>(JWT, API Key, PBKDF2 Password Hashing)"]
-        Parser["AST SQL Parser & Injection Firewall<br/>(Multi-Statement, CTE & Privilege Escalation Guards)"]
-        Policy["Policy & Governance Engine<br/>(RBAC, Tenant RLS, Dynamic Masking, Anomaly Detection)"]
-        Engine["VaultEngine Orchestrator<br/>(Dual-Commit Pipeline & Merkle Verification)"]
+        Auth["Authentication & Identity"]
+        Parser["AST SQL Parser & Firewall"]
+        Policy["Policy Engine & Data Masking"]
+        Engine["VaultEngine Orchestrator"]
 
-        Auth --> Parser
-        Parser --> Policy
-        Policy --> Engine
+        Auth --> Parser --> Policy --> Engine
     end
 
-    subgraph Storage ["Dual-Storage Architecture"]
-        subgraph PostgresStore ["PostgreSQL Relational Store"]
-            PGBiz["Business Tables<br/>(users, accounts, transactions, access_requests)"]
-            PGAudit["Relational Audit Mirror (vault_audit.audit_logs)<br/>Engine-Level Triggers: Reject UPDATE & DELETE"]
-        end
-
-        subgraph ImmudbStore ["immudb Cryptographic Ledger"]
-            ImmuLog["Append-Only Merkle Tree (audit:log:id)<br/>Cryptographic Inclusion Proofs & SHA-256 State Roots"]
-        end
+    subgraph Storage ["Dual-Storage Layer"]
+        PG[("PostgreSQL<br/>Business DB & Audit Mirror")]
+        Immu[("immudb<br/>Cryptographic Merkle Ledger")]
     end
 
-    Clients -->|SQL Query + Auth Credentials| Auth
-    Engine -->|1. Scoped Query Execution| PGBiz
-    Engine -->|2. Cryptographic Audit Append| ImmuLog
-    Engine -->|3. Relational Mirror Write| PGAudit
-    Engine -.->|Cryptographic Cross-Verification| ImmudbStore
+    Clients -->|SQL Query| Auth
+    Engine -->|Execute & Mirror| PG
+    Engine -->|Cryptographic Seal| Immu
 ```
 
-### Dual-Storage Architecture
+### Dual-Storage & Cryptographic Verification
+
+```mermaid
+flowchart LR
+    subgraph DualCommit ["Synchronized Dual-Commit"]
+        direction TB
+        Engine["VaultEngine"]
+        PG_Mirror[("PostgreSQL Mirror")]
+        Immu_Tree[("immudb Merkle Tree")]
+
+        Engine -->|Relational Record| PG_Mirror
+        Engine -->|Cryptographic Append| Immu_Tree
+    end
+
+    subgraph Verification ["Tamper Verification"]
+        direction TB
+        Verifier["Cross-Verification Engine"]
+        Status{"Integrity Match?"}
+        Valid["Verified Untampered"]
+        Tamper["Tamper Alert"]
+
+        Verifier --> Status
+        Status -->|Yes| Valid
+        Status -->|No| Tamper
+    end
+
+    PG_Mirror -.->|Read Stored Hash| Verifier
+    Immu_Tree -.->|Read Merkle Root| Verifier
+```
+
 VaultDB couples two complementary storage technologies:
 1. **PostgreSQL Relational Mirror (`vault_audit.audit_logs`)**:
    - Stores fast, indexable relational records with B-tree indexes for dashboard search, pagination, and multi-field filtering.
@@ -152,7 +173,7 @@ sequenceDiagram
 * **Engine-Level Immutability**: PostgreSQL PL/pgSQL triggers in [`db/schema.sql`](db/schema.sql) reject direct `UPDATE`, `DELETE`, and `TRUNCATE` operations on `vault_audit.audit_logs`. If a DBA circumvents relational triggers out-of-band, the Merkle tree state in immudb flags the discrepancy with field-by-field verification diffs.
 
 ### Role-Based Access Control (RBAC) & AST Parser
-* **Server-Derived Identity**: Client requests cannot dictate or override `app_user` or `user_role`. Identity is derived strictly server-side from salted PBKDF2 password hashes, RFC 7519 HS256 JWT tokens, or cryptographically verified API keys in [`src/vault_db/auth/`](src/vault_db/auth/).
+* **Server-Derived Identity**: Client requests cannot dictate or override `app_user` or `user_role`. Identity is derived strictly server-side via RFC 7519 HS256 JWT tokens or cryptographically verified API keys in [`src/vault_db/auth/`](src/vault_db/auth/).
 * **AST-Level SQL Inspection**: Deep parsing in [`src/vault_db/core/parser.py`](src/vault_db/core/parser.py) extracts targets, actions (`SELECT`, `INSERT`, `UPDATE`, `DELETE`, `DDL:DROP`, `ALTER`), and sensitive attributes before execution.
 * **Injection Firewall**: Blocks stacked queries (multi-statement injection), CTE write attacks (`WITH x AS (DELETE ...) SELECT 1;`), `COPY PROGRAM`, and unprivileged privilege escalation (`SET ROLE`).
 
@@ -442,7 +463,7 @@ Vault_DB/
 │       ├── auth/                       # Security & Identity Modules
 │       │   ├── dependencies.py         # Server-derived authentication dependencies
 │       │   ├── jwt_handler.py          # RFC 7519 HS256 token encoding/decoding
-│       │   └── security.py             # Salted PBKDF2-HMAC-SHA256 password hashing
+│       │   └── security.py             # Security utilities & secret management
 │       ├── core/                       # Core Security & Governance Engines
 │       │   ├── alerts.py               # Slack Block Kit notification dispatcher
 │       │   ├── anomaly.py              # Behavioral anomaly detector (bulk, off-hours, denials)
