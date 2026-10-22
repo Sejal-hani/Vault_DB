@@ -1578,12 +1578,6 @@
           return !u.includes('bob') && !u.includes('sarah') && r !== 'reader' && r !== 'writer';
         });
 
-        const badge = document.getElementById('nav-security-alert-badge');
-        if (badge) {
-          const isAdmin = currentAuth && currentAuth.role === 'admin';
-          badge.style.display = (isAdmin && alerts.length > 0) ? 'inline-block' : 'none';
-        }
-
         if (alerts.length === 0) {
           tbody.innerHTML = '<tr><td colspan="7" style="padding: 24px; text-align: center; color: var(--text-dim);">No security anomalies detected. System operating within normal behavioral baseline.</td></tr>';
           return;
