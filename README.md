@@ -24,7 +24,7 @@
 - [7. Installation & Setup Guide](#7-installation--setup-guide)
 - [8. Enterprise Personas & Access Control](#8-enterprise-personas--access-control)
 - [9. Automated Verification & Test Suite](#9-automated-verification--test-suite)
-- [10. Python SDK Integration](#10-python-sdk-integration)
+- [10. Practical Query & Compliance Examples](#10-practical-query--compliance-examples)
 - [11. Regulatory Compliance Mapping](#11-regulatory-compliance-mapping)
 - [12. Project Directory Structure](#12-project-directory-structure)
 
@@ -390,8 +390,9 @@ pytest tests/ -v
 
 ---
 
-## 10. Python SDK Integration
+## 10. Practical Query & Compliance Examples
 
+### 10.1 Python SDK Integration
 Applications connect to VaultDB using the Python client SDK:
 
 ```python
@@ -416,6 +417,90 @@ print("Latest Log ID:", logs[0]["id"])
 proof = client.verify_proof(log_id=logs[0]["id"])
 print("Cryptographically Verified:", proof["verified"])
 ```
+
+---
+
+### 10.2 Real-World Compliance Scenario: "Who Accessed Customer #101's Records?"
+
+When a compliance officer or regulator asks for proof of who accessed customer records, VaultDB answers the inquiry immediately:
+
+```sql
+-- Compliance Officer Audit Query
+SELECT logged_at, app_user, user_role, action, query_text, execution_status
+FROM vault_audit.audit_logs
+WHERE target_table = 'accounts' AND query_text ILIKE '%101%'
+ORDER BY logged_at DESC;
+```
+
+**Audit Trail Output:**
+| Timestamp (IST) | User | Role | Action | Executed SQL Query | Status |
+| :--- | :--- | :--- | :--- | :--- | :---: |
+| `2026-10-22 14:45:10` | `john@bank.com` | `employee` | `SELECT` | `SELECT name, balance FROM app_data.accounts WHERE id = 101` | `SUCCESS` |
+| `2026-10-22 10:30:45` | `compliance.lead@bank.com` | `auditor` | `SELECT` | `SELECT * FROM app_data.accounts WHERE id = 101` | `SUCCESS` |
+
+> **Compliance Report Summary**: *"John and Sarah accessed Customer #101's records 2 times total. Cryptographic Merkle inclusion proofs verified for regulatory delivery."*
+
+---
+
+### 10.3 Dynamic In-Flight Data Masking Example
+
+When an employee queries customer accounts, sensitive PII attributes (e.g., SSN) are masked in real time, while sensitive credential columns are suppressed:
+
+**Input Query:**
+```sql
+SELECT name, account_number, ssn, balance FROM app_data.accounts LIMIT 1;
+```
+
+**Masked Result Set Returned to Employee:**
+| name | account_number | ssn | balance |
+| :--- | :--- | :--- | :--- |
+| Alice Smith | ACC-1001-US | `***-**-1234` | $54,200.00 |
+
+---
+
+### 10.4 Immutable Audit Log Entry Structure (immudb)
+
+Every intercepted query generates a cryptographically sealed JSON record stored in immudb's append-only Merkle tree:
+
+```json
+{
+  "timestamp": "2026-10-22T10:30:45Z",
+  "user": "john@bank.com",
+  "role": "employee",
+  "query": "SELECT name, balance FROM app_data.accounts WHERE id = 101",
+  "action": "SELECT",
+  "table_accessed": "accounts",
+  "rows_affected": 1,
+  "execution_status": "SUCCESS",
+  "is_sensitive": false,
+  "immudb_tx_id": 582,
+  "immudb_tx_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}
+```
+
+---
+
+### 10.5 Policy Violation & Injection Denial Example
+
+When an unprivileged user or adversary attempts an unauthorized action (such as dropping a table or executing stacked statements), VaultDB blocks the operation before it reaches PostgreSQL:
+
+**Malicious Query Attempted by Employee:**
+```sql
+DROP TABLE app_data.accounts;
+```
+
+**HTTP 403 Response Delivered to Client:**
+```json
+{
+  "detail": "Access Denied: Role 'employee' is not permitted to execute 'DDL:DROP' on table 'accounts'.",
+  "audit_ref": {
+    "log_id": 1043,
+    "status": "DENIED",
+    "immudb_tx_id": 583
+  }
+}
+```
+*The violation is permanently sealed in immudb with status `DENIED`, ensuring complete forensic accountability.*
 
 ---
 

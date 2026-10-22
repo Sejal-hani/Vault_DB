@@ -1,8 +1,18 @@
+"""
+VaultDB Dynamic Row-Level Security (RLS) & Tenant Isolation Module (V2 Scope)
+Ensures customer personas can only view their own accounts and transaction records
+by dynamically injecting predicate constraints into queries prior to execution.
+"""
+
 import re
 from typing import Optional, Tuple
 
 
 def _inject_where_clause(query: str, scope_clause: str) -> str:
+    """
+    Safely injects a tenant constraint into an existing SQL statement,
+    preserving existing WHERE predicates, ORDER BY, GROUP BY, and LIMIT clauses.
+    """
     clean_q = query.strip().rstrip(";")
     clause_match = re.search(r'\b(order\s+by|group\s+by|having|limit|offset)\b', clean_q, re.IGNORECASE)
     if clause_match:
