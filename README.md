@@ -63,7 +63,7 @@ flowchart TD
     end
 
     subgraph Middleware ["VaultDB Security Middleware"]
-        Auth["Authentication & Identity"]
+        Auth["Authentication & Identity<br/>(JWT & Password Hashing)"]
         Parser["AST SQL Parser & Firewall"]
         Policy["Policy Engine & Data Masking"]
         Engine["VaultEngine Orchestrator"]
@@ -137,7 +137,7 @@ sequenceDiagram
     participant PG as PostgreSQL (Business DB)
     participant Immu as immudb (Cryptographic Ledger)
 
-    Client->>Auth: Request + JWT Cookie / X-API-Key
+    Client->>Auth: Request + JWT Cookie / Session
     Auth->>Auth: Verify Signature & Derive Authenticated User + Role
     Client->>Engine: Execute SQL Query
     Engine->>Engine: Parse AST, extract actions, tables, sensitive columns
@@ -173,7 +173,7 @@ sequenceDiagram
 * **Engine-Level Immutability**: PostgreSQL PL/pgSQL triggers in [`db/schema.sql`](db/schema.sql) reject direct `UPDATE`, `DELETE`, and `TRUNCATE` operations on `vault_audit.audit_logs`. If a DBA circumvents relational triggers out-of-band, the Merkle tree state in immudb flags the discrepancy with field-by-field verification diffs.
 
 ### Role-Based Access Control (RBAC) & AST Parser
-* **Server-Derived Identity**: Client requests cannot dictate or override `app_user` or `user_role`. Identity is derived strictly server-side via RFC 7519 HS256 JWT tokens or cryptographically verified API keys in [`src/vault_db/auth/`](src/vault_db/auth/).
+* **Server-Derived Identity**: Client requests cannot dictate or override `app_user` or `user_role`. Identity is derived strictly server-side via RFC 7519 HS256 JWT tokens and salted PBKDF2 password hashing in [`src/vault_db/auth/`](src/vault_db/auth/).
 * **AST-Level SQL Inspection**: Deep parsing in [`src/vault_db/core/parser.py`](src/vault_db/core/parser.py) extracts targets, actions (`SELECT`, `INSERT`, `UPDATE`, `DELETE`, `DDL:DROP`, `ALTER`), and sensitive attributes before execution.
 * **Injection Firewall**: Blocks stacked queries (multi-statement injection), CTE write attacks (`WITH x AS (DELETE ...) SELECT 1;`), `COPY PROGRAM`, and unprivileged privilege escalation (`SET ROLE`).
 
@@ -209,7 +209,7 @@ sequenceDiagram
 | Threat Vector | Attack Scenario | VaultDB Defense Mechanism |
 | :--- | :--- | :--- |
 | **Rogue DBA / Insider Threat** | Attacker with database admin access executes `DELETE FROM audit_logs` or modifies past queries. | **immudb Merkle Tree**: Immutable append-only ledger prevents alterations. PostgreSQL triggers reject direct table mutations. In-browser verification flags field-by-field diffs if the relational store is tampered with. |
-| **Client Identity Spoofing** | Adversary injects `{"user": "admin@bank.com"}` in query parameters. | **Server-Derived Identity**: User identity and permissions are resolved exclusively from cryptographic JWT signatures or API keys. Client declarations are ignored. |
+| **Client Identity Spoofing** | Adversary injects `{"user": "admin@bank.com"}` in query parameters. | **Server-Derived Identity**: User identity and permissions are resolved exclusively from cryptographic JWT signatures and secure password verification. Client declarations are ignored. |
 | **Stacked SQL Injection** | Malicious input attempts `SELECT 1; DROP TABLE app_data.accounts;`. | **AST Multi-Statement Firewall**: Detects stacked statements and CTE write vectors; blocks execution before reaching PostgreSQL and logs a security violation. |
 | **PII Data Exfiltration** | Employee attempts to query unmasked customer SSNs or card numbers. | **Dynamic Data Masking**: In-flight regex masking redacts sensitive tokens (`***-**-XXXX`) in query results and sanitizes SQL constants in audit logs. |
 | **Cross-Tenant Snooping** | Retail customer attempts to query other customer account numbers. | **Row-Level Security (RLS)**: Enforces tenant boundary isolation by rewriting customer queries to filter on authenticated user ID only. |
@@ -347,12 +347,12 @@ Open **`http://localhost:8000`** in your browser to access the live dashboard.
 ### Pre-Configured Demo Personas
 VaultDB includes 4 pre-seeded enterprise banking personas available for instant 1-click identity switching in the dashboard:
 
-| Role | Email Identity | Default Password | API Key | Permissions |
-| :--- | :--- | :--- | :--- | :--- |
-| **Admin** | `admin@bank.com` | `AdminPass123!` | `vlt_key_admin_9a8b7c6d5e4f3a2b` | Full read, write, DDL execution, access approvals, security alerts. |
-| **Auditor** | `compliance.lead@bank.com` | `AuditorPass123!` | `vlt_key_auditor_5d6e7f8a9b0c1d2e` | Read-only ledger audit, proof verification, report generation, masked schema inspection. |
-| **Employee** | `john@bank.com` | `EmployeePass123!` | `vlt_key_employee_1a2b3c4d5e6f7a8b` | Standard business transactions, temporary elevation requests, masked PII. |
-| **Customer** | `alice@bank.com` | `CustomerPass123!` | `vlt_key_customer_4d5e6f7a8b9c0d1e` | Self-service banking, personal account access (RLS-scoped, masked PII). |
+| Role | Email Identity | Default Password | Permissions |
+| :--- | :--- | :--- | :--- |
+| **Admin** | `admin@bank.com` | `AdminPass123!` | Full read, write, DDL execution, access approvals, security alerts. |
+| **Auditor** | `compliance.lead@bank.com` | `AuditorPass123!` | Read-only ledger audit, proof verification, report generation, masked schema inspection. |
+| **Employee** | `john@bank.com` | `EmployeePass123!` | Standard business transactions, temporary elevation requests, masked PII. |
+| **Customer** | `alice@bank.com` | `CustomerPass123!` | Self-service banking, personal account access (RLS-scoped, masked PII). |
 
 ---
 
@@ -467,7 +467,7 @@ Vault_DB/
 │       ├── auth/                       # Security & Identity Modules
 │       │   ├── dependencies.py         # Server-derived authentication dependencies
 │       │   ├── jwt_handler.py          # RFC 7519 HS256 token encoding/decoding
-│       │   └── security.py             # Security utilities & secret management
+│       │   └── security.py             # Salted PBKDF2 password hashing & token utilities
 │       ├── core/                       # Core Security & Governance Engines
 │       │   ├── alerts.py               # Slack Block Kit notification dispatcher
 │       │   ├── anomaly.py              # Behavioral anomaly detector (bulk, off-hours, denials)
