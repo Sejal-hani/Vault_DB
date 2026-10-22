@@ -93,7 +93,10 @@ ACCOUNTS = [
 
 def init_postgres():
     print(f"[*] Initializing PostgreSQL at {settings.POSTGRES_HOST}:{settings.POSTGRES_PORT}...")
-    schema_path = BASE_DIR / "schema.sql"
+    schema_path = BASE_DIR / "db" / "schema.sql"
+    if not schema_path.exists():
+        # Fallback to root directory if present
+        schema_path = BASE_DIR / "schema.sql"
 
     if not schema_path.exists():
         print(f"[-] Error: {schema_path} not found.")

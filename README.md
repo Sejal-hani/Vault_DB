@@ -164,7 +164,7 @@ sequenceDiagram
 ### Cryptographic Audit Ledger
 * **Dual-Commit Pipeline**: Every query attempt (both successful executions and rejected violations) is recorded in PostgreSQL and committed to an append-only [immudb](https://immudb.io/) Merkle tree.
 * **Mathematical Inclusion Proofs**: Each audit entry produces a verifiable SHA-256 state root and linear transaction height. Auditors can independently verify cryptographic membership proofs directly in the web console or via API.
-* **Engine-Level Immutability**: PostgreSQL PL/pgSQL triggers in [`schema.sql`](schema.sql) reject direct `UPDATE`, `DELETE`, and `TRUNCATE` operations on `vault_audit.audit_logs`. If a DBA circumvents relational triggers out-of-band, the Merkle tree state in immudb flags the discrepancy with field-by-field verification diffs.
+* **Engine-Level Immutability**: PostgreSQL PL/pgSQL triggers in [`db/schema.sql`](db/schema.sql) reject direct `UPDATE`, `DELETE`, and `TRUNCATE` operations on `vault_audit.audit_logs`. If a DBA circumvents relational triggers out-of-band, the Merkle tree state in immudb flags the discrepancy with field-by-field verification diffs.
 
 ### Role-Based Access Control (RBAC) & AST Parser
 * **Server-Derived Identity**: Client requests cannot dictate or override `app_user` or `user_role`. Identity is derived strictly server-side from salted PBKDF2 password hashes, RFC 7519 HS256 JWT tokens, or cryptographically verified API keys in [`src/vault_db/auth/`](src/vault_db/auth/).
@@ -300,7 +300,7 @@ ANOMALY_TIMEZONE=Asia/Kolkata
 ```
 
 #### 3. Initialize Database & Immutability Triggers
-Run the automated initialization script in [`scripts/init_databases.py`](scripts/init_databases.py) to establish database schemas from [`schema.sql`](schema.sql), immutability triggers, and seed demo enterprise accounts:
+Run the automated initialization script in [`scripts/init_databases.py`](scripts/init_databases.py) to establish database schemas from [`db/schema.sql`](db/schema.sql), immutability triggers, and seed demo enterprise accounts:
 ```bash
 python scripts/init_databases.py
 ```
@@ -425,11 +425,12 @@ Vault_DB/
 │   ├── __init__.py
 │   └── settings.py                     # Centralized Pydantic configuration & env validation
 ├── data/                               # Local persistent storage (immudb ledger & alerts buffer)
+├── db/
+│   └── schema.sql                      # Database DDL, triggers, and immutability procedures
 ├── docker-compose.yml                  # Multi-container orchestration (PostgreSQL, immudb, VaultDB)
 ├── Dockerfile                          # Production container image specification
 ├── pyproject.toml                      # PEP 621 package metadata & project build configuration
 ├── requirements.txt                    # Python runtime package dependencies
-├── schema.sql                          # Database DDL, triggers, and immutability procedures
 ├── server.py                           # Application web server entry point
 ├── scripts/
 │   ├── init_databases.py               # Database setup, schema generation & persona seeding

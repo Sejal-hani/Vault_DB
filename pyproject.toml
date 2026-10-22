@@ -61,3 +61,8 @@ dev = [
 where = ["."]
 include = ["src*", "config*"]
 
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+
+
