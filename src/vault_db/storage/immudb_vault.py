@@ -76,10 +76,6 @@ class ImmudbVault:
 
     def _peek_next_id(self) -> int:
         """Reads or advances current counter atomically while lock is held."""
-        if self._cached_counter is not None:
-            self._cached_counter += 1
-            return self._cached_counter
-
         self._ensure_connected()
         try:
             val_bytes = self._client.get(self.COUNTER_KEY).value
@@ -87,18 +83,19 @@ class ImmudbVault:
         except Exception:
             immu_counter = 0
 
-        # Synchronize with PostgreSQL to avoid sequence collisions
+        # Synchronize with PostgreSQL on every write to strictly prevent sequence collisions across processes
         try:
             from src.vault_db.storage.postgres import PostgresStorage
             pg = PostgresStorage()
             pg_res, _, _ = pg.execute_query("SELECT COALESCE(MAX(log_id), 0) FROM vault_audit.audit_logs;")
             pg_max = pg_res[0][0] if pg_res else 0
-            base_counter = max(immu_counter, pg_max)
         except Exception:
-            base_counter = immu_counter
+            pg_max = 0
 
-        self._cached_counter = base_counter + 1
-        return self._cached_counter
+        cached = self._cached_counter or 0
+        next_id = max(immu_counter, pg_max, cached) + 1
+        self._cached_counter = next_id
+        return next_id
 
     def append_audit_log(
         self,
