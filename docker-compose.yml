@@ -3,9 +3,9 @@ services:
     image: postgres:16-alpine
     container_name: vaultdb-postgres
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: nimit8222
-      POSTGRES_DB: postgres
+      POSTGRES_USER: ${POSTGRES_ADMIN_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-vaultdb}
     ports:
       - "5432:5432"
     volumes:
@@ -40,8 +40,8 @@ services:
       POSTGRES_DB: postgres
       POSTGRES_USER: vault_user
       POSTGRES_PASSWORD: vault123
-      POSTGRES_ADMIN_USER: postgres
-      POSTGRES_ADMIN_PASSWORD: nimit8222
+      POSTGRES_ADMIN_USER: ${POSTGRES_ADMIN_USER:-postgres}
+      POSTGRES_ADMIN_PASSWORD: ${POSTGRES_ADMIN_PASSWORD:-postgres}
       IMMUDB_HOST: immudb
       IMMUDB_PORT: 3322
       IMMUDB_USER: immudb

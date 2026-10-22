@@ -1,6 +1,6 @@
 """
-Comprehensive Test Suite for VaultDB V1 Requirements & V2 Features
-Validates 3-role access control (admin, writer, reader), customer RLS on transactions,
+Comprehensive Test Suite for VaultDB Enterprise Security Specifications
+Validates role-based access control, customer RLS on transactions,
 sensitive column detection on SELECT *, and query-text masking in logs.
 """
 

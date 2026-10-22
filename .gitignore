@@ -1,27 +1,50 @@
-# Python
+# Python & Bytecode
 __pycache__/
 *.py[cod]
 *$py.class
-venv/
-.env
+*.egg-info/
+dist/
+build/
 
-# immudb data and logs
+# Virtual Environments
+venv/
+.venv/
+env/
+
+# Environment Variables
+.env
+.env.local
+.env.*.local
+
+# Database Data & Logs
 data/
 immulog/
 *.log
 *.csv
+*.db
+*.sqlite
+*.sqlite3
 
-# IDE
+# IDEs & System Files
 .vscode/
 .idea/
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
 
-# Testing & Dependencies
+# Testing & Code Quality
 node_modules/
 .pytest_cache/
 .coverage
 htmlcov/
+.mypy_cache/
+.ruff_cache/
 
-# Local binaries
+# Binaries and Compiled Libraries
 bin/
-
-
+*.exe
+*.dll
+*.so
+*.dylib
+*.bin
