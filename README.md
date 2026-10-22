@@ -8,7 +8,7 @@
 [![immudb](https://img.shields.io/badge/immudb-Cryptographic%20Merkle%20Ledger-green?logo=database)](https://immudb.io/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115%2B-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)](https://www.python.org/)
-[![Tests](https://img.shields.io/badge/Test%20Suite-147%20Passed-success)](tests/)
+[![Tests](https://img.shields.io/badge/Test%20Suite-160%20Passed-success)](tests/)
 [![Compliance](https://img.shields.io/badge/Compliance-GDPR%20|%20HIPAA%20|%20PCI--DSS-orange)](#11-regulatory-compliance-mapping)
 
 ---
@@ -53,55 +53,40 @@ Traditional database architectures remain vulnerable to three primary attack vec
 
 ## 3. System Architecture & Dual-Storage Engine
 
-```
-+---------------------------------------------------------------------------------------------------+
-|                                        Client Applications                                        |
-|              (Web Management Console, Python SDK, Microservices, Automated Test Suites)           |
-+-------------------------------------------------+-------------------------------------------------+
-                                                  |
-                                                  v
-+---------------------------------------------------------------------------------------------------+
-|                                         VaultDB Middleware                                        |
-|                                                                                                   |
-|  [Authentication & Server-Derived Identity]                                                       |
-|    - Salted PBKDF2-HMAC-SHA256 Password Verification                                              |
-|    - RFC 7519 Compliant HS256 JWT (HttpOnly Cookie / Bearer Token)                                |
-|    - Cryptographic API Key Verification (X-API-Key Header)                                        |
-|    - Zero Client Trust: User identity and roles are resolved strictly on the server               |
-|                                                                                                   |
-|  [SQL Security & AST Parser Engine]                                                               |
-|    - Action Extraction (SELECT, INSERT, UPDATE, DELETE, DDL:DROP, ALTER, TRUNCATE)                |
-|    - Stacked Query & Multi-Statement SQL Injection Firewall                                       |
-|    - Table & Schema Resolution with Real-Relation Validation                                      |
-|    - Sensitive Column & PII Attribute Detection                                                   |
-|                                                                                                   |
-|  [Policy, Isolation & Enforcement Layer]                                                          |
-|    - Role-Based Access Control (RBAC) across Enterprise Personas                                  |
-|    - Row-Level Security (RLS) Dynamic Query Rewriter (Personal Record Scoping)                    |
-|    - Dynamic Data Masking Engine (Redacts SSN, Cards, and Passwords in Results & Logs)            |
-|    - Real-Time Behavioral Anomaly Detector (Bulk Rows, After-Hours Access, Repeated Denials)      |
-|                                                                                                   |
-|  [Dual-Storage Cryptographic Ledger Orchestrator]                                                 |
-|    - Synchronous in-memory & disk buffering to eliminate UI race conditions                       |
-|    - Synchronized Dual-Commit (PostgreSQL Relational Mirror + immudb Merkle Tree)                 |
-|    - Cross-Verification Engine (Merkle Root Consistency & Field-Level Diff Tracking)               |
-+----------------------------------+------------------------------------+---------------------------+
-                                   |                                    |
-                                   v                                    v
-+---------------------------------------------------+  +--------------------------------------------+
-|             PostgreSQL Relational Store           |  |          immudb Cryptographic Ledger       |
-|                                                   |  |                                            |
-| - ConnectionPool (psycopg-pool)                   |  | - Append-Only Merkle Tree Ledger           |
-| - Business Data:                                  |  | - Cryptographic verifiedSet / verifiedGet  |
-|     app_data.users                                |  | - Cryptographic Inclusion Proofs           |
-|     app_data.accounts                             |  | - SHA-256 State Root Commitments           |
-|     app_data.transactions                         |  | - Linear Transaction Heights               |
-|     app_data.access_requests                      |  | - Zero External Mutation Capability        |
-| - Relational Audit Mirror:                        |  |                                            |
-|     vault_audit.audit_logs                        |  |                                            |
-| - Engine-Level Immutability Triggers:             |  |                                            |
-|     Rejects UPDATE, DELETE, TRUNCATE via PL/pgSQL |  |                                            |
-+---------------------------------------------------+  +--------------------------------------------+
+```mermaid
+flowchart TD
+    subgraph Clients ["Client Applications"]
+        UI["Web Management Console"]
+        SDK["Python Client SDK (VaultClient)"]
+    end
+
+    subgraph Middleware ["VaultDB Security Middleware"]
+        Auth["Authentication & Server-Derived Identity<br/>(JWT, API Key, PBKDF2 Password Hashing)"]
+        Parser["AST SQL Parser & Injection Firewall<br/>(Multi-Statement, CTE & Privilege Escalation Guards)"]
+        Policy["Policy & Governance Engine<br/>(RBAC, Tenant RLS, Dynamic Masking, Anomaly Detection)"]
+        Engine["VaultEngine Orchestrator<br/>(Dual-Commit Pipeline & Merkle Verification)"]
+
+        Auth --> Parser
+        Parser --> Policy
+        Policy --> Engine
+    end
+
+    subgraph Storage ["Dual-Storage Architecture"]
+        subgraph PostgresStore ["PostgreSQL Relational Store"]
+            PGBiz["Business Tables<br/>(users, accounts, transactions, access_requests)"]
+            PGAudit["Relational Audit Mirror (vault_audit.audit_logs)<br/>Engine-Level Triggers: Reject UPDATE & DELETE"]
+        end
+
+        subgraph ImmudbStore ["immudb Cryptographic Ledger"]
+            ImmuLog["Append-Only Merkle Tree (audit:log:id)<br/>Cryptographic Inclusion Proofs & SHA-256 State Roots"]
+        end
+    end
+
+    Clients -->|SQL Query + Auth Credentials| Auth
+    Engine -->|1. Scoped Query Execution| PGBiz
+    Engine -->|2. Cryptographic Audit Append| ImmuLog
+    Engine -->|3. Relational Mirror Write| PGAudit
+    Engine -.->|Cryptographic Cross-Verification| ImmudbStore
 ```
 
 ### Dual-Storage Architecture
@@ -177,6 +162,7 @@ sequenceDiagram
 
 ### Dynamic In-Flight Data Masking
 * **In-Flight PII Redaction**: Automatically redacts sensitive identifiers (Social Security Numbers as `***-**-XXXX`, credit card numbers, CVVs, and passwords) in query responses via [`src/vault_db/core/masking.py`](src/vault_db/core/masking.py).
+* **Credential Secret Suppression**: Automatically strips security-critical credential columns (`password_hash`, `api_key`) from all tabular query results and Schema Explorer responses across all roles, preventing credential exfiltration while preserving server-side authentication.
 * **Masked Audit Trails**: Constants in SQL text are sanitized in both execution results and persistent audit logs, preventing PII leakage into compliance archives.
 
 ### Behavioral Anomaly Detection Engine
@@ -214,14 +200,16 @@ sequenceDiagram
 
 VaultDB provides a unified dark-themed web workstation served at **`http://localhost:8000`**:
 
-* **SQL Execution Console**: Interactive query editor with keyboard shortcuts (`Ctrl+Enter`), preset attack scenarios, execution latency metrics, and instant result tables.
-* **Audit Ledger**: Complete historical query trail with sorting (ID, timestamp, user), search filtering, and a sticky pagination toolbar (`25`, `50`, `100`, `250` rows per page) permanently anchored at the bottom of the card.
-* **Mathematical Proof Verification Modal**: Click **Verify Proof** on any ledger entry to view cryptographic state roots, transaction IDs, and live Merkle inclusion proofs.
-* **Schema Explorer**: Interactive table inspection and column structure discovery for PostgreSQL schemas with pagination.
+* **Top Telemetry Stats Bar**: 4 real-time security telemetry cards (Total audited queries, Policy violations blocked, Flagged sensitive queries, Active temporary grants) stretched across the workstation header for instant operational visibility.
+* **1-Click User Identity Switching**: Seamless zero-friction persona switching between enterprise identities (Admin, Auditor, Employee, Customer) directly from the top navigation bar or the SQL Console persona bar without password entry forms.
+* **SQL Execution Console**: Interactive query editor with keyboard shortcuts (`Ctrl+Enter`), preset compliance and attack scenarios, execution latency metrics, and tabular result sets rendered with clean Indian Standard Time (`YYYY-MM-DD HH:MM:SS IST`) timestamps.
+* **Audit Ledger**: Complete historical query trail with multi-field search filtering, chronological sorting, and sticky pagination (`25`, `50`, `100`, `250` rows per page).
+* **Mathematical Proof Verification Modal**: Click **Verify Proof** on any ledger entry to view cryptographic SHA-256 state roots, transaction IDs, linear transaction heights, and live Merkle inclusion proofs proving database immutability.
+* **Schema Explorer**: Interactive table inspection and column structure discovery for PostgreSQL schemas with pagination, masked PII, and backend credential suppression (`password_hash`, `api_key` stripped; `status` omitted from `users` display).
 * **Security Center**:
-  - *Access Requests & Approvals*: Self-service elevation submission, admin approval, and one-click revocation.
+  - *Access Requests & Approvals*: Self-service temporary elevation submission, admin approval, and one-click revocation.
   - *Security Alerts*: Real-time feed of detected behavioral anomalies with direct links (`#<ID>`) to the corresponding ledger record.
-* **Compliance Report Generator**: Direct PDF compliance generation with custom date windows and status filters.
+* **Compliance Report Generator**: Direct PDF compliance generation with custom date windows (24h, 7d, 30d, all) and status filters.
 
 ---
 
@@ -334,14 +322,14 @@ Open **`http://localhost:8000`** in your browser to access the live dashboard.
 ## 8. Enterprise Personas & Access Control
 
 ### Pre-Configured Demo Personas
-VaultDB includes 4 pre-seeded enterprise banking personas:
+VaultDB includes 4 pre-seeded enterprise banking personas available for instant 1-click identity switching in the dashboard:
 
 | Role | Email Identity | Default Password | API Key | Permissions |
 | :--- | :--- | :--- | :--- | :--- |
 | **Admin** | `admin@bank.com` | `AdminPass123!` | `vlt_key_admin_9a8b7c6d5e4f3a2b` | Full read, write, DDL execution, access approvals, security alerts. |
-| **Auditor** | `compliance.lead@bank.com` | `AuditorPass123!` | `vlt_key_auditor_5d6e7f8a9b0c1d2e` | Read-only ledger audit, proof verification, report generation. |
-| **Employee** | `john@bank.com` | `EmployeePass123!` | `vlt_key_employee_1a2b3c4d5e6f7a8b` | Standard business transactions, temporary elevation requests. |
-| **Customer** | `alice@bank.com` | `CustomerPass123!` | `vlt_key_customer_4d5e6f7a8b9c0d1e` | Self-service banking, personal account access (RLS-scoped). |
+| **Auditor** | `compliance.lead@bank.com` | `AuditorPass123!` | `vlt_key_auditor_5d6e7f8a9b0c1d2e` | Read-only ledger audit, proof verification, report generation, masked schema inspection. |
+| **Employee** | `john@bank.com` | `EmployeePass123!` | `vlt_key_employee_1a2b3c4d5e6f7a8b` | Standard business transactions, temporary elevation requests, masked PII. |
+| **Customer** | `alice@bank.com` | `CustomerPass123!` | `vlt_key_customer_4d5e6f7a8b9c0d1e` | Self-service banking, personal account access (RLS-scoped, masked PII). |
 
 ---
 
@@ -349,12 +337,12 @@ VaultDB includes 4 pre-seeded enterprise banking personas:
 
 | Resource / Action | Customer | Employee | Auditor | Admin |
 | :--- | :---: | :---: | :---: | :---: |
-| `accounts:SELECT` | Allowed (RLS Scoped + Masked) | Allowed | Allowed | Allowed (Full Access) |
+| `accounts:SELECT` | Allowed (RLS Scoped + Masked) | Allowed (Masked) | Allowed (Masked) | Allowed (Full Access) |
 | `accounts:INSERT/UPDATE/DELETE` | Denied | Denied | Denied | Allowed |
 | `transactions:SELECT` | Allowed (RLS Scoped) | Allowed | Allowed | Allowed |
 | `transactions:INSERT/UPDATE` | Denied | Allowed | Denied | Allowed |
 | `transactions:DELETE` | Denied | Denied | Denied | Allowed |
-| `users:SELECT` | Denied | Denied | Allowed | Allowed |
+| `users:SELECT` | Denied | Denied | Allowed (Secrets Stripped) | Allowed (Secrets Stripped) |
 | `users:INSERT/UPDATE/DELETE` | Denied | Denied | Denied | Allowed |
 | `audit_logs:SELECT` | Allowed (Own Scoped History) | Denied | Allowed (Full Ledger) | Allowed (Full Ledger) |
 | `audit_logs:UPDATE/DELETE/TRUNCATE` | **Blocked by Trigger** | **Blocked by Trigger** | **Blocked by Trigger** | **Blocked by Trigger** |
@@ -364,7 +352,7 @@ VaultDB includes 4 pre-seeded enterprise banking personas:
 
 ## 9. Automated Verification & Test Suite
 
-VaultDB features an automated test suite containing **147 tests** in [`tests/`](tests/) covering adversarial vectors, cryptographic validation, and role enforcement:
+VaultDB features an automated test suite containing **160 tests** in [`tests/`](tests/) covering adversarial vectors, cryptographic validation, and role enforcement:
 
 ```bash
 pytest tests/ -v
@@ -374,7 +362,7 @@ pytest tests/ -v
 * **100+ Adversarial SQL Vectors** ([`tests/test_attack_vectors.py`](tests/test_attack_vectors.py)): Multi-statement injection, CTE writes, `COPY PROGRAM`, `SET ROLE`, out-of-band schema drops, and comment truncation.
 * **Engine Immutability Triggers**: Verification that direct `UPDATE`, `DELETE`, and `TRUNCATE` operations on `vault_audit.audit_logs` are rejected by PostgreSQL.
 * **Cryptographic Merkle Proofs** ([`tests/test_immudb.py`](tests/test_immudb.py)): SHA-256 state root consistency and tamper detection logic.
-* **Enterprise Security & Approvals** ([`tests/test_enterprise_security.py`](tests/test_enterprise_security.py)): Evaluation of bulk thresholds (`>= 1,000` rows), after-hours windows, repeated denial accumulation, temporary JIT elevation, and PDF generation.
+* **Enterprise Security & Approvals** ([`tests/test_enterprise_security.py`](tests/test_enterprise_security.py)): Evaluation of bulk thresholds (`>= 1,000` rows), after-hours windows, repeated denial accumulation, temporary JIT elevation, PDF compliance export, credential secret suppression (`password_hash`, `api_key`), and non-admin SSN masking.
 * **Tenant Isolation & Masking** ([`tests/test_rbac.py`](tests/test_rbac.py)): Customer row scoping and in-flight PII redaction.
 
 ---
@@ -438,6 +426,8 @@ Vault_DB/
 │   └── start_services.py               # Standalone daemon process launcher
 ├── src/
 │   └── vault_db/
+│       ├── __init__.py
+│       ├── vault_client.py             # VaultDB Python Client SDK
 │       ├── api/                        # FastAPI Web Layer
 │       │   ├── app.py                  # Application factory, CORS, static mounting & lifecycle
 │       │   ├── dependencies.py         # Shared engine singleton & serialization utilities
@@ -456,6 +446,8 @@ Vault_DB/
 │       ├── core/                       # Core Security & Governance Engines
 │       │   ├── alerts.py               # Slack Block Kit notification dispatcher
 │       │   ├── anomaly.py              # Behavioral anomaly detector (bulk, off-hours, denials)
+│       │   ├── approval.py             # Just-in-Time temporary elevation manager
+│       │   ├── crypto.py               # AES-256-GCM column encryption utilities
 │       │   ├── engine.py               # VaultEngine middleware orchestrator
 │       │   ├── masking.py              # In-flight PII masking engine (SSN, cards, passwords)
 │       │   ├── parser.py               # AST SQL inspection & injection firewall
@@ -464,7 +456,7 @@ Vault_DB/
 │       ├── reports/                    # Compliance Reporting
 │       │   └── pdf_generator.py        # Certified PDF compliance report generator
 │       └── storage/                    # Database Connectors & Interfaces
-│           ├── immudb_storage.py       # Append-only Merkle ledger interface
+│           ├── immudb_vault.py         # Append-only Merkle ledger interface
 │           └── postgres.py             # PostgreSQL ConnectionPool interface
 ├── static/                             # Frontend Web Console Assets
 │   ├── css/
