@@ -673,6 +673,16 @@
       loadAlerts();
     }
 
+    function formatTableCell(c) {
+      if (c === null || c === undefined) return 'NULL';
+      if (typeof c === 'string') {
+        if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(c)) {
+          return formatIST(c);
+        }
+      }
+      return String(c);
+    }
+
     function renderResultTable(columns, rows, totalRows) {
       const thead = document.getElementById('result-thead');
       const tbody = document.getElementById('result-tbody');
@@ -691,7 +701,7 @@
       }
 
       let html = rows.map(r => `
-        <tr>${r.map(c => `<td class="mono">${escapeHtml(String(c === null ? 'NULL' : c))}</td>`).join('')}</tr>
+        <tr>${r.map(c => `<td class="mono">${escapeHtml(formatTableCell(c))}</td>`).join('')}</tr>
       `).join('');
 
       if (totalRows !== undefined && totalRows > rows.length) {
@@ -1204,7 +1214,7 @@
 
         thead.innerHTML = `<tr>${data.columns.map(c => `<th>${escapeHtml(c)}</th>`).join('')}</tr>`;
         tbody.innerHTML = data.rows.map(r => `
-          <tr>${r.map(c => `<td class="mono">${escapeHtml(String(c === null ? 'NULL' : c))}</td>`).join('')}</tr>
+          <tr>${r.map(c => `<td class="mono">${escapeHtml(formatTableCell(c))}</td>`).join('')}</tr>
         `).join('');
 
         filterExplorerRows();

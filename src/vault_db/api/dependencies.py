@@ -6,11 +6,14 @@ Provides singleton access to VaultEngine and data serialization helpers.
 import logging
 from decimal import Decimal
 from datetime import datetime
+from zoneinfo import ZoneInfo
 from typing import Any, Optional
 
 from src.vault_db.core.engine import VaultEngine
 
 logger = logging.getLogger(__name__)
+
+IST_TZ = ZoneInfo("Asia/Kolkata")
 
 # Global singleton engine instance
 _engine: Optional[VaultEngine] = None
@@ -47,5 +50,9 @@ def serialize_item(item: Any) -> Any:
     if isinstance(item, Decimal):
         return float(item)
     if isinstance(item, datetime):
-        return item.isoformat()
+        try:
+            dt = item.astimezone(IST_TZ) if item.tzinfo else item.replace(tzinfo=ZoneInfo("UTC")).astimezone(IST_TZ)
+            return dt.strftime("%Y-%m-%d %H:%M:%S IST")
+        except Exception:
+            return item.strftime("%Y-%m-%d %H:%M:%S IST")
     return item
