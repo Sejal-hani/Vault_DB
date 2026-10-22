@@ -962,11 +962,11 @@
           : '<span class="tag tag-success">SUCCESS</span>';
         
         let sensTag = isSensitive 
-          ? '<span class="tag tag-sensitive" style="margin-left:4px;" title="Sensitive PII accessed">SENSITIVE</span>' 
+          ? '<span class="tag tag-sensitive" title="Sensitive PII accessed">SENSITIVE</span>' 
           : '';
 
         let anomalyTag = isAnomaly 
-          ? `<span class="tag tag-anomaly" style="margin-left:4px; font-weight:700; cursor:pointer;" onclick="navigateToSecurityCenter('alerts')" title="Security Anomaly Triggered (Click to cross-reference with Security Alerts)">ANOMALY</span>` 
+          ? `<span class="tag tag-anomaly" style="font-weight:700; cursor:pointer;" onclick="navigateToSecurityCenter('alerts')" title="Security Anomaly Triggered (Click to cross-reference with Security Alerts)">ANOMALY</span>` 
           : '';
 
         return `
@@ -977,7 +977,7 @@
             <td><span class="role-badge role-${(l.role||'user').toLowerCase()}">${escapeHtml(l.role || '-')}</span></td>
             <td>${escapeHtml(l.action || '-')}</td>
             <td><code class="mono" style="color: var(--text-muted);">${escapeHtml(l.table || '-')}</code></td>
-            <td>${statusTag}${sensTag}${anomalyTag}</td>
+            <td style="white-space: nowrap;"><div style="display: inline-flex; align-items: center; gap: 4px;">${statusTag}${sensTag}${anomalyTag}</div></td>
             <td class="mono" style="color: #93c5fd;">#${l.immudb_tx_id || '-'}</td>
             <td><button class="btn btn-secondary btn-sm" onclick="verifyProof(${l.id})">Verify proof</button></td>
             <td class="sql-cell" title="${escapeHtml(l.query || '')}">${escapeHtml(l.query || '')}</td>
