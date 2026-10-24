@@ -59,15 +59,16 @@ class ImmudbVault:
             raise
 
     def _ensure_connected(self):
-        """Re-establishes connection if closed or stale."""
+        """Re-establishes connection if closed, stale, or token expired."""
         if self._client is None:
             self._connect()
         else:
             try:
-                # Lightweight health check
+                # Lightweight authenticated health check to verify active session token
                 self._client.healthCheck()
-            except Exception:
-                logger.info("Reconnecting to immudb...")
+                self._client.currentState()
+            except Exception as e:
+                logger.info(f"Reconnecting to immudb (session expired or connection stale: {e})...")
                 try:
                     self._client.logout()
                 except Exception:
