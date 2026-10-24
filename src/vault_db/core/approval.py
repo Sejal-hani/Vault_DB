@@ -18,9 +18,13 @@ logger = logging.getLogger(__name__)
 class ApprovalManager:
     """Manages time-bounded privilege requests, manager approvals, and auto-revocation."""
 
-    def __init__(self, postgres: Optional[PostgresStorage] = None, immudb: Optional[ImmudbVault] = None):
+    def __init__(self, postgres: Optional[PostgresStorage] = None, immudb: Optional[Any] = None):
         self.postgres = postgres or PostgresStorage()
-        self.immudb = immudb or ImmudbVault()
+        if immudb is not None:
+            self.immudb = immudb
+        else:
+            from src.vault_db.core.engine import VaultEngine
+            self.immudb = VaultEngine._create_immutable_vault()
 
     def create_request(
         self,

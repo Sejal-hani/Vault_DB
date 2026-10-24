@@ -30,6 +30,9 @@ class Settings:
     IMMUDB_PASSWORD: str = os.getenv("IMMUDB_PASSWORD", "immudb")
     IMMUDB_DATABASE: str = os.getenv("IMMUDB_DATABASE", "defaultdb")
 
+    # Cryptographic Ledger Backend: "auto" (immudb if available, fallback to pure-Python Merkle tree), "immudb", or "merkle"
+    STORAGE_BACKEND: str = os.getenv("STORAGE_BACKEND", "auto").lower()
+
     # API / Server Configuration
     APP_HOST: str = os.getenv("APP_HOST", "0.0.0.0")
     APP_PORT: int = int(os.getenv("APP_PORT", "8000"))

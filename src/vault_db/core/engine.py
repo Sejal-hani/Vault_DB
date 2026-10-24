@@ -13,6 +13,8 @@ from src.vault_db.core.rbac import RBACManager, AccessDeniedError, QueryExecutio
 from src.vault_db.core.parser import SQLParser, QueryAnalysis
 from src.vault_db.storage.postgres import PostgresStorage
 from src.vault_db.storage.immudb_vault import ImmudbVault
+from src.vault_db.storage.merkle_vault import MerkleVault
+from config.settings import settings
 from src.vault_db.core.masking import mask_tabular_results, mask_query_text
 from src.vault_db.core.rls import apply_row_level_security
 from src.vault_db.core.anomaly import AnomalyDetector
@@ -29,15 +31,42 @@ class VaultEngine:
     and cryptographic immutable audit logging to immudb.
     """
 
+    @staticmethod
+    def _create_immutable_vault() -> Any:
+        """
+        Creates an immutable ledger instance based on settings or auto-detection.
+        If immudb is unavailable or on a platform without immudb binary,
+        seamlessly falls back to the native pure-Python Merkle tree ledger.
+        """
+        backend = getattr(settings, "STORAGE_BACKEND", "auto").lower()
+        if backend in ("merkle", "native"):
+            logger.info("Using Native Cryptographic Merkle Tree Ledger (Pure Python).")
+            return MerkleVault()
+
+        if backend == "immudb":
+            return ImmudbVault()
+
+        # 'auto' mode: try immudb first; if daemon offline, gracefully fallback
+        try:
+            vault = ImmudbVault()
+            vault._ensure_connected()
+            return vault
+        except Exception as e:
+            logger.warning(
+                f"External immudb daemon unavailable ({e}). "
+                f"Falling back seamlessly to Native Cryptographic Merkle Tree Ledger (Pure Python)."
+            )
+            return MerkleVault()
+
     def __init__(
         self,
         postgres_storage: Optional[PostgresStorage] = None,
-        immudb_vault: Optional[ImmudbVault] = None,
+        immudb_vault: Optional[Any] = None,
         rbac_manager: Optional[RBACManager] = None,
         approval_manager: Optional[ApprovalManager] = None,
     ):
         self.postgres = postgres_storage or PostgresStorage()
-        self.immudb = immudb_vault or ImmudbVault()
+        self.immudb = immudb_vault if immudb_vault is not None else self._create_immutable_vault()
         self.rbac = rbac_manager or RBACManager()
         self.approvals = approval_manager or ApprovalManager(self.postgres, self.immudb)
 

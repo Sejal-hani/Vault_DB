@@ -25,42 +25,42 @@ def is_port_in_use(port: int, host: str = "127.0.0.1") -> bool:
 
 def ensure_immudb_running() -> subprocess.Popen | None:
     if is_port_in_use(settings.IMMUDB_PORT, settings.IMMUDB_HOST):
-        print(f"[+] immudb service is already active on port {settings.IMMUDB_PORT}.")
+        print(f"[+] immudb service is active on port {settings.IMMUDB_PORT}.")
         return None
 
-    binary_path = BASE_DIR / "bin" / "immudb.exe"
-    if not binary_path.exists():
-        print(f"[-] Warning: {binary_path} not found! For local runs without Docker, download immudb from official releases and place it in bin/ (or launch via: docker compose up --build).")
-        return None
+    if sys.platform == "win32":
+        binary_path = BASE_DIR / "bin" / "immudb.exe"
+        if binary_path.exists():
+            data_dir = BASE_DIR / "data" / "immudb"
+            data_dir.mkdir(parents=True, exist_ok=True)
 
-    data_dir = BASE_DIR / "data" / "immudb"
-    data_dir.mkdir(parents=True, exist_ok=True)
+            cmd = [
+                str(binary_path),
+                "--dir", str(data_dir),
+                "--pgsql-server=false",
+                "--web-server=false",
+                "--port", str(settings.IMMUDB_PORT),
+            ]
 
-    cmd = [
-        str(binary_path),
-        "--dir", str(data_dir),
-        "--pgsql-server=false",
-        "--web-server=false",
-        "--port", str(settings.IMMUDB_PORT),
-    ]
+            print(f"[*] Launching immudb server on port {settings.IMMUDB_PORT}...")
+            proc = subprocess.Popen(
+                cmd,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                creationflags=subprocess.CREATE_NEW_PROCESS_GROUP
+            )
 
-    print(f"[*] Launching immudb server on port {settings.IMMUDB_PORT}...")
-    proc = subprocess.Popen(
-        cmd,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if sys.platform == "win32" else 0
-    )
+            # Wait for port to become available
+            for _ in range(20):
+                if is_port_in_use(settings.IMMUDB_PORT, settings.IMMUDB_HOST):
+                    print(f"[+] immudb server started successfully (PID: {proc.pid}).")
+                    return proc
+                time.sleep(0.3)
 
-    # Wait for port to become available
-    for _ in range(20):
-        if is_port_in_use(settings.IMMUDB_PORT, settings.IMMUDB_HOST):
-            print(f"[+] immudb server started successfully (PID: {proc.pid}).")
-            return proc
-        time.sleep(0.3)
-
-    print("[-] Warning: immudb did not start within expected timeout.")
-    return proc
+    print("[i] External immudb daemon not detected on port 3322.")
+    print("[i] Automatically enabling Native Cryptographic Merkle Tree Ledger (Pure Python).")
+    print("[i] Runs natively on any OS (macOS, Linux, Windows) with zero binary dependencies.")
+    return None
 
 
 def main():

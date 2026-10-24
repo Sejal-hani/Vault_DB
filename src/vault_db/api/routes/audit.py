@@ -366,10 +366,15 @@ async def get_dashboard_stats():
             sensitive_count = int(res[0][2] or 0)
             success_count = int(res[0][3] or 0)
 
-        # Synchronize with immudb primary ledger counter so total matches the latest immutable transactions
+        # Synchronize with immutable ledger counter so total matches the latest transactions
         try:
-            counter_bytes = eng.immudb._client.get(eng.immudb.COUNTER_KEY).value
-            immu_total = int(counter_bytes.decode("utf-8"))
+            if hasattr(eng.immudb, "_client") and hasattr(eng.immudb, "COUNTER_KEY"):
+                counter_bytes = eng.immudb._client.get(eng.immudb.COUNTER_KEY).value
+                immu_total = int(counter_bytes.decode("utf-8"))
+            elif hasattr(eng.immudb, "_counter"):
+                immu_total = int(eng.immudb._counter)
+            else:
+                immu_total = total
             if immu_total > total:
                 total = immu_total
                 success_count = max(0, total - denied_count)

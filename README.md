@@ -8,7 +8,7 @@
 [![immudb](https://img.shields.io/badge/immudb-Cryptographic%20Merkle%20Ledger-green?logo=database)](https://immudb.io/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115%2B-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)](https://www.python.org/)
-[![Tests](https://img.shields.io/badge/Test%20Suite-160%20Passed-success)](tests/)
+[![Tests](https://img.shields.io/badge/Test%20Suite-164%20Passed-success)](tests/)
 [![Compliance](https://img.shields.io/badge/Compliance-GDPR%20|%20HIPAA%20|%20PCI--DSS-orange)](#11-regulatory-compliance-mapping)
 
 ---
@@ -237,6 +237,20 @@ VaultDB provides a unified dark-themed web workstation served at **`http://local
 ## 7. Installation & Setup Guide
 
 > For quick setup instructions, see [SETUP.md](SETUP.md).
+
+### ⚡ 1-Command Universal Quickstart (Runs on Any Computer)
+VaultDB runs natively on **macOS, Linux, and Windows** with zero external binaries:
+```bash
+# Windows:
+run.bat
+
+# macOS / Linux:
+chmod +x run.sh && ./run.sh
+
+# Or direct Python:
+python scripts/quickstart.py
+```
+Open `http://localhost:8000` in your browser.
 
 ### System Prerequisites
 | Component | Minimum Version | Notes |

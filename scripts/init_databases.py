@@ -175,15 +175,17 @@ def init_postgres():
 
 
 def init_immudb():
-    print(f"[*] Connecting to immudb at {settings.immudb_address}...")
+    backend = getattr(settings, "STORAGE_BACKEND", "auto").lower()
+    print(f"[*] Checking immutable ledger backend (mode: {backend})...")
+    from src.vault_db.core.engine import VaultEngine
     try:
-        immudb = ImmudbVault()
-        state = immudb.get_ledger_state()
-        print(f"[+] immudb ledger active (Database: {state['database']}, Current Tx: #{state['tx_id']})")
-        immudb.close()
+        vault = VaultEngine._create_immutable_vault()
+        state = vault.get_ledger_state()
+        print(f"[+] Cryptographic ledger active (Engine: {state.get('database', 'ledger')}, Current Tx: #{state.get('tx_id', 0)}, Root: {str(state.get('root_hash', ''))[:16]}...)")
+        vault.close()
         return True
     except Exception as e:
-        print(f"[-] immudb connection failed: {e}")
+        print(f"[-] Ledger initialization notice: {e}")
         return False
 
 

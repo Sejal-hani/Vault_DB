@@ -12,12 +12,12 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE_DIR))
 
-from src.vault_db.storage.immudb_vault import ImmudbVault
+from src.vault_db.core.engine import VaultEngine
 
 
-def verify_single(immudb: ImmudbVault, log_id: int) -> dict:
-    """Verifies a single log entry against immudb's cryptographic Merkle tree."""
-    result = immudb.verify_audit_log(log_id)
+def verify_single(vault, log_id: int) -> dict:
+    """Verifies a single log entry against the cryptographic Merkle tree."""
+    result = vault.verify_audit_log(log_id)
     
     if result.get("verified"):
         print(f"Log #{log_id}: VERIFIED (Authentic & Untampered)")
@@ -30,19 +30,19 @@ def verify_single(immudb: ImmudbVault, log_id: int) -> dict:
     return result
 
 
-def verify_all(immudb: ImmudbVault, limit: int = 10) -> list:
+def verify_all(vault, limit: int = 10) -> list:
     """Audits the latest N log entries and displays a concise verification table."""
-    logs = immudb.get_audit_logs(limit=limit)
+    logs = vault.get_audit_logs(limit=limit)
     if not logs:
-        print("No audit logs found in immudb ledger.")
+        print("No audit logs found in immutable ledger.")
         return []
 
-    print(f"\nAuditing latest {len(logs)} entries in immudb:")
+    print(f"\nAuditing latest {len(logs)} entries in immutable ledger:")
     print(f"{'ID':<6} {'STATUS':<10} {'USER':<24} {'ACTION':<10} {'INTEGRITY'}")
 
     for log in logs:
         log_id = log.get("id")
-        check = immudb.verify_audit_log(log_id)
+        check = vault.verify_audit_log(log_id)
         status = "PASS" if check.get("verified") else "FAIL (Tampered)"
         
         user_str = str(log.get('user') or 'N/A')
@@ -60,14 +60,14 @@ def main():
     parser.add_argument("--limit", type=int, help="Number of recent logs to audit", default=10)
     args = parser.parse_args()
 
-    immudb = ImmudbVault()
+    vault = VaultEngine._create_immutable_vault()
     try:
         if args.log_id is not None:
-            verify_single(immudb, args.log_id)
+            verify_single(vault, args.log_id)
         else:
-            verify_all(immudb, args.limit)
+            verify_all(vault, args.limit)
     finally:
-        immudb.close()
+        vault.close()
 
 
 if __name__ == "__main__":
