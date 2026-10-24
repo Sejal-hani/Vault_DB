@@ -1,23 +1,15 @@
 """
-VaultDB Dynamic Data Masking Module (V2 Scope)
-Redacts sensitive PII attributes (SSN, payment card numbers, CVVs)
-for unprivileged roles and strips credential secrets (password_hash, api_key)
-from all query results and schema explorations.
+VaultDB Dynamic Data Masking Module
+Redacts sensitive customer PII attributes (SSN) for unprivileged roles
+and strips credential secrets (password_hash, api_key) from all query results.
 """
 
 import re
 from typing import Any, List, Optional, Set, Tuple
-
-
-HIDDEN_COLUMNS: Set[str] = {"password_hash", "api_key"}
-
-MASK_PATTERNS = {
-    "ssn": re.compile(r"^\d{3}-\d{2}-\d{4}$"),
-    "card": re.compile(r"^\d{4}-\d{4}-\d{4}-\d{4}$"),
-}
-
-
 from src.vault_db.core.crypto import decrypt_field
+
+# Columns containing credentials or tokens that must NEVER be exposed to any user (even admin)
+HIDDEN_COLUMNS: Set[str] = {"password_hash", "api_key"}
 
 
 def strip_hidden_columns(
@@ -26,8 +18,8 @@ def strip_hidden_columns(
     extra_hidden: Optional[Set[str]] = None,
 ) -> Tuple[List[str], List[List[Any]]]:
     """
-    Strips security-sensitive credential columns (e.g. password_hash, api_key)
-    and optional display-hidden columns (e.g. status) from both columns and rows.
+    Unconditionally strips security-sensitive credential columns (password_hash, api_key)
+    and optional display-hidden columns from both column headers and row values.
     """
     deny_set = HIDDEN_COLUMNS | {s.lower() for s in (extra_hidden or set())}
     keep_indices = [i for i, col in enumerate(columns) if col.lower() not in deny_set]
@@ -44,7 +36,10 @@ def strip_hidden_columns(
 
 
 def mask_ssn(val: Any) -> str:
-    """Decrypts if encrypted at rest, then masks SSN to '***-**-1234' format."""
+    """
+    Decrypts AES-256-GCM ciphertext if encrypted at rest, then dynamically masks
+    the Social Security Number to the standard '***-**-1234' redacted format.
+    """
     plain = decrypt_field(val)
     s = str(plain).strip()
     if len(s) >= 4:
@@ -52,35 +47,19 @@ def mask_ssn(val: Any) -> str:
     return "***-**-****"
 
 
-def mask_card_number(val: Any) -> str:
-    """Masks credit/debit card numbers to '****-****-****-1234' format."""
-    s = str(val).strip()
-    if len(s) >= 4:
-        return f"****-****-****-{s[-4:]}"
-    return "****-****-****-****"
-
-
-def mask_cvv(val: Any) -> str:
-    return "***"
-
-
 def mask_query_text(query: str) -> str:
     """
     Sanitizes SQL query text by redacting embedded sensitive constants
-    (SSNs, credit card numbers, CVVs, passwords) before writing to audit logs.
-    Satisfies V2 Requirement: 'Mask in logs AND in results'.
+    (SSNs, passwords, credentials) before committing entries into the audit log.
+    Ensures raw sensitive parameters are never leaked in immutable audit ledgers.
     """
     if not query:
         return query
     q = query
     # Redact SSNs (e.g., 123-45-6789 -> ***-**-6789)
     q = re.sub(r'\b\d{3}-\d{2}-(\d{4})\b', r'***-**-\1', q)
-    # Redact credit card numbers (e.g., 4111-2222-3333-4444 -> ****-****-****-4444)
-    q = re.sub(r'\b(?:\d{4}[-\s]?){3}(\d{4})\b', r'****-****-****-\1', q)
-    # Redact CVVs/PINs (e.g., cvv = '123' -> cvv = '***')
-    q = re.sub(r'\b(cvv|pin)\s*=\s*[\'"]?\d{3,4}[\'"]?', r"\1='***'", q, flags=re.IGNORECASE)
-    # Redact Passwords / Secrets
-    q = re.sub(r'\b(password|pwd|secret)\s*=\s*[\'"][^\'"]+[\'"]', r"\1='[REDACTED]'", q, flags=re.IGNORECASE)
+    # Redact Passwords / Secrets / Tokens in WHERE clauses
+    q = re.sub(r'\b(password|pwd|secret|api_key|token)\s*=\s*[\'"][^\'"]+[\'"]', r"\1='[REDACTED]'", q, flags=re.IGNORECASE)
     return q
 
 
@@ -91,8 +70,8 @@ def mask_tabular_results(
 ) -> Tuple[List[List[Any]], bool, List[str]]:
     """
     Evaluates result columns, strips hidden credential columns (password_hash, api_key),
-    and dynamically masks sensitive fields (SSN, card numbers, CVVs) for unprivileged roles.
-    Only authorized 'admin' role receives decrypted business data.
+    and dynamically masks sensitive PII fields (SSN) for unprivileged roles.
+    Only the authorized 'admin' role receives decrypted business data.
     Returns (masked_rows, was_masked, masked_column_names).
     """
     # 1. Strip hidden credentials (password_hash, api_key) for ALL roles
@@ -110,6 +89,7 @@ def mask_tabular_results(
             new_rows.append(row_copy)
         return new_rows, False, []
 
+    # 2. Identify sensitive columns requiring masking for unprivileged personas
     masked_cols = []
     mask_actions = {}
 
@@ -118,17 +98,11 @@ def mask_tabular_results(
         if "ssn" in col_lower:
             mask_actions[idx] = mask_ssn
             masked_cols.append(col)
-        elif "card" in col_lower or "credit" in col_lower or "pan" in col_lower:
-            mask_actions[idx] = mask_card_number
-            masked_cols.append(col)
-        elif "cvv" in col_lower or "pin" in col_lower:
-            mask_actions[idx] = mask_cvv
-            masked_cols.append(col)
 
     if not mask_actions:
         return rows, False, []
 
-    # Apply masking transformations
+    # 3. Apply masking transformations
     new_rows = []
     for row in rows:
         row_copy = list(row)

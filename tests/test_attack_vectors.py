@@ -299,7 +299,7 @@ def test_client_connect_authentication():
 # ------------------------------------------------------------------------------
 
 def test_dynamic_data_masking():
-    """Validates masking of SSN, card numbers, and CVV for unauthorized roles."""
+    """Validates dynamic masking of SSN and stripping of credentials for unauthorized roles."""
     columns = ["account_number", "name", "ssn", "balance"]
     rows = [
         ["ACCT1001", "Alice Smith", "123-45-6789", 45000.00],

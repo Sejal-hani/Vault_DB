@@ -339,7 +339,7 @@ class VaultEngine:
         # 4. Dynamic Data Masking (V2 Scope)
         masked_results, is_masked, masked_cols = mask_tabular_results(columns, results, user_role)
 
-        sensitive_in_cols = [c for c in columns if any(s in c.lower() for s in ("ssn", "password", "card", "cvv", "pin", "secret"))]
+        sensitive_in_cols = [c for c in columns if any(s in c.lower() for s in ("ssn", "password", "secret", "api_key", "token"))]
         is_sensitive_effective = bool(analysis.is_sensitive or is_masked or masked_cols or sensitive_in_cols)
         sensitive_fields_effective = sorted(list(set(analysis.sensitive_fields_found + masked_cols + sensitive_in_cols)))
 
