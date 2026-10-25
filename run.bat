@@ -10,5 +10,5 @@ if exist venv\Scripts\python.exe (
     set "PYTHON_EXE=python"
 )
 
-%PYTHON_EXE% scripts/quickstart.py
+%PYTHON_EXE% server.py
 pause

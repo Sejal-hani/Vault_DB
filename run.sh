@@ -13,4 +13,4 @@ else
     PYTHON_EXE="python"
 fi
 
-$PYTHON_EXE scripts/quickstart.py
+$PYTHON_EXE server.py
