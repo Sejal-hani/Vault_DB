@@ -268,26 +268,16 @@ class ApprovalManager:
         clean_email = user_email.strip().lower()
         now = datetime.now(timezone.utc)
 
-        sql = """
-            SELECT id, requested_role, expires_at
-            FROM app_data.access_requests
-            WHERE user_email = %s AND status = 'APPROVED'
-            ORDER BY expires_at DESC
-            LIMIT 1;
+        # 1. Expire any past approvals for this user
+        sql_find_expired = """
+            SELECT id FROM app_data.access_requests
+            WHERE user_email = %s AND status = 'APPROVED' AND expires_at IS NOT NULL AND expires_at <= %s;
         """
-        rows, _, _ = self.postgres.execute_query(sql, (clean_email,))
-        if not rows:
-            return None
-
-        req_id, role, expires_at = rows[0]
-        if expires_at and expires_at.tzinfo is None:
-            expires_at = expires_at.replace(tzinfo=timezone.utc)
-
-        if expires_at and now >= expires_at:
-            # Auto-revoke expired approval
+        expired_rows, _, _ = self.postgres.execute_query(sql_find_expired, (clean_email, now))
+        for (exp_id,) in expired_rows:
             self.postgres.execute_query(
                 "UPDATE app_data.access_requests SET status = 'EXPIRED' WHERE id = %s;",
-                (req_id,)
+                (exp_id,)
             )
             try:
                 self.immudb.append_audit_log(
@@ -295,19 +285,33 @@ class ApprovalManager:
                     user_role="system",
                     action="ACCESS_REQUEST:EXPIRED",
                     target_table="access_requests",
-                    query_text=f"ACCESS AUTO-REVOKED: Request #{req_id} for {clean_email} expired after designated duration.",
+                    query_text=f"ACCESS AUTO-REVOKED: Request #{exp_id} for {clean_email} expired after designated duration.",
                     execution_status="SUCCESS",
                 )
             except Exception:
                 pass
-            return None
 
-        return role
+        if expired_rows:
+            self.postgres.clear_role_cache()
+
+        # 2. Check for active unexpired approved elevation
+        sql_active = """
+            SELECT requested_role
+            FROM app_data.access_requests
+            WHERE user_email = %s AND status = 'APPROVED' AND (expires_at IS NULL OR expires_at > %s)
+            ORDER BY expires_at DESC
+            LIMIT 1;
+        """
+        rows, _, _ = self.postgres.execute_query(sql_active, (clean_email, now))
+        if rows:
+            return rows[0][0]
+
+        return None
 
     def _check_and_expire_active_requests(self):
         """Batch expires any active requests whose expires_at is past."""
         now = datetime.now(timezone.utc)
-        sql_find = "SELECT id, user_email FROM app_data.access_requests WHERE status = 'APPROVED' AND expires_at <= %s;"
+        sql_find = "SELECT id, user_email FROM app_data.access_requests WHERE status = 'APPROVED' AND expires_at IS NOT NULL AND expires_at <= %s;"
         rows, _, _ = self.postgres.execute_query(sql_find, (now,))
         for r in rows:
             req_id, email = r[0], r[1]
@@ -326,3 +330,5 @@ class ApprovalManager:
                 )
             except Exception:
                 pass
+        if rows:
+            self.postgres.clear_role_cache()
