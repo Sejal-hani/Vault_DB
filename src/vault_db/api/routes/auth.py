@@ -29,9 +29,17 @@ async def login(req: LoginRequest, response: Response, request: Request):
     if not user or not verify_password(req.password, user.get("password_hash", "")):
         raise HTTPException(status_code=401, detail="Invalid email or password.")
 
+    effective_role = user["role"]
+    try:
+        elevated = eng.approvals.check_active_elevation(user["email"])
+        if elevated:
+            effective_role = elevated
+    except Exception:
+        pass
+
     token = create_access_token({
         "sub": user["email"],
-        "role": user["role"],
+        "role": effective_role,
         "name": user.get("full_name", user["email"]),
     })
 
@@ -46,7 +54,7 @@ async def login(req: LoginRequest, response: Response, request: Request):
     return LoginResponse(
         access_token=token,
         email=user["email"],
-        role=user["role"],
+        role=effective_role,
         full_name=user.get("full_name", user["email"]),
         api_key=user.get("api_key"),
         department=user.get("department", "General"),

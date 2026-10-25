@@ -63,9 +63,17 @@ async def get_current_user(
     if api_key:
         user_record = storage.get_user_by_api_key(api_key)
         if user_record and user_record.get("status") == "active":
+            effective_role = user_record["role"].lower()
+            try:
+                from src.vault_db.api.dependencies import get_engine
+                elevated = get_engine().approvals.check_active_elevation(user_record["email"])
+                if elevated:
+                    effective_role = elevated.lower()
+            except Exception:
+                pass
             return AuthenticatedUser(
                 email=user_record["email"],
-                role=user_record["role"].lower(),
+                role=effective_role,
                 full_name=user_record.get("full_name", user_record["email"]),
                 api_key=api_key,
                 department=user_record.get("department", "General"),
@@ -97,9 +105,18 @@ async def get_current_user(
                     detail="User account is deactivated or no longer exists.",
                 )
 
+            effective_role = user_record["role"].lower()
+            try:
+                from src.vault_db.api.dependencies import get_engine
+                elevated = get_engine().approvals.check_active_elevation(user_record["email"])
+                if elevated:
+                    effective_role = elevated.lower()
+            except Exception:
+                pass
+
             return AuthenticatedUser(
                 email=user_record["email"],
-                role=user_record["role"].lower(),
+                role=effective_role,
                 full_name=user_record.get("full_name", user_record["email"]),
                 api_key=user_record.get("api_key"),
                 department=user_record.get("department", "General"),
