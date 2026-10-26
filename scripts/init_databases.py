@@ -16,7 +16,7 @@ import psycopg
 from config.settings import settings
 from src.vault_db.auth.security import hash_password
 from src.vault_db.core.crypto import encrypt_field
-from src.vault_db.storage.immudb_vault import ImmudbVault
+
 
 DEMO_USERS = [
     {

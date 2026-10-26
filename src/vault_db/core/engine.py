@@ -1,7 +1,7 @@
 """
 VaultEngine - Core Middleware Orchestrator
 Intercepts SQL operations, verifies RBAC permissions, routes business queries to PostgreSQL,
-and cryptographically records all audit trails into immudb.
+and cryptographically records all audit trails into immudb or native Merkle tree ledger.
 """
 
 import re

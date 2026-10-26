@@ -9,7 +9,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, List, Optional
 
 from src.vault_db.storage.postgres import PostgresStorage
-from src.vault_db.storage.immudb_vault import ImmudbVault
+
 from src.vault_db.core.alerts import AlertDispatcher
 
 logger = logging.getLogger(__name__)

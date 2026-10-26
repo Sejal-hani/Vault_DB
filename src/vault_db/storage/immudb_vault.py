@@ -6,7 +6,7 @@ Provides tamper-proof, append-only logging with Merkle tree cryptographic verifi
 import json
 import logging
 import threading
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 from datetime import datetime, timezone
 
 from immudb.client import ImmudbClient
