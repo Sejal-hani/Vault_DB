@@ -17,11 +17,15 @@ engine = VaultEngine()
 
 @pytest.fixture(autouse=True)
 def reset_test_state():
-    """Ensures each test runs with pristine role cache and no active elevations."""
-    engine.postgres.execute_query("UPDATE app_data.access_requests SET status = 'REVOKED' WHERE status = 'APPROVED';")
+    """Ensures each test runs with pristine role cache and no active elevations for test users."""
+    engine.postgres.execute_query(
+        "UPDATE app_data.access_requests SET status = 'REVOKED' WHERE status = 'APPROVED' AND user_email IN ('bob.reader@bank.com', 'john@bank.com', 'sarah.writer@bank.com');"
+    )
     engine.postgres.clear_role_cache()
     yield
-    engine.postgres.execute_query("UPDATE app_data.access_requests SET status = 'REVOKED' WHERE status = 'APPROVED';")
+    engine.postgres.execute_query(
+        "UPDATE app_data.access_requests SET status = 'REVOKED' WHERE status = 'APPROVED' AND user_email IN ('bob.reader@bank.com', 'john@bank.com', 'sarah.writer@bank.com');"
+    )
     engine.postgres.clear_role_cache()
 
 
