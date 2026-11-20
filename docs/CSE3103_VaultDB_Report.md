@@ -4,7 +4,7 @@
 **Course**: CSE3103: Applied Databases and Systems Thinking  
 **Institution**: School of Engineering and Technology, BML Munjal University  
 **Track**: Development Track  
-**Repository Release**: `v1.0-report` | **Commit**: `f2b9f24`  
+**Repository Release**: `v1.0-report` / `v1.1-report` (Release: `v1.1`) | **Commit**: `c20e0ce`  
 **Authors**:
 * **Somya Tomar** (Roll No: Somya-Roll / somya.tomar@bmu.edu.in) — *Middleware Architecture, Query Interception & Logging Engine*
 * **Vani Shrivastava** (Roll No: Vani-Roll / vani.shrivastava@bmu.edu.in) — *Access Control, AST Firewall, RBAC & Row-Level Security*

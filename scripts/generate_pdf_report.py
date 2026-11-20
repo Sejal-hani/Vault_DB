@@ -206,7 +206,7 @@ def build_pdf():
     story.append(Paragraph(
         "<b>Course:</b> CSE3103: Applied Databases & Systems Thinking &nbsp;|&nbsp; <b>Track:</b> Development Track<br/>"
         "<b>Authors:</b> Somya Tomar, Vani Shrivastava, Sejal Patil &nbsp;|&nbsp; <b>Institution:</b> School of Engineering and Technology, BML Munjal University<br/>"
-        "<b>Repository:</b> <font color='#2563eb'>https://github.com/Sejal-hani/Vault_DB</font> &nbsp;|&nbsp; <b>Release Tag:</b> v1.0-report &nbsp;|&nbsp; <b>Commit:</b> f50a7e3",
+        "<b>Repository:</b> <font color='#2563eb'>https://github.com/Sejal-hani/Vault_DB</font> &nbsp;|&nbsp; <b>Release Tags:</b> v1.0-report / v1.1-report (Release v1.1) &nbsp;|&nbsp; <b>Commit:</b> c20e0ce",
         meta_style
     ))
     story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#cbd5e1"), spaceAfter=10))

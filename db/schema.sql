@@ -87,10 +87,12 @@ CREATE TABLE IF NOT EXISTS vault_audit.audit_logs (
     query_text TEXT,
     execution_status VARCHAR(20),
     immudb_tx_id INT,
-    immudb_tx_hash VARCHAR(128)
+    immudb_tx_hash VARCHAR(128),
+    is_sensitive BOOLEAN DEFAULT FALSE
 );
 ALTER TABLE vault_audit.audit_logs ADD COLUMN IF NOT EXISTS immudb_tx_id INT;
 ALTER TABLE vault_audit.audit_logs ADD COLUMN IF NOT EXISTS immudb_tx_hash VARCHAR(128);
+ALTER TABLE vault_audit.audit_logs ADD COLUMN IF NOT EXISTS is_sensitive BOOLEAN DEFAULT FALSE;
 CREATE INDEX IF NOT EXISTS idx_audit_logged_at ON vault_audit.audit_logs(logged_at DESC);
 CREATE INDEX IF NOT EXISTS idx_audit_app_user ON vault_audit.audit_logs(app_user);
 CREATE INDEX IF NOT EXISTS idx_audit_immudb_tx ON vault_audit.audit_logs(immudb_tx_id);

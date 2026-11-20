@@ -75,6 +75,22 @@ DEMO_USERS = [
         "password": "CustomerPass123!",
         "api_key": "vlt_key_sarah_cust_5678",
     },
+    {
+        "email": "sarah.writer@bank.com",
+        "full_name": "Sarah Writer",
+        "role": "writer",
+        "department": "Loan Operations",
+        "password": "WriterPass123!",
+        "api_key": "vlt_key_writer_11223344",
+    },
+    {
+        "email": "bob.reader@bank.com",
+        "full_name": "Bob Reader",
+        "role": "reader",
+        "department": "Compliance Review",
+        "password": "ReaderPass123!",
+        "api_key": "vlt_key_reader_55667788",
+    },
 ]
 
 ACCOUNTS = [
@@ -158,13 +174,14 @@ def init_postgres():
                 # 4. Seed Initial Transactions
                 merchants = ["Federal Reserve Wire", "SWIFT Clearinghouse", "JPMorgan Settlement", "Euroclear Settlement"]
                 tx_types = ["TRANSFER", "WIRE", "DEPOSIT", "PAYROLL"]
+                account_ids = [acc[0] for acc in ACCOUNTS]
                 base_time = datetime.now(timezone.utc) - timedelta(days=7)
                 for i in range(1, 25):
                     cur.execute("""
                         INSERT INTO app_data.transactions (id, account_id, transaction_type, amount, merchant, status, created_at)
                         VALUES (%s, %s, %s, %s, %s, 'completed', %s)
                         ON CONFLICT (id) DO NOTHING;
-                    """, (i, random.randint(1, len(ACCOUNTS)), random.choice(tx_types), round(random.uniform(500.0, 50000.0), 2), random.choice(merchants), base_time + timedelta(hours=i * 6)))
+                    """, (i, random.choice(account_ids), random.choice(tx_types), round(random.uniform(500.0, 50000.0), 2), random.choice(merchants), base_time + timedelta(hours=i * 6)))
                 cur.execute("SELECT setval(pg_get_serial_sequence('app_data.transactions', 'id'), COALESCE(max(id), 1)) FROM app_data.transactions;")
 
         print("[+] PostgreSQL schemas, triggers, and seed data initialized successfully.")

@@ -75,7 +75,7 @@ def build_report():
         "Course: CSE3103: Applied Databases and Systems Thinking | Track: Development Track\n"
         "BML Munjal University, School of Engineering and Technology\n"
         "Team Members: Somya Tomar, Vani Shrivastava, Sejal Patil\n"
-        "GitHub Repository Release: v1.0-report | Commit: f50a7e3"
+        "GitHub Repository Release: v1.0-report / v1.1-report (Release v1.1) | Commit: c20e0ce"
     )
     run_meta.font.name = "Arial"
     run_meta.font.size = Pt(10)
