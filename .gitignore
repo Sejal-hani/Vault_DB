@@ -43,6 +43,7 @@ htmlcov/
 
 # Binaries and Compiled Libraries
 bin/
+pgsql/
 *.exe
 *.dll
 *.so

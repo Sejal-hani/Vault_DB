@@ -10,6 +10,17 @@
 [![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![Tests](https://img.shields.io/badge/Test%20Suite-160%20Passed-success)](tests/)
 [![Compliance](https://img.shields.io/badge/Compliance-GDPR%20|%20HIPAA%20|%20PCI--DSS-orange)](#11-regulatory-compliance-mapping)
+[![Release](https://img.shields.io/badge/Release-v1.0--report-blueviolet?logo=github)](https://github.com/Sejal-hani/Vault_DB/releases/tag/v1.0-report)
+
+---
+
+### CSE3103 Applied Databases & Systems Thinking (Development Track) Official Submission:
+* **Final PDF Report**: [CSE3103_VaultDB_Report.pdf](CSE3103_VaultDB_Report.pdf)
+* **Editable Word Document**: [CSE3103_VaultDB_Report.docx](CSE3103_VaultDB_Report.docx)
+* **Tagged Release for Grading**: [v1.0-report](https://github.com/Sejal-hani/Vault_DB/releases/tag/v1.0-report)
+* **Authors**: Somya Tomar, Vani Shrivastava, Sejal Patil (School of Engineering and Technology, BML Munjal University)
+* **Optional Evaluation & Empirical Benchmark**: VaultDB achieves zero-trust database security, dynamic in-flight PII masking, and cryptographic Merkle tree audit immutability with an empirical overhead of only **0.82 ms** over pgAudit and **1.58 ms** over raw PostgreSQL (measured across 15,000 queries, 5 runs x 1,000 queries with warmup).
+
 
 ---
 
