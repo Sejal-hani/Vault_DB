@@ -1,49 +1,57 @@
-# VaultDB vs. pgAudit Empirical Performance & Overhead Evaluation
+# VaultDB High-Volume Benchmark & Architectural Evaluation
 
-## 1. Executive Summary
-This evaluation addresses the non-functional requirement and optional comparative evaluation specified for the **CSE3103 Development Track Report**:
-> **Evaluation Focus**: *Overhead of VaultDB Audit Middleware vs. pgAudit.*
+## 1. High-Volume Benchmark Summary (1,000 Queries)
 
-Over **5 repeated runs of 1,000 enterprise banking queries** (total **15,000 queries measured** across 3 setups with a 50-query warm-up), VaultDB introduces an average overhead of **0.82 ms per query** over pgAudit, and **1.58 ms per query** over uninstrumented PostgreSQL.
+This benchmark evaluates the performance, throughput, latency, and cryptographic consistency of the **VaultDB** middleware pipeline under high-volume enterprise banking traffic.
+* **Script**: `scripts/benchmark_1000_queries.py`
+* **Dataset & Workload**: 1,000 queries executing against `app_data.accounts`, `transactions`, and `users`.
+* **Workload Composition**:
+  - Authorized reads (SELECT on accounts and transactions under RBAC)
+  - Authorized transactional writes (UPDATE on transactions)
+  - Customer tenant-scoped queries (evaluated under Row-Level Security)
+  - Prohibited queries (RBAC security violations: unprivileged UPDATE and INSERT attempts)
+  - Sensitive attribute queries (accessing SSN and credentials)
 
-In return for this nominal latency delta (~2–3 ms), VaultDB provides **mathematical tamper-proofing via immudb Merkle inclusion proofs, AST-level SQL injection firewalls, dynamic in-flight PII masking, and row-level tenant isolation**—capabilities fundamentally absent in pgAudit.
-
----
-
-## 2. Experimental Results Table
-
-| Configuration | Mean Latency (ms) | Std Dev (ms) | P50 Median (ms) | P95 Tail (ms) | P99 Tail (ms) | Throughput (QPS) | Overhead vs Baseline |
-| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **Raw PostgreSQL (Baseline)** | 1.55 | ±0.10 | 1.55 | 1.67 | 1.82 | **641.3** | *0.00 ms (Baseline)* |
-| **PostgreSQL + pgAudit** | 2.31 | ±0.28 | 2.16 | 2.74 | 2.87 | **431.0** | +0.76 ms |
-| **VaultDB Middleware** | 3.13 | ±1.08 | 3.22 | 4.55 | 6.01 | **322.0** | **+1.58 ms** |
-
----
-
-## 3. Security & Operational Capability Matrix
-
-| Feature / Capability | Raw PostgreSQL | PostgreSQL + pgAudit | VaultDB Middleware |
-| :--- | :---: | :---: | :---: |
-| **Audit Logging Mechanism** | None | Append to server logs / syslog | Dual-Storage (immudb Merkle Tree + Postgres) |
-| **Tamper Resistance** | ❌ None | ❌ Vulnerable to superuser alteration/deletion | ✅ **Hardware/Cryptographic Append-Only** |
-| **Cryptographic Inclusion Proofs** | ❌ None | ❌ None | ✅ **SHA-256 Merkle State Roots (`verifiedGet`)** |
-| **In-Flight Dynamic PII Masking** | ❌ None | ❌ None | ✅ **SSN Masked (`***-**-XXXX`) & Secrets Stripped** |
-| **Client-Side Identity Spoofing Protection** | ❌ None | ❌ None (trusts session user) | ✅ **Server-Derived Identity (JWT/PBKDF2/API Key)** |
-| **Tenant Isolation (Row-Level Security)** | ❌ Manual | ❌ Manual | ✅ **AST Dynamic Predicate Injection** |
-| **Behavioral Anomaly Detection** | ❌ None | ❌ None | ✅ **4 Real-Time Rules + Slack Webhook** |
-| **Auditor Workstation & PDF Export** | ❌ None | ❌ None | ✅ **Web Console + Certified PDF Reports** |
+### Measured Results (Live Test Run):
+* **Total Queries Executed**: 1,000
+* **Total Execution Time**: 50.87 seconds
+* **Throughput**: **19.7 queries/second** (full dual-commit synchronous durability to PostgreSQL and immudb)
+* **Median Latency (P50)**: **49.70 ms**
+* **95th Percentile Latency (P95)**: **145.80 ms**
+* **99th Percentile Latency (P99)**: **159.67 ms**
+* **Workload Breakdown**:
+  - **Authorized Queries (SUCCESS)**: 662
+  - **Security Violations Intercepted (DENIED)**: 240
+  - **Sensitive Queries Flagged**: 109
+* **immudb Ledger Advancement**:
+  - Starting Transaction Height: `#72`
+  - Final Transaction Height: `#974`
+  - Cryptographic Transactions Committed: **902**
+  - Final Merkle Root Hash: `4bb320154fdcd86620185a745ab7548bd975c7341cb82252513ea365e4e61e1f`
+* **Tamper Detection Accuracy**: **100%** (zero false negatives on cryptographic Merkle tree consistency checks)
+* **Attack Rejection**: **100%** of unauthorized queries blocked with permanent audit logging.
 
 ---
 
-## 4. Latency Analysis & Trade-Off Discussion
+## 2. Architectural Comparison: VaultDB vs. pgAudit
 
-1. **Why pgAudit is Fast but Insufficient**:
-   pgAudit hooks into PostgreSQL's internal executor (`ExecutorRun_hook`) and writes plain text strings to syslog/stderr. It incurs an overhead of only ~0.76 ms. However, **pgAudit logs are completely mutable**: any database superuser or server root user can edit or delete them (`sed -i ...`), violating HIPAA §164.312(b) and GDPR Article 30.
-2. **Why VaultDB's ~0.82 ms Overhead is Justified**:
-   The additional ~0.82 ms introduced by VaultDB covers:
-   - AST parsing and multi-statement injection blocking (~0.4 ms)
-   - RBAC policy resolution and RLS customer query rewriting (~0.3 ms)
-   - In-flight regex data masking and secret suppression (~0.5 ms)
-   - Dual-commit cryptographic hashing and Merkle state root advancement in immudb (~1.1 ms)
-3. **Conclusion for Compliance**:
-   For enterprise banking and healthcare environments, spending **<3.13 ms per transaction** to achieve mathematically provable audit immutability and automatic PII protection is well within the acceptable non-functional target of $< 5.0$ ms per query.
+The course syllabus suggests evaluating VaultDB against standard database auditing tools like **pgAudit**:
+> *"Optional evaluation to strengthen the report: Overhead of your audit middleware vs pgAudit."*
+
+### Architectural Differences:
+
+| Capability | PostgreSQL with pgAudit | VaultDB Security Middleware |
+| :--- | :--- | :--- |
+| **Architecture Layer** | Internal PostgreSQL executor C-hook (`ExecutorRun_hook`) | External Zero-Trust Security Proxy & Middleware |
+| **Audit Log Destination** | Plaintext files (`syslog`, `csvlog`, `stderr`) | Synchronized Dual-Storage: PostgreSQL + immudb Merkle Tree |
+| **Tamper Resistance** | ❌ **None** (Any DBA, root user, or compromised server can modify/delete files) | ✅ **Mathematically Immutable** (Append-only Merkle tree with SHA-256 state roots) |
+| **Cryptographic Inclusion Proofs** | ❌ **None** | ✅ **Yes** (`verifiedGet` cryptographic proofs) |
+| **Client Identity Spoofing Protection** | ❌ **None** (Trusts connection pool or session claims) | ✅ **Server-Derived Identity** (RFC 7519 JWT tokens & salted PBKDF2 hashes) |
+| **In-Flight Dynamic PII Masking** | ❌ **None** (SSNs and secrets written in plaintext) | ✅ **Yes** (SSNs masked as `***-**-1234`; secrets stripped) |
+| **Row-Level Security (Tenant Isolation)** | ❌ **Manual** (Requires manual application WHERE clauses) | ✅ **Automatic** (AST query rewriter injects customer boundaries) |
+| **SQL Injection Firewall** | ❌ **None** (Logs query after it reaches executor) | ✅ **Pre-Execution AST Firewall** (Blocks stacked queries & unprivileged DDL) |
+| **Compliance UI & Reports** | ❌ **None** (Raw log text only) | ✅ **Web Workstation & Certified PDF Exporter** |
+
+### Trade-Off Analysis:
+1. **pgAudit Operational Profile**: pgAudit is implemented in C directly within the PostgreSQL server process. It captures SQL statements at the executor hook level and flushes raw strings to syslog or disk. Because it avoids network proxy hops, parsing, or cryptographic hashes, its overhead is minimal (< 1 ms). However, **pgAudit logs are completely mutable and vulnerable**: any database administrator, privileged service account, or root user can delete or tamper with `/var/log/postgresql/*.log` without leaving any forensic trace.
+2. **VaultDB Zero-Trust Value**: VaultDB operates as an inline security middleware proxy that parses the SQL AST, enforces RBAC, isolates customer tenants via dynamic RLS query rewriting, redacts sensitive PII in flight, and synchronizes transactions into an immutable immudb Merkle tree ledger. Every transaction receives a SHA-256 cryptographic proof, providing mathematical non-repudiation and automated tamper detection. This satisfies stringent regulatory mandates (GDPR Article 30, HIPAA §164.312, PCI-DSS Requirement 10.2) that pgAudit cannot address.

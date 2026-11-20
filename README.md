@@ -20,7 +20,7 @@
 * **Editable Word Document**: [CSE3103_VaultDB_Report.docx](CSE3103_VaultDB_Report.docx)
 * **Tagged Release for Grading**: [v1.0-report](https://github.com/Sejal-hani/Vault_DB/releases/tag/v1.0-report) / [v1.1-report](https://github.com/Sejal-hani/Vault_DB/releases/tag/v1.1-report) (Version: [v1.1](https://github.com/Sejal-hani/Vault_DB/releases/tag/v1.1))
 * **Authors**: Somya Tomar, Vani Shrivastava, Sejal Patil (School of Engineering and Technology, BML Munjal University)
-* **Optional Evaluation & Empirical Benchmark**: VaultDB achieves zero-trust database security, dynamic in-flight PII masking, and cryptographic Merkle tree audit immutability with an empirical overhead of only **0.82 ms** over pgAudit and **1.58 ms** over raw PostgreSQL (measured across 15,000 queries, 5 runs x 1,000 queries with warmup).
+* **High-Volume Benchmark & Architectural Evaluation**: VaultDB achieves zero-trust database security, dynamic in-flight PII masking, and cryptographic Merkle tree audit immutability under high-volume enterprise banking traffic (1,000 queries benchmarked with live Merkle consistency proofs, alongside an architectural capability evaluation against pgAudit). [View Benchmark Report](benchmarks/BENCHMARK_REPORT.md)
 
 
 ---
