@@ -97,28 +97,32 @@ def test_query_text_ssn_masked_in_audit():
 
 def test_tamper_simulate_and_restore_via_api():
     """API endpoints /api/tamper-demo/simulate and /api/tamper-demo/restore operate smoothly."""
-    # Execute a clean query
-    exec_resp = client.post("/api/execute", json={"user": "admin@bank.com", "query": "SELECT count(*) FROM app_data.accounts;"})
+    from src.vault_db.auth.jwt_handler import create_access_token
+    admin_token = create_access_token({"sub": "admin@bank.com", "role": "admin"})
+    admin_headers = {"Authorization": f"Bearer {admin_token}"}
+
+    # Execute a clean query under admin identity
+    exec_resp = client.post("/api/execute", headers=admin_headers, json={"query": "SELECT count(*) FROM app_data.accounts;"})
     assert exec_resp.status_code == 200
     log_id = exec_resp.json()["immudb_log_id"]
 
-    # 1. Simulate tamper
-    sim_resp = client.post("/api/tamper-demo/simulate", json={"log_id": log_id})
+    # 1. Simulate tamper (requires admin)
+    sim_resp = client.post("/api/tamper-demo/simulate", headers=admin_headers, json={"log_id": log_id})
     assert sim_resp.status_code == 200
     assert sim_resp.json()["status"] == "TAMPERED"
 
     # 2. Verify tamper is detected
-    v_resp = client.get(f"/api/verify/{log_id}")
+    v_resp = client.get(f"/api/verify/{log_id}", headers=admin_headers)
     assert v_resp.status_code == 200
     assert v_resp.json()["tamper_detected"] is True
 
-    # 3. Restore
-    rest_resp = client.post(f"/api/tamper-demo/restore?log_id={log_id}")
+    # 3. Restore (requires admin)
+    rest_resp = client.post(f"/api/tamper-demo/restore?log_id={log_id}", headers=admin_headers)
     assert rest_resp.status_code == 200
     assert rest_resp.json()["status"] == "RESTORED"
 
     # 4. Verify proof is clean again
-    v2_resp = client.get(f"/api/verify/{log_id}")
+    v2_resp = client.get(f"/api/verify/{log_id}", headers=admin_headers)
     assert v2_resp.status_code == 200
     assert v2_resp.json()["verified"] is True
     assert v2_resp.json()["tamper_detected"] is False
@@ -311,8 +315,12 @@ def test_compliance_pdf_report_with_role_and_date_filters():
     """
     Validates Section 7: Compliance PDF Reports
     Filters by role, status, date range, and returns valid certified PDF bytes.
+    Requires authentication.
     """
-    resp = client.get("/api/reports/pdf?role=admin&status=SUCCESS&time_range=24h")
+    from src.vault_db.auth.jwt_handler import create_access_token
+    admin_token = create_access_token({"sub": "admin@bank.com", "role": "admin"})
+    admin_headers = {"Authorization": f"Bearer {admin_token}"}
+    resp = client.get("/api/reports/pdf?role=admin&status=SUCCESS&time_range=24h", headers=admin_headers)
     assert resp.status_code == 200
     assert resp.headers["content-type"] == "application/pdf"
     assert resp.content.startswith(b"%PDF")
@@ -366,8 +374,12 @@ def test_schema_explorer_secrets_and_status_hidden():
     - Hides the 'status' column on the 'users' table
     - Dynamically masks SSNs for all table previews
     """
+    from src.vault_db.auth.jwt_handler import create_access_token
+    admin_token = create_access_token({"sub": "admin@bank.com", "role": "admin"})
+    admin_headers = {"Authorization": f"Bearer {admin_token}"}
+
     # 1. Check users table
-    resp_users = client.get("/api/tables/users")
+    resp_users = client.get("/api/tables/users", headers=admin_headers)
     assert resp_users.status_code == 200
     data_users = resp_users.json()
     assert "password_hash" not in data_users["columns"]
@@ -377,7 +389,7 @@ def test_schema_explorer_secrets_and_status_hidden():
     assert "api_key" not in str(data_users["rows"])
 
     # 2. Check accounts table
-    resp_accs = client.get("/api/tables/accounts")
+    resp_accs = client.get("/api/tables/accounts", headers=admin_headers)
     assert resp_accs.status_code == 200
     data_accs = resp_accs.json()
     assert "password_hash" not in str(data_accs)

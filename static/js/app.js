@@ -165,13 +165,27 @@
       }
     }
 
-    let currentAuth = {
-      token: null,
-      email: 'admin@bank.com',
-      role: 'admin',
-      full_name: 'Chief Security Officer',
-      department: 'SecOps'
-    };
+    let currentAuth = (() => {
+      try {
+        const stored = sessionStorage.getItem('vault_auth');
+        if (stored) return JSON.parse(stored);
+      } catch (e) {}
+      return {
+        token: null,
+        email: 'admin@bank.com',
+        role: 'admin',
+        full_name: 'Chief Security Officer',
+        department: 'SecOps'
+      };
+    })();
+
+    function getAuthHeaders(extraHeaders = {}) {
+      const headers = { ...extraHeaders };
+      if (currentAuth && currentAuth.token) {
+        headers['Authorization'] = `Bearer ${currentAuth.token}`;
+      }
+      return headers;
+    }
 
     function toggleAccountMenu(e) {
       if (e) e.stopPropagation();
@@ -506,7 +520,14 @@
 
     async function simulateTampering() {
       try {
-        const resp = await fetch(`${API}/api/tamper-demo/simulate`, { method: 'POST' });
+        const resp = await fetch(`${API}/api/tamper-demo/simulate`, {
+          method: 'POST',
+          headers: getAuthHeaders({ 'Content-Type': 'application/json' })
+        });
+        if (!resp.ok) {
+          const err = await resp.json().catch(() => ({}));
+          throw new Error(err.detail || `HTTP ${resp.status}`);
+        }
         const data = await resp.json();
         await loadAuditLogs();
         verifyProof(data.log_id);
@@ -517,7 +538,14 @@
 
     async function restoreTamperedRecord(logId) {
       try {
-        const resp = await fetch(`${API}/api/tamper-demo/restore?log_id=${logId}`, { method: 'POST' });
+        const resp = await fetch(`${API}/api/tamper-demo/restore?log_id=${logId}`, {
+          method: 'POST',
+          headers: getAuthHeaders()
+        });
+        if (!resp.ok) {
+          const err = await resp.json().catch(() => ({}));
+          throw new Error(err.detail || `HTTP ${resp.status}`);
+        }
         const data = await resp.json();
         await verifyProof(logId);
         await loadAuditLogs();
@@ -745,7 +773,14 @@
         if (user) url += `&user=${encodeURIComponent(user)}`;
         if (status && status !== 'SENSITIVE') url += `&status=${encodeURIComponent(status)}`;
 
-        const resp = await fetch(url);
+        const resp = await fetch(url, { headers: getAuthHeaders() });
+        if (!resp.ok) {
+          const err = await resp.json().catch(() => ({}));
+          console.warn("Audit logs fetch failed:", err);
+          cachedLedger = [];
+          filterLedger();
+          return;
+        }
         cachedLedger = await resp.json();
         const sideCount = document.getElementById('sidebar-log-count');
         if (sideCount) sideCount.innerText = cachedLedger.length;
@@ -997,7 +1032,11 @@
       body.innerHTML = '<p style="color: var(--text-dim); font-size: 12px;">Querying Cryptographic Ledger for Merkle inclusion proof...</p>';
 
       try {
-        const resp = await fetch(`${API}/api/verify/${logId}`);
+        const resp = await fetch(`${API}/api/verify/${logId}`, { headers: getAuthHeaders() });
+        if (!resp.ok) {
+          const err = await resp.json().catch(() => ({}));
+          throw new Error(err.detail || `HTTP ${resp.status}`);
+        }
         const data = await resp.json();
 
         const record = data.record || {};
@@ -1151,7 +1190,12 @@
 
     async function loadTableMetadata() {
       try {
-        const resp = await fetch(`${API}/api/tables`);
+        const resp = await fetch(`${API}/api/tables`, { headers: getAuthHeaders() });
+        if (!resp.ok) {
+          const err = await resp.json().catch(() => ({}));
+          console.warn("Schema tables fetch failed:", err);
+          return;
+        }
         const tables = await resp.json();
         const chipsContainer = document.getElementById('table-chips');
         chipsContainer.innerHTML = tables.map(t => `
@@ -1174,7 +1218,12 @@
       tbody.innerHTML = '';
 
       try {
-        const resp = await fetch(`${API}/api/tables/${tableName}?limit=${limit}&page=${page}`);
+        const resp = await fetch(`${API}/api/tables/${tableName}?limit=${limit}&page=${page}`, { headers: getAuthHeaders() });
+        if (!resp.ok) {
+          const err = await resp.json().catch(() => ({}));
+          thead.innerHTML = `<tr><th style="color:var(--red);">Access Denied: ${escapeHtml(err.detail || 'Failed to inspect table')}</th></tr>`;
+          return;
+        }
         const data = await resp.json();
 
         currentTotalCount = data.total_count || 0;
@@ -1255,43 +1304,58 @@
       // Kept for navigation and change hooks
     }
 
-    function downloadFilteredPdfReport() {
+    async function downloadFilteredPdfReport() {
       const isCustomer = currentAuth && currentAuth.role === 'customer';
+      let url = `${API}/api/reports/pdf?limit=500`;
       if (isCustomer) {
         const timeRange = document.getElementById('report-customer-timerange') ? document.getElementById('report-customer-timerange').value : 'all';
-        let url = `${API}/api/reports/pdf?limit=500&customer=${encodeURIComponent(currentAuth.email || 'alice@bank.com')}`;
+        url += `&customer=${encodeURIComponent(currentAuth.email || 'alice@bank.com')}`;
         if (timeRange && timeRange !== 'all') {
           url += `&time_range=${encodeURIComponent(timeRange)}`;
         }
-        window.open(url, '_blank');
-        return;
+      } else {
+        const timeRange = document.getElementById('report-filter-timerange') ? document.getElementById('report-filter-timerange').value : 'all';
+        const user = document.getElementById('report-filter-user') ? document.getElementById('report-filter-user').value : '';
+        const role = document.getElementById('report-filter-role') ? document.getElementById('report-filter-role').value : '';
+        const status = document.getElementById('report-filter-status') ? document.getElementById('report-filter-status').value : '';
+
+        if (timeRange && timeRange !== 'all') {
+          url += `&time_range=${encodeURIComponent(timeRange)}`;
+        }
+        if (user) {
+          url += `&user=${encodeURIComponent(user)}`;
+        }
+        if (role) {
+          url += `&role=${encodeURIComponent(role)}`;
+        }
+        if (status) {
+          url += `&status=${encodeURIComponent(status)}`;
+        }
       }
 
-      const timeRange = document.getElementById('report-filter-timerange') ? document.getElementById('report-filter-timerange').value : 'all';
-      const user = document.getElementById('report-filter-user') ? document.getElementById('report-filter-user').value : '';
-      const role = document.getElementById('report-filter-role') ? document.getElementById('report-filter-role').value : '';
-      const status = document.getElementById('report-filter-status') ? document.getElementById('report-filter-status').value : '';
-
-      let url = `${API}/api/reports/pdf?limit=500`;
-      if (timeRange && timeRange !== 'all') {
-        url += `&time_range=${encodeURIComponent(timeRange)}`;
+      try {
+        const resp = await fetch(url, { headers: getAuthHeaders() });
+        if (!resp.ok) {
+          const err = await resp.json().catch(() => ({}));
+          throw new Error(err.detail || `HTTP ${resp.status}`);
+        }
+        const blob = await resp.blob();
+        const downloadUrl = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = downloadUrl;
+        a.download = `VaultDB_Compliance_Report_${Date.now()}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(downloadUrl);
+      } catch (err) {
+        alert(`PDF generation failed: ${err.message}`);
       }
-      if (user) {
-        url += `&user=${encodeURIComponent(user)}`;
-      }
-      if (role) {
-        url += `&role=${encodeURIComponent(role)}`;
-      }
-      if (status) {
-        url += `&status=${encodeURIComponent(status)}`;
-      }
-
-      window.open(url, '_blank');
     }
 
     async function loadStats() {
       try {
-        const resp = await fetch(API + '/api/stats');
+        const resp = await fetch(API + '/api/stats', { headers: getAuthHeaders() });
         if (resp.ok) {
           const s = await resp.json();
           document.getElementById('kpi-total').innerText = (s.total_audited || 0).toLocaleString();
@@ -1333,10 +1397,10 @@
           showView(savedViewId, navEl);
         }
       }
+      loadStats();
+      loadAuditLogs();
+      loadTableMetadata();
     });
-    loadStats();
-    loadAuditLogs();
-    loadTableMetadata();
     setInterval(loadStats, 10000);
   
     async function loadApprovals() {

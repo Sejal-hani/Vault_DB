@@ -9,7 +9,7 @@
 [![immudb](https://img.shields.io/badge/immudb-Pluggable%20Enterprise%20Adapter-green?logo=database)](https://immudb.io/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115%2B-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)](https://www.python.org/)
-[![Tests](https://img.shields.io/badge/Test%20Suite-166%20Passed-success)](tests/)
+[![Tests](https://img.shields.io/badge/Test%20Suite-171%20Passed-success)](tests/)
 [![Compliance](https://img.shields.io/badge/Compliance-GDPR%20|%20HIPAA%20|%20PCI--DSS-orange)](#11-regulatory-compliance-mapping)
 
 ---
@@ -149,6 +149,10 @@ Implemented in [`src/vault_db/core/merkle.py`](src/vault_db/core/merkle.py), the
   *Why Domain Separation?* Prepending distinct single-byte prefixes prevents **second preimage attacks**, mathematically guaranteeing that an attacker cannot pass off an intermediate branch node as a valid leaf payload.
 - **Tree Structure & Balancing**: Follows standard binary Merkle tree construction where odd-numbered leaf levels duplicate the final node to maintain complete binary tree geometry across arbitrary transaction heights.
 - **Startup Integrity & Checkpointing**: On system boot, `MerkleVault` re-hashes every audit entry from raw canonical JSON payload bytes to verify that stored leaf digests match disk content. Furthermore, it validates the loaded transaction count and computed root against `data/merkle_vault/ledger_state.json`, immediately flagging offline journal tampering, rollback, or file truncation.
+
+> [!NOTE]
+> **Trust Boundary & Threat Model Assumption**:
+> VaultDB detects unauthorized modification of stored audit records when the trusted checkpoint remains intact. Protection against an attacker with root administrative privileges who can simultaneously rewrite both the append-only ledger and the local checkpoint is outside the current implementation's threat model. In production environments, checkpoints can be anchored to an external timestamping service, remote append-only replica, or hardware security module (HSM).
 
 ### 4.2 Logarithmic Inclusion Proofs ($O(\log N)$)
 When an auditor requests proof of a transaction, `MerkleTree.get_audit_path(index)` computes the exact list of sibling hashes (and traversal directions) necessary to reconstruct the current Merkle root:

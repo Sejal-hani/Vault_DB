@@ -5,10 +5,10 @@ Endpoints for executing SQL queries under zero-trust identity context with RBAC,
 
 import logging
 from typing import Optional
-from fastapi import APIRouter, Request, Header, Cookie
+from fastapi import APIRouter, Request, Depends
 
 from src.vault_db.api.dependencies import get_engine, serialize_item
-from src.vault_db.auth.dependencies import get_current_user
+from src.vault_db.auth.dependencies import get_current_user, AuthenticatedUser
 from src.vault_db.core.rbac import AccessDeniedError, QueryExecutionError
 from src.vault_db.core.parser import SQLParser
 from src.vault_db.api.models import ExecuteQueryRequest, ExecuteQueryResponse
@@ -22,25 +22,17 @@ router = APIRouter(tags=["Query Execution"])
 async def execute_query(
     req: ExecuteQueryRequest,
     request: Request,
-    authorization: Optional[str] = Header(None),
-    x_api_key: Optional[str] = Header(None),
-    vault_session: Optional[str] = Cookie(None),
+    current_user: AuthenticatedUser = Depends(get_current_user),
 ):
     """
-    Executes a SQL query under server-derived user identity context with RBAC, RLS, masking, and immudb audit trail.
+    Executes a SQL query under server-derived user identity context with RBAC, RLS, masking, and cryptographic Merkle audit trail.
+    Requires valid authentication (Bearer JWT, session cookie, or API key).
     """
     eng = get_engine()
     client_ip = request.client.host if request.client else "127.0.0.1"
 
-    # Derive authenticated identity from Bearer token, Cookie, or X-API-Key
-    authenticated_user = None
-    try:
-        authenticated_user = await get_current_user(request, authorization, x_api_key, vault_session)
-    except Exception:
-        pass
-
-    # Use authenticated identity if present; otherwise fallback to request user or default
-    resolved_user = authenticated_user.email if authenticated_user else (req.user or req.app_user or "alice@bank.com")
+    # Enforce verified server-derived identity (never trust unauthenticated client-supplied identity)
+    resolved_user = current_user.email
 
     try:
         res = eng.execute(

@@ -9,10 +9,11 @@ import math
 import psycopg
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional
-from fastapi import APIRouter, HTTPException, Query, Response
+from fastapi import APIRouter, HTTPException, Query, Response, Depends
 
 from config.settings import settings
 from src.vault_db.api.dependencies import get_engine, serialize_item
+from src.vault_db.auth.dependencies import get_current_user, require_role, AuthenticatedUser
 from src.vault_db.reports.pdf_generator import generate_audit_pdf_report
 from src.vault_db.core.masking import mask_ssn, strip_hidden_columns
 from src.vault_db.api.models import (
@@ -36,15 +37,20 @@ async def get_logs(
     table: Optional[str] = Query(default=None, description="Filter by table name"),
     status: Optional[str] = Query(default=None, description="Filter by status (SUCCESS, DENIED)"),
     time_range: Optional[str] = Query(default=None, description="Date filter (24h, 7d, 30d, all)"),
+    current_user: AuthenticatedUser = Depends(get_current_user),
 ):
     """
-    Retrieves the latest audit logs from the immutable immudb ledger (or postgres fallback).
+    Retrieves the latest audit logs from the immutable ledger (or postgres fallback).
+    Requires authentication. Customers are strictly restricted to their own audit records.
     Supports filtering by user, table, status, and date range (last 24h, last 7 days, last 30 days).
-    Supports retrieving up to 1,000 live audit records.
     """
     eng = get_engine()
+
+    # Customer persona is strictly scoped to their own audit records
+    effective_user = current_user.email if current_user.role == "customer" else user
+
     # Fetch an adequate window from immudb so that valid query records fill the requested limit
-    fetch_limit = min(2000, max(500, limit * 2)) if (user or table or status or (time_range and time_range != "all")) else min(2000, max(200, limit + 50))
+    fetch_limit = min(2000, max(500, limit * 2)) if (effective_user or table or status or (time_range and time_range != "all")) else min(2000, max(200, limit + 50))
     if limit >= 1000:
         fetch_limit = 2000
     raw_logs = eng.get_audit_logs(limit=fetch_limit, source=source)
@@ -68,11 +74,6 @@ async def get_logs(
         if action_str.startswith("AUTH:") or status_str == "ERROR" or table_str == "u":
             continue
 
-        # Standardize enterprise banking personas
-        if entry.get("role") in ("reader", "writer") or entry.get("user") in ("bob.reader@bank.com", "sarah.writer@bank.com"):
-            entry["role"] = "employee"
-            entry["user"] = "john@bank.com"
-
         # Evaluate genuine anomaly status (cross-referenced with immudb record and Security Alerts)
         is_anom = bool(entry.get("is_anomaly"))
         anom_flags = list(entry.get("anomalies") or [])
@@ -92,7 +93,7 @@ async def get_logs(
         entry["is_anomaly"] = is_anom
         entry["anomalies"] = anom_flags
 
-        if user and entry.get("user") != user:
+        if effective_user and entry.get("user") != effective_user:
             continue
         if table and (not table_str or table.lower() not in table_str.lower()):
             continue
@@ -125,14 +126,28 @@ async def get_logs(
 
 
 @router.get("/verify/{log_id}", response_model=VerifyLogResponse)
-async def verify_log(log_id: int):
+async def verify_log(
+    log_id: int,
+    current_user: AuthenticatedUser = Depends(get_current_user),
+):
     """
     Cryptographically verifies the authenticity and Merkle tree proof of an audit log.
     Also cross-verifies against the PostgreSQL relational mirror to detect any database tampering.
+    Requires authentication. Customers can only verify proofs of their own query activity.
     """
     eng = get_engine()
     result = eng.verify_audit_log(log_id)
     result["ledger_key"] = result.get("ledger_key") or result.get("immudb_key") or f"audit:log:{log_id}"
+
+    # Customer scoping check
+    if current_user.role == "customer":
+        rec = result.get("record", {}) or {}
+        rec_user = rec.get("app_user") or rec.get("user")
+        if rec_user and rec_user != current_user.email:
+            raise HTTPException(
+                status_code=403,
+                detail="Customers are not permitted to inspect audit records of other users.",
+            )
 
     # 1. Independent cryptographic Merkle inclusion proof
     ledger_integrity = bool(result.get("verified", True))
@@ -203,9 +218,14 @@ async def verify_log(log_id: int):
 
 
 @router.post("/tamper-demo/simulate")
-async def simulate_tamper(payload: Optional[TamperPayload] = None, log_id: Optional[int] = Query(default=None)):
+async def simulate_tamper(
+    payload: Optional[TamperPayload] = None,
+    log_id: Optional[int] = Query(default=None),
+    current_user: AuthenticatedUser = Depends(require_role(["admin"])),
+):
     """
     Simulates an attacker or rogue DBA tampering directly with PostgreSQL audit records.
+    Requires admin privileges.
     Uses admin connection to temporarily disable trigger and mutate a row in vault_audit.audit_logs.
     """
     eng = get_engine()
@@ -259,7 +279,11 @@ async def simulate_tamper(payload: Optional[TamperPayload] = None, log_id: Optio
 
 
 @router.post("/tamper-demo/restore")
-async def restore_tamper(payload: Optional[TamperPayload] = None, log_id: Optional[int] = Query(default=None)):
+async def restore_tamper(
+    payload: Optional[TamperPayload] = None,
+    log_id: Optional[int] = Query(default=None),
+    current_user: AuthenticatedUser = Depends(require_role(["admin"])),
+):
     """
     Restores a tampered PostgreSQL record back to its verified cryptographic immudb state.
     """
@@ -440,14 +464,22 @@ async def export_pdf_report(
     start_date: Optional[str] = Query(default=None),
     end_date: Optional[str] = Query(default=None),
     limit: int = Query(default=200, ge=1, le=1000),
+    current_user: AuthenticatedUser = Depends(get_current_user),
 ):
     """
-    Exports a certified compliance PDF report from the immudb immutable audit trail.
+    Exports a certified compliance PDF report from the immutable audit trail.
+    Requires authentication.
     Supports filtering by user, role, table, status, and date range.
-    For customers, scopes the audit to all staff and systems that accessed their personal records.
+    For customers, strictly scopes the audit to all staff and systems that accessed their personal records.
     """
     eng = get_engine()
     raw_logs = eng.get_audit_logs(limit=limit, source="immudb")
+
+    # Scope customer reports strictly to their own identity
+    effective_customer = current_user.email if current_user.role == "customer" else customer
+    effective_user = None if current_user.role == "customer" else user
+    effective_role = None if current_user.role == "customer" else role
+    effective_table = None if current_user.role == "customer" else table
 
     now = datetime.now(timezone.utc)
     cutoff_start = None
@@ -483,23 +515,18 @@ async def export_pdf_report(
     # Apply optional filters
     filtered_logs = []
     for l in raw_logs:
-        # Standardize enterprise personas
-        if l.get("role") in ("reader", "writer") or l.get("user") in ("bob.reader@bank.com", "sarah.writer@bank.com"):
-            l["role"] = "employee"
-            l["user"] = "john@bank.com"
-
-        if customer:
+        if effective_customer:
             # Customer audit: queries executed by customer OR queries accessing customer accounts/transactions data
-            is_own_query = l.get("user") == customer
+            is_own_query = l.get("user") == effective_customer
             touches_data = l.get("table") in ("accounts", "transactions")
             if not (is_own_query or touches_data):
                 continue
         else:
-            if user and l.get("user") != user:
+            if effective_user and l.get("user") != effective_user:
                 continue
-            if role and l.get("role") and l.get("role").lower() != role.lower():
+            if effective_role and l.get("role") and l.get("role").lower() != effective_role.lower():
                 continue
-            if table and (not l.get("table") or table.lower() not in l.get("table", "").lower()):
+            if effective_table and (not l.get("table") or effective_table.lower() not in l.get("table", "").lower()):
                 continue
             if status == "SENSITIVE":
                 if not l.get("is_sensitive"):
@@ -528,9 +555,9 @@ async def export_pdf_report(
     pdf_bytes = generate_audit_pdf_report(
         logs=filtered_logs,
         ledger_state=ledger_state,
-        filter_user=customer if customer else user,
-        filter_role=None if customer else role,
-        filter_table=None if customer else table,
+        filter_user=effective_customer if effective_customer else effective_user,
+        filter_role=None if effective_customer else effective_role,
+        filter_table=None if effective_customer else effective_table,
         filter_status=status,
         filter_time_range=time_range or (f"{start_date} to {end_date}" if start_date else None),
         approvals=None,
@@ -546,11 +573,17 @@ async def export_pdf_report(
 
 
 @router.get("/tables")
-async def list_schema_tables():
+async def list_schema_tables(
+    current_user: AuthenticatedUser = Depends(get_current_user),
+):
     """
     Returns metadata for all business tables dynamically discovered from PostgreSQL.
     Supports any custom schema and any external business tables.
+    Requires authentication (staff only; customer access is restricted).
     """
+    if current_user.role == "customer":
+        raise HTTPException(status_code=403, detail="Customers are not permitted to inspect database schemas.")
+
     eng = get_engine()
     results = []
     try:
@@ -589,12 +622,17 @@ async def inspect_table_data(
     limit: int = Query(default=50, ge=1, le=1000),
     page: Optional[int] = Query(default=None, ge=1),
     offset: Optional[int] = Query(default=None, ge=0),
+    current_user: AuthenticatedUser = Depends(get_current_user),
 ):
     """
     Returns tabular data with pagination for exploring schema contents.
     Dynamically resolves table from any non-system PostgreSQL schema.
     Supports pagination parameters: limit, page, and offset.
+    Requires authentication (staff only; customer access is restricted).
     """
+    if current_user.role == "customer":
+        raise HTTPException(status_code=403, detail="Customers are not permitted to inspect database schemas.")
+
     clean_name = table_name.lower().strip()
     eng = get_engine()
 
