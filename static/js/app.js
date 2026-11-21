@@ -187,6 +187,67 @@
       if (drop) drop.style.display = 'none';
     }
 
+    async function handleDropdownLogin(e) {
+      e.preventDefault();
+      const emailInput = document.getElementById('dropdown-login-email');
+      const passInput = document.getElementById('dropdown-login-password');
+      const errBox = document.getElementById('dropdown-login-error');
+      if (errBox) errBox.style.display = 'none';
+
+      const email = emailInput ? emailInput.value.trim() : '';
+      const password = passInput ? passInput.value : '';
+
+      try {
+        const resp = await fetch(`${API}/api/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
+        if (!resp.ok) {
+          const err = await resp.json().catch(() => ({}));
+          throw new Error(err.detail || 'Invalid email or password');
+        }
+        const data = await resp.json();
+        currentAuth = {
+          token: data.access_token,
+          email: data.email,
+          role: data.role.toLowerCase(),
+          full_name: data.full_name || data.email,
+          department: data.department || 'General'
+        };
+        sessionStorage.setItem('vault_auth', JSON.stringify(currentAuth));
+        sessionStorage.setItem('vault_persona', data.role.toLowerCase());
+
+        document.getElementById('current-user-email').innerText = data.email;
+        document.getElementById('user-select').value = data.email;
+        const roleBadge = document.getElementById('identity-role-badge');
+        if (roleBadge) {
+          roleBadge.className = `role-badge role-${data.role.toLowerCase()}`;
+          roleBadge.innerText = data.role.toLowerCase();
+        }
+        const descText = document.getElementById('identity-desc-text');
+        if (descText) descText.innerText = currentAuth.full_name;
+
+        const topName = document.getElementById('topbar-user-name');
+        if (topName) topName.innerText = currentAuth.full_name;
+        const topRole = document.getElementById('topbar-user-role');
+        if (topRole) topRole.innerText = currentAuth.role;
+
+        document.querySelectorAll('.persona-btns .persona-btn').forEach(b => b.classList.remove('active'));
+        const activeBtn = document.getElementById(`btn-persona-${currentAuth.role}`);
+        if (activeBtn) activeBtn.classList.add('active');
+
+        applyRoleUiPermissions(currentAuth.role);
+        const drop = document.getElementById('account-dropdown');
+        if (drop) drop.style.display = 'none';
+      } catch (err) {
+        if (errBox) {
+          errBox.innerText = err.message;
+          errBox.style.display = 'block';
+        }
+      }
+    }
+
     document.addEventListener('click', (e) => {
       const drop = document.getElementById('account-dropdown');
       const btn = document.getElementById('topbar-user-btn');

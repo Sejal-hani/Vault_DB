@@ -116,6 +116,16 @@
                 <span class="role-badge role-customer">customer</span>
               </button>
             </div>
+
+            <!-- Email & Password Login -->
+            <div style="border-top: 1px solid var(--border); margin-top: 8px; padding-top: 8px;">
+              <form id="dropdown-login-form" onsubmit="handleDropdownLogin(event)" style="display: flex; flex-direction: column; gap: 6px; margin: 0;">
+                <input type="email" id="dropdown-login-email" required placeholder="email" style="width: 100%; padding: 6px 9px; font-size: 11.5px; background: #0c0d0e; border: 1px solid var(--border); border-radius: 5px; color: #fff; box-sizing: border-box;">
+                <input type="password" id="dropdown-login-password" required placeholder="password" style="width: 100%; padding: 6px 9px; font-size: 11.5px; background: #0c0d0e; border: 1px solid var(--border); border-radius: 5px; color: #fff; box-sizing: border-box;">
+                <div id="dropdown-login-error" style="display: none; font-size: 10.5px; color: #ef4444; background: rgba(239, 68, 68, 0.1); padding: 4px 8px; border-radius: 4px;"></div>
+                <button type="submit" class="btn btn-primary btn-sm" style="width: 100%; justify-content: center; font-weight: 600; padding: 6px; font-size: 11.5px; border-radius: 5px; cursor: pointer;">Login</button>
+              </form>
+            </div>
           </div>
         </div>
       </div>
