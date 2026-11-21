@@ -1,6 +1,7 @@
 """
 SQL Query Parser and Inspector Module
 Extracts verbs, affected target tables, and sensitive field accesses.
+Handles comments (single line, block comments, dollar quotes, strings), CTEs, and comma joins.
 """
 
 import re
@@ -16,8 +17,7 @@ SQL_RESERVED_KEYWORDS = {
 }
 
 SENSITIVE_FIELD_NAMES = {
-    "ssn", "password", "pwd", "secret", "api_key", "token", "auth_token",
-    "credit_card", "card_number", "card_no", "cvv", "pan"
+    "ssn", "password", "pwd", "secret", "api_key", "token", "auth_token"
 }
 
 
@@ -36,48 +36,129 @@ class SQLParser:
 
     @staticmethod
     def strip_comments(sql: str) -> str:
-        """Strips SQL comments (-- and /* */) without affecting strings inside quotes."""
-        out = []
+        """
+        Strips SQL comments while strictly preserving string literals,
+        double-quoted identifiers, PostgreSQL dollar-quoted strings ($tag$...$tag$),
+        and correctly stripping block comments (/* ... */) and line comments (--).
+        """
+        result = []
         i = 0
         n = len(sql)
         in_single = False
         in_double = False
+        in_dollar = None
+
         while i < n:
-            c = sql[i]
-            if c == "'" and not in_double:
-                in_single = not in_single
-                out.append(c)
+            # Handle PostgreSQL dollar-quoted strings: $tag$...$tag$ or $$...$$
+            if not in_single and not in_double and sql[i] == '$':
+                if in_dollar is not None:
+                    if sql.startswith(in_dollar, i):
+                        result.append(in_dollar)
+                        i += len(in_dollar)
+                        in_dollar = None
+                        continue
+                else:
+                    m = re.match(r'^\$[a-zA-Z0-9_]*\$', sql[i:])
+                    if m:
+                        tag = m.group(0)
+                        in_dollar = tag
+                        result.append(tag)
+                        i += len(tag)
+                        continue
+
+            if in_dollar is not None:
+                result.append(sql[i])
                 i += 1
                 continue
-            elif c == '"' and not in_single:
-                in_double = not in_double
-                out.append(c)
+
+            # Handle single quotes
+            if sql[i] == "'" and not in_double:
+                if in_single:
+                    if i + 1 < n and sql[i + 1] == "'":
+                        result.append("''")
+                        i += 2
+                        continue
+                    in_single = False
+                else:
+                    in_single = True
+                result.append(sql[i])
                 i += 1
                 continue
+
+            # Handle double quotes
+            if sql[i] == '"' and not in_single:
+                if in_double:
+                    if i + 1 < n and sql[i + 1] == '"':
+                        result.append('""')
+                        i += 2
+                        continue
+                    in_double = False
+                else:
+                    in_double = True
+                result.append(sql[i])
+                i += 1
+                continue
+
+            # Handle comments outside of quotes
             if not in_single and not in_double:
-                if c == '-' and i + 1 < n and sql[i + 1] == '-':
-                    while i < n and sql[i] != '\n':
-                        i += 1
-                    continue
-                if c == '/' and i + 1 < n and sql[i + 1] == '*':
-                    i += 2
-                    while i + 1 < n and not (sql[i] == '*' and i + 1 < n and sql[i + 1] == '/'):
-                        i += 1
-                    i += 2
-                    continue
-            out.append(c)
+                # Block comments /* ... */
+                if sql[i:i + 2] == '/*':
+                    end = sql.find('*/', i + 2)
+                    if end != -1:
+                        i = end + 2
+                        result.append(' ')
+                        continue
+                    else:
+                        break
+                # Line comments -- ...
+                if sql[i:i + 2] == '--':
+                    end = sql.find('\n', i + 2)
+                    if end != -1:
+                        i = end + 1
+                        result.append('\n')
+                        continue
+                    else:
+                        break
+
+            result.append(sql[i])
             i += 1
-        return ''.join(out).strip()
+
+        return ''.join(result)
 
     @classmethod
     def split_statements(cls, sql: str) -> List[str]:
-        """Splits SQL string into statements by semicolons outside of quotes."""
-        clean_sql = cls.strip_comments(sql)
+        """Splits SQL string into statements by semicolons outside of quotes and dollar-quotes."""
         statements = []
         current = []
         in_single = False
         in_double = False
-        for char in clean_sql:
+        in_dollar = None
+        i = 0
+        n = len(sql)
+
+        while i < n:
+            char = sql[i]
+            if not in_single and not in_double and char == '$':
+                if in_dollar is not None:
+                    if sql.startswith(in_dollar, i):
+                        current.append(in_dollar)
+                        i += len(in_dollar)
+                        in_dollar = None
+                        continue
+                else:
+                    m = re.match(r'^\$[a-zA-Z0-9_]*\$', sql[i:])
+                    if m:
+                        tag = m.group(0)
+                        in_dollar = tag
+                        current.append(tag)
+                        i += len(tag)
+                        continue
+
+            if in_dollar is not None:
+                current.append(char)
+                i += 1
+                continue
+
             if char == "'" and not in_double:
                 in_single = not in_single
             elif char == '"' and not in_single:
@@ -87,8 +168,12 @@ class SQLParser:
                 if stmt:
                     statements.append(stmt)
                 current = []
+                i += 1
                 continue
+
             current.append(char)
+            i += 1
+
         last = ''.join(current).strip()
         if last:
             statements.append(last)
@@ -104,17 +189,16 @@ class SQLParser:
 
         q_upper = q.upper()
 
-        # Handle Common Table Expressions (CTEs): check for data-modifying CTEs
-        if re.search(r"^\s*WITH\b", q_upper):
-            if re.search(r"\bDELETE\s+FROM\b", q_upper) or re.search(r"\bDELETE\b", q_upper):
+        # Handle CTE (Common Table Expressions) WITH ...
+        if q_upper.startswith("WITH"):
+            q_lower = q.lower()
+            if re.search(r'\b(delete\s+from|delete)\b', q_lower):
                 return "DELETE"
-            if re.search(r"\bUPDATE\s+[A-Z0-9_.]+\s+SET\b", q_upper) or re.search(r"\bUPDATE\b", q_upper):
-                return "UPDATE"
-            if re.search(r"\bINSERT\s+INTO\b", q_upper) or re.search(r"\bINSERT\b", q_upper):
+            if re.search(r'\b(insert\s+into|insert)\b', q_lower):
                 return "INSERT"
-            for verb in ["DROP", "TRUNCATE", "ALTER"]:
-                if re.search(rf"\b{verb}\b", q_upper):
-                    return f"DDL:{verb}"
+            if re.search(r'\b(update\s+[a-zA-Z0-9_.]+\s+set|update)\b', q_lower):
+                return "UPDATE"
+            return "SELECT"
 
         ddl_verbs = ["DROP", "TRUNCATE", "ALTER", "CREATE"]
         for verb in ddl_verbs:
@@ -136,32 +220,32 @@ class SQLParser:
 
         return "UNKNOWN"
 
-    @classmethod
-    def extract_tables(cls, query: str) -> List[str]:
+    @staticmethod
+    def extract_tables(query: str) -> List[str]:
         tables: Set[str] = set()
-        q = cls.strip_comments(query).lower()
+        q = query.lower()
 
-        # 1. Comma-separated tables after FROM (e.g. FROM accounts a, users u)
-        from_match = re.search(r'\bfrom\s+([^;\(\)]+?)(?:\bwhere\b|\bjoin\b|\bgroup\b|\border\b|\bhaving\b|\blimit\b|\bunion\b|;|$)', q)
-        if from_match:
-            table_clause = from_match.group(1)
-            for part in table_clause.split(','):
-                tokens = part.strip().split()
-                if tokens:
-                    raw_token = tokens[0]
-                    clean_name = raw_token.split('.')[-1].strip('`"\'[];')
-                    if clean_name and clean_name not in SQL_RESERVED_KEYWORDS and not clean_name.startswith('('):
-                        tables.add(clean_name)
-
-        # 2. Match table references after INTO, UPDATE, TABLE, JOIN, TRUNCATE
-        matches = re.finditer(r'\b(into|update|table|join|truncate)\s+([a-zA-Z0-9_.]+)', q)
+        # Match table references after FROM, INTO, UPDATE, TABLE, JOIN, TRUNCATE
+        matches = re.finditer(r'\b(from|into|update|table|join|truncate)\s+([a-zA-Z0-9_.]+)', q)
         for m in matches:
             token = m.group(2)
+            # Remove schema if present (e.g. app_data.accounts -> accounts)
             clean_name = token.split('.')[-1].strip('`"\'[];')
             if clean_name and clean_name not in SQL_RESERVED_KEYWORDS:
                 tables.add(clean_name)
 
-        # 3. Match table references after DROP TABLE, ALTER TABLE, DROP SCHEMA
+        # Match comma-separated table joins in FROM clause (e.g. FROM accounts a, users u)
+        from_matches = re.finditer(r'\bfrom\s+([^;]+?)(?:\bwhere\b|\bjoin\b|\bgroup\b|\border\b|\blimit\b|;|$)', q)
+        for fm in from_matches:
+            from_clause = fm.group(1)
+            tokens = [t.strip() for t in from_clause.split(',')]
+            for item in tokens:
+                first_word = item.split()[0] if item else ''
+                clean_name = first_word.split('.')[-1].strip('`"\'[];')
+                if clean_name and clean_name not in SQL_RESERVED_KEYWORDS:
+                    tables.add(clean_name)
+
+        # Match table references after DROP TABLE, ALTER TABLE, DROP SCHEMA
         drop_alter_matches = re.finditer(r'\b(?:drop|alter)\s+(?:table|schema)\s+([a-zA-Z0-9_.]+)', q)
         for m in drop_alter_matches:
             token = m.group(1)

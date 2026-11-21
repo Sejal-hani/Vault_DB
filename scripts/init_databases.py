@@ -75,22 +75,6 @@ DEMO_USERS = [
         "password": "CustomerPass123!",
         "api_key": "vlt_key_sarah_cust_5678",
     },
-    {
-        "email": "sarah.writer@bank.com",
-        "full_name": "Sarah Writer",
-        "role": "writer",
-        "department": "Loan Operations",
-        "password": "WriterPass123!",
-        "api_key": "vlt_key_writer_11223344",
-    },
-    {
-        "email": "bob.reader@bank.com",
-        "full_name": "Bob Reader",
-        "role": "reader",
-        "department": "Compliance Review",
-        "password": "ReaderPass123!",
-        "api_key": "vlt_key_reader_55667788",
-    },
 ]
 
 ACCOUNTS = [

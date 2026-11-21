@@ -147,26 +147,25 @@ class PostgresStorage:
             raise RuntimeError("PostgreSQL ConnectionPool is not available.")
 
         with self._pool.connection() as conn:
-            with conn.cursor() as cur:
+            orig_read_only = conn.read_only
+            try:
                 if read_only:
-                    cur.execute("SET default_transaction_read_only = on;")
-                try:
-                    cur.execute(query, params)
-                    columns: List[str] = []
-                    results: List[Any] = []
-                    if cur.description is not None:
-                        columns = [desc[0] for desc in cur.description]
-                        results = cur.fetchall()
-                        rows_affected = len(results)
-                    else:
-                        rows_affected = cur.rowcount if cur.rowcount != -1 else 0
-                    return results, columns, rows_affected
-                finally:
-                    if read_only:
-                        try:
-                            cur.execute("SET default_transaction_read_only = off;")
-                        except Exception:
-                            pass
+                    conn.read_only = True
+                with conn.transaction():
+                    with conn.cursor() as cur:
+                        cur.execute(query, params)
+                        columns: List[str] = []
+                        results: List[Any] = []
+                        if cur.description is not None:
+                            columns = [desc[0] for desc in cur.description]
+                            results = cur.fetchall()
+                            rows_affected = len(results)
+                        else:
+                            rows_affected = cur.rowcount if cur.rowcount != -1 else 0
+                        return results, columns, rows_affected
+            finally:
+                if read_only:
+                    conn.read_only = orig_read_only
 
     def write_audit_log(
         self,

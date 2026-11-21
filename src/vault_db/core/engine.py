@@ -395,7 +395,7 @@ class VaultEngine:
 
         # 3. Execution on Business Database (PostgreSQL)
         # Enforce PostgreSQL engine-level read-only transaction for non-writing personas (auditor, reader, customer, employee)
-        is_writer = (user_role.lower() in ("admin", "writer"))
+        is_writer = (user_role.lower() in ("admin", "employee", "writer"))
         read_only = not is_writer
 
         try:

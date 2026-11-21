@@ -20,44 +20,44 @@ engine = VaultEngine()
 def reset_test_state():
     """Ensures each test runs with pristine role cache and no active elevations for test users."""
     engine.postgres.execute_query(
-        "UPDATE app_data.access_requests SET status = 'REVOKED' WHERE status = 'APPROVED' AND user_email IN ('bob.reader@bank.com', 'john@bank.com', 'sarah.writer@bank.com');"
+        "UPDATE app_data.access_requests SET status = 'REVOKED' WHERE status = 'APPROVED' AND user_email IN ('compliance.lead@bank.com', 'john@bank.com');"
     )
     engine.postgres.clear_role_cache()
     yield
     engine.postgres.execute_query(
-        "UPDATE app_data.access_requests SET status = 'REVOKED' WHERE status = 'APPROVED' AND user_email IN ('bob.reader@bank.com', 'john@bank.com', 'sarah.writer@bank.com');"
+        "UPDATE app_data.access_requests SET status = 'REVOKED' WHERE status = 'APPROVED' AND user_email IN ('compliance.lead@bank.com', 'john@bank.com');"
     )
     engine.postgres.clear_role_cache()
 
 
-def test_writer_role_permissions():
-    """Writer can SELECT and UPDATE accounts/transactions, but is denied DELETE/DDL."""
+def test_employee_role_permissions():
+    """Employee can SELECT accounts and UPDATE/INSERT transactions, but is denied DELETE/DDL."""
     # 1. SELECT allowed
-    res = engine.execute("SELECT id, name, balance FROM app_data.accounts LIMIT 1;", app_user="sarah.writer@bank.com")
+    res = engine.execute("SELECT id, name, balance FROM app_data.accounts LIMIT 1;", app_user="john@bank.com")
     assert res["status"] == "SUCCESS"
 
-    # 2. UPDATE allowed
-    res_up = engine.execute("UPDATE app_data.transactions SET status = 'completed' WHERE id = 1;", app_user="sarah.writer@bank.com")
+    # 2. UPDATE allowed on transactions
+    res_up = engine.execute("UPDATE app_data.transactions SET status = 'completed' WHERE id = 1;", app_user="john@bank.com")
     assert res_up["status"] == "SUCCESS"
 
     # 3. DDL forbidden
     with pytest.raises(AccessDeniedError):
-        engine.execute("DROP TABLE app_data.accounts;", app_user="sarah.writer@bank.com")
+        engine.execute("DROP TABLE app_data.accounts;", app_user="john@bank.com")
 
 
-def test_reader_role_permissions():
-    """Reader can only read (SELECT), mutations are denied."""
+def test_auditor_role_permissions():
+    """Auditor can only read (SELECT), mutations are denied."""
     # 1. SELECT allowed
-    res = engine.execute("SELECT id, name FROM app_data.accounts LIMIT 1;", app_user="bob.reader@bank.com")
+    res = engine.execute("SELECT id, name FROM app_data.accounts LIMIT 1;", app_user="compliance.lead@bank.com")
     assert res["status"] == "SUCCESS"
 
     # 2. UPDATE forbidden
     with pytest.raises(AccessDeniedError):
-        engine.execute("UPDATE app_data.accounts SET balance = 500 WHERE id = 1;", app_user="bob.reader@bank.com")
+        engine.execute("UPDATE app_data.accounts SET balance = 500 WHERE id = 1;", app_user="compliance.lead@bank.com")
 
     # 3. INSERT forbidden
     with pytest.raises(AccessDeniedError):
-        engine.execute("INSERT INTO app_data.transactions (account_id, amount) VALUES (1, 100);", app_user="bob.reader@bank.com")
+        engine.execute("INSERT INTO app_data.transactions (account_id, amount) VALUES (1, 100);", app_user="compliance.lead@bank.com")
 
 
 def test_customer_rls_on_transactions():
@@ -131,45 +131,48 @@ def test_tamper_simulate_and_restore_via_api():
 def test_approval_workflow_elevation_and_auto_revocation():
     """
     Validates V2 Feature 3: Approval Workflows
-    Bob (reader) requests access for 24 hours -> Manager approves -> Bob gets elevated role -> Revoke -> Reverts.
+    Auditor requests temporary 'admin' elevation for 24 hours -> Manager approves -> gets elevated role -> Revoke -> Reverts.
     """
-    # 1. Bob starts as reader
-    assert engine.get_user_role("bob.reader@bank.com") == "reader"
+    # 1. Auditor starts as auditor
+    assert engine.get_user_role("compliance.lead@bank.com") == "auditor"
 
-    # 2. Bob denied UPDATE by default
+    # 2. Auditor denied UPDATE by default
     with pytest.raises(AccessDeniedError):
-        engine.execute("UPDATE app_data.transactions SET status = 'completed' WHERE id = 1;", app_user="bob.reader@bank.com")
+        engine.execute("UPDATE app_data.transactions SET status = 'completed' WHERE id = 1;", app_user="compliance.lead@bank.com")
 
-    # 3. Bob requests 24h elevation to 'writer'
+    # 3. Auditor requests 24h elevation to 'admin'
     req = engine.approvals.create_request(
-        user_email="bob.reader@bank.com",
-        requested_role="writer",
+        user_email="compliance.lead@bank.com",
+        requested_role="admin",
         duration_hours=24,
         reason="Required for ledger transaction reconciliations",
     )
     assert req["status"] == "PENDING"
     req_id = req["id"]
 
-    # 4. Manager/Admin approves request
-    appr = engine.approvals.approve_request(req_id, reviewer_email="admin@bank.com")
-    assert appr["status"] == "APPROVED"
-    assert "expires_at" in appr
+    try:
+        # 4. Manager/Admin approves request
+        appr = engine.approvals.approve_request(req_id, reviewer_email="admin@bank.com")
+        assert appr["status"] == "APPROVED"
+        assert "expires_at" in appr
 
-    # 5. Bob now has active elevated role 'writer'
-    assert engine.get_user_role("bob.reader@bank.com") == "writer"
+        # 5. Auditor now has active elevated role 'admin'
+        assert engine.get_user_role("compliance.lead@bank.com") == "admin"
 
-    # 6. Now Bob can execute UPDATE query successfully!
-    res = engine.execute("UPDATE app_data.transactions SET status = 'completed' WHERE id = 1;", app_user="bob.reader@bank.com")
-    assert res["status"] == "SUCCESS"
+        # 6. Now Auditor can execute UPDATE query successfully!
+        res = engine.execute("UPDATE app_data.transactions SET status = 'completed' WHERE id = 1;", app_user="compliance.lead@bank.com")
+        assert res["status"] == "SUCCESS"
 
-    # 7. Revoke approval and verify immediate role downgrade back to reader
-    rev = engine.approvals.revoke_request(req_id, reviewer_email="admin@bank.com")
-    assert rev["status"] == "REVOKED"
-    assert engine.get_user_role("bob.reader@bank.com") == "reader"
+        # 7. Revoke approval and verify immediate role downgrade back to auditor
+        rev = engine.approvals.revoke_request(req_id, reviewer_email="admin@bank.com")
+        assert rev["status"] == "REVOKED"
+        assert engine.get_user_role("compliance.lead@bank.com") == "auditor"
 
-    # 8. Bob is again blocked from UPDATE
-    with pytest.raises(AccessDeniedError):
-        engine.execute("UPDATE app_data.transactions SET status = 'completed' WHERE id = 1;", app_user="bob.reader@bank.com")
+        # 8. Auditor is again blocked from UPDATE
+        with pytest.raises(AccessDeniedError):
+            engine.execute("UPDATE app_data.transactions SET status = 'completed' WHERE id = 1;", app_user="compliance.lead@bank.com")
+    finally:
+        engine.postgres.execute_query("DELETE FROM app_data.access_requests WHERE id = %s;", (req_id,))
 
 
 def test_slack_webhook_alert_dispatch():
@@ -179,8 +182,8 @@ def test_slack_webhook_alert_dispatch():
     from src.vault_db.core.alerts import AlertDispatcher
 
     AlertDispatcher.dispatch_anomaly_alert(
-        app_user="bob.reader@bank.com",
-        user_role="reader",
+        app_user="compliance.lead@bank.com",
+        user_role="auditor",
         anomalies=["OFF_HOURS_ACTIVITY", "BULK_DATA_ACCESS"],
         query="SELECT * FROM app_data.accounts WHERE balance > 0;",
         rows_affected=5000,
@@ -191,7 +194,7 @@ def test_slack_webhook_alert_dispatch():
 
     recent = AlertDispatcher.get_recent_alerts(limit=10)
     assert len(recent) > 0
-    matched = next((a for a in recent if a["user"] == "bob.reader@bank.com"), None)
+    matched = next((a for a in recent if a["user"] == "compliance.lead@bank.com"), None)
     assert matched is not None
     assert "slack_payload" in matched
     assert "blocks" in matched["slack_payload"]
@@ -201,28 +204,31 @@ def test_api_approvals_flow():
     """Validates FastAPI approval endpoints /api/approvals."""
     # 1. Submit request via API
     resp = client.post("/api/approvals/request", json={
-        "user_email": "bob.reader@bank.com",
-        "requested_role": "writer",
+        "user_email": "john@bank.com",
+        "requested_role": "auditor",
         "duration_hours": 24,
-        "reason": "API reconciliation access"
+        "reason": "Quarterly compliance review"
     })
     assert resp.status_code == 200
     req_id = resp.json()["id"]
 
-    # 2. List requests
-    list_resp = client.get("/api/approvals?status=PENDING")
-    assert list_resp.status_code == 200
-    assert any(r["id"] == req_id for r in list_resp.json())
+    try:
+        # 2. List requests
+        list_resp = client.get("/api/approvals?status=PENDING")
+        assert list_resp.status_code == 200
+        assert any(r["id"] == req_id for r in list_resp.json())
 
-    # 3. Approve via API
-    appr_resp = client.post(f"/api/approvals/{req_id}/approve?reviewer_email=admin@bank.com")
-    assert appr_resp.status_code == 200
-    assert appr_resp.json()["status"] == "APPROVED"
+        # 3. Approve via API
+        appr_resp = client.post(f"/api/approvals/{req_id}/approve?reviewer_email=admin@bank.com")
+        assert appr_resp.status_code == 200
+        assert appr_resp.json()["status"] == "APPROVED"
 
-    # 4. Clean up / Revoke via API
-    rev_resp = client.post(f"/api/approvals/{req_id}/revoke?reviewer_email=admin@bank.com")
-    assert rev_resp.status_code == 200
-    assert rev_resp.json()["status"] == "REVOKED"
+        # 4. Clean up / Revoke via API
+        rev_resp = client.post(f"/api/approvals/{req_id}/revoke?reviewer_email=admin@bank.com")
+        assert rev_resp.status_code == 200
+        assert rev_resp.json()["status"] == "REVOKED"
+    finally:
+        engine.postgres.execute_query("DELETE FROM app_data.access_requests WHERE id = %s;", (req_id,))
 
 
 def test_customer_cannot_access_other_records_and_or_bypass_prevented():
@@ -309,6 +315,7 @@ def test_non_admin_cannot_approve_requests_backend_enforcement():
 
     # Cleanup
     client.post(f"/api/approvals/{req_id}/revoke", headers=admin_headers)
+    engine.postgres.execute_query("DELETE FROM app_data.access_requests WHERE id = %s;", (req_id,))
 
 
 def test_compliance_pdf_report_with_role_and_date_filters():
