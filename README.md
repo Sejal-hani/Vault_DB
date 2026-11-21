@@ -185,8 +185,8 @@ We evaluated VaultDB under sustained transactional load (1,000 queries) to compa
 
 | Metric | Native RFC 6962 Merkle Ledger | immudb Enterprise Daemon | Performance Delta |
 | :--- | :---: | :---: | :---: |
-| **Throughput** | **190.2 queries/sec** | 8.5 queries/sec | **22.4x Higher Throughput** 🚀 |
-| **P50 Latency** | **4.66 ms** | 105.65 ms | **95.6% Latency Reduction** ⚡ |
+| **Throughput** | **190.2 queries/sec** | 8.5 queries/sec | **22.4x Higher Throughput** |
+| **P50 Latency** | **4.66 ms** | 105.65 ms | **95.6% Latency Reduction** |
 | **Total Test Time (1,000 queries)** | **5.26 seconds** | 117.65 seconds | **22.3x Faster Execution** |
 | **Cryptographic Inclusion Proof** | **< 0.1 ms** ($O(\log N)$ in-memory) | 4.2 ms (gRPC roundtrip) | **42x Faster Proofs** |
 | **External Dependencies** | **0 (Zero)** | 1 (`immudb.exe` / Go daemon) | **100% Universal Portability** |
@@ -310,7 +310,7 @@ VaultDB provides a unified dark-themed web workstation served at **`http://local
 
 > For quick setup instructions, see [SETUP.md](SETUP.md).
 
-### ⚡ 1-Command Universal Quickstart (Runs on Any Computer)
+### 1-Command Universal Quickstart (Runs on Any Computer)
 VaultDB runs natively on **macOS, Linux, and Windows** with zero external binaries:
 ```bash
 # Windows:

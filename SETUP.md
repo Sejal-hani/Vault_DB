@@ -4,7 +4,7 @@ This guide provides simple, step-by-step instructions to install, configure, ini
 
 ---
 
-## ⚡ 1-Command Universal Quickstart
+## 1-Command Universal Quickstart
 
 VaultDB includes an automated launcher that auto-detects your OS, verifies Python, sets up configurations, and initializes the cryptographic ledger:
 
