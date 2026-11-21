@@ -46,6 +46,9 @@ class MerkleVault:
         self._tree = MerkleTree()
         self._counter: int = 0
         self._file_offset: int = 0
+        self._tamper_detected: bool = False
+        self._truncation_detected: bool = False
+        self._tampered_entries: List[int] = []
         self._load_ledger()
 
     def _ensure_connected(self) -> None:
@@ -55,6 +58,7 @@ class MerkleVault:
     def _sync_ledger(self) -> None:
         """
         Incrementally reads any new ledger entries appended by other processes or instances.
+        Recomputes cryptographic leaf hashes to verify payload integrity in transit.
         """
         if not self.ledger_file.exists():
             return
@@ -74,10 +78,22 @@ class MerkleVault:
                             continue
                         try:
                             entry = json.loads(line)
-                            leaf_hash = entry.get("leaf_hash")
-                            if not leaf_hash:
-                                payload_bytes = json.dumps(entry["payload"], sort_keys=True).encode("utf-8")
-                                leaf_hash = MerkleTree.hash_leaf(payload_bytes)
+                            payload = entry.get("payload")
+                            if payload:
+                                payload_bytes = json.dumps(payload, sort_keys=True).encode("utf-8")
+                                computed_hash = MerkleTree.hash_leaf(payload_bytes)
+                                stored_hash = entry.get("leaf_hash")
+                                if stored_hash and computed_hash != stored_hash:
+                                    logger.error(
+                                        f"CRITICAL: Integrity failure on sync at log #{entry.get('id')}: "
+                                        f"stored={stored_hash}, computed={computed_hash}"
+                                    )
+                                    self._tamper_detected = True
+                                    self._tampered_entries.append(entry.get("id"))
+                                leaf_hash = computed_hash
+                            else:
+                                leaf_hash = entry.get("leaf_hash")
+
                             self._tree.append_leaf(leaf_hash)
                             self._counter = max(self._counter, entry.get("id", self._counter + 1))
                         except Exception:
@@ -90,6 +106,8 @@ class MerkleVault:
         """
         Reads existing transaction records from append-only storage and
         reconstructs the Merkle tree state root in memory.
+        Enforces strict cryptographic payload re-hashing and checkpoint state validation
+        to detect offline disk tampering or journal truncation.
         """
         leaf_hashes: List[str] = []
         count: int = 0
@@ -102,10 +120,22 @@ class MerkleVault:
                         continue
                     try:
                         entry = json.loads(line)
-                        leaf_hash = entry.get("leaf_hash")
-                        if not leaf_hash:
-                            payload_bytes = json.dumps(entry["payload"], sort_keys=True).encode("utf-8")
-                            leaf_hash = MerkleTree.hash_leaf(payload_bytes)
+                        payload = entry.get("payload")
+                        if payload:
+                            payload_bytes = json.dumps(payload, sort_keys=True).encode("utf-8")
+                            computed_hash = MerkleTree.hash_leaf(payload_bytes)
+                            stored_hash = entry.get("leaf_hash")
+                            if stored_hash and computed_hash != stored_hash:
+                                logger.error(
+                                    f"CRITICAL: Offline tampering detected at log #{entry.get('id', count+1)}! "
+                                    f"Stored hash: {stored_hash}, Computed: {computed_hash}"
+                                )
+                                self._tamper_detected = True
+                                self._tampered_entries.append(entry.get("id", count + 1))
+                            leaf_hash = computed_hash
+                        else:
+                            leaf_hash = entry.get("leaf_hash")
+
                         leaf_hashes.append(leaf_hash)
                         count = max(count, entry.get("id", count + 1))
                     except Exception as e:
@@ -117,9 +147,34 @@ class MerkleVault:
 
         self._tree = MerkleTree(leaf_hashes)
         self._counter = count
+
+        # Cross-validate against persisted checkpoint state to detect offline truncation or root divergence
+        if self.state_file.exists():
+            try:
+                with open(self.state_file, "r", encoding="utf-8") as sf:
+                    saved_state = json.load(sf)
+                    saved_tx = saved_state.get("tx_id", 0)
+                    saved_root = saved_state.get("root_hash")
+                    if count < saved_tx:
+                        logger.error(
+                            f"CRITICAL: Ledger journal truncation detected! "
+                            f"Persisted checkpoint expected at least {saved_tx} records, but only {count} found on disk."
+                        )
+                        self._truncation_detected = True
+                        self._tamper_detected = True
+                    elif count == saved_tx and saved_root and self._tree.get_root() != saved_root:
+                        logger.error(
+                            f"CRITICAL: Ledger state root divergence detected! "
+                            f"Recomputed root: {self._tree.get_root()}, Checkpoint root: {saved_root}"
+                        )
+                        self._tamper_detected = True
+            except Exception as e:
+                logger.warning(f"Could not verify persisted checkpoint state: {e}")
+
         logger.info(
             f"MerkleVault active: {self._counter} records loaded. "
-            f"Current Root: {self._tree.get_root()[:16]}..."
+            f"Current Root: {self._tree.get_root()[:16]}... "
+            f"(Tamper Detected: {self._tamper_detected}, Truncation: {self._truncation_detected})"
         )
 
     def _persist_state(self) -> None:
