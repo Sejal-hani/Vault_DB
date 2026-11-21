@@ -1,6 +1,6 @@
 """
 Generates the publication-grade CSE3103 Project Report PDF using ReportLab.
-Produces docs/CSE3103_VaultDB_Report.pdf and copies to root CSE3103_VaultDB_Report.pdf.
+Produces docs/CSE3103_VaultDB_Report.pdf.
 """
 
 import sys
@@ -22,9 +22,6 @@ from reportlab.pdfgen import canvas
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 PDF_PATH_DOCS = BASE_DIR / "docs" / "CSE3103_VaultDB_Report.pdf"
-PDF_PATH_ROOT = BASE_DIR / "CSE3103_VaultDB_Report.pdf"
-DOCX_PATH_DOCS = BASE_DIR / "docs" / "CSE3103_VaultDB_Report.docx"
-DOCX_PATH_ROOT = BASE_DIR / "CSE3103_VaultDB_Report.docx"
 
 
 class NumberedCanvas(canvas.Canvas):
@@ -547,15 +544,6 @@ def build_pdf():
 
     doc.build(story, canvasmaker=NumberedCanvas)
     print(f"[+] Generated PDF in docs: {PDF_PATH_DOCS}")
-
-    # Copy to root directory as well
-    import shutil
-    shutil.copyfile(PDF_PATH_DOCS, PDF_PATH_ROOT)
-    print(f"[+] Copied PDF to root: {PDF_PATH_ROOT}")
-
-    if DOCX_PATH_DOCS.exists():
-        shutil.copyfile(DOCX_PATH_DOCS, DOCX_PATH_ROOT)
-        print(f"[+] Copied DOCX to root: {DOCX_PATH_ROOT}")
 
 
 if __name__ == "__main__":

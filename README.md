@@ -16,8 +16,8 @@
 ---
 
 ### CSE3103 Applied Databases & Systems Thinking (Development Track) Official Submission:
-* **Final PDF Report**: [CSE3103_VaultDB_Report.pdf](CSE3103_VaultDB_Report.pdf)
-* **Editable Word Document**: [CSE3103_VaultDB_Report.docx](CSE3103_VaultDB_Report.docx)
+* **Final PDF Report**: [CSE3103_VaultDB_Report.pdf](docs/CSE3103_VaultDB_Report.pdf)
+* **Editable Word Document**: [CSE3103_VaultDB_Report.docx](docs/CSE3103_VaultDB_Report.docx)
 * **Tagged Release for Grading**: [v1.0-report](https://github.com/Sejal-hani/Vault_DB/releases/tag/v1.0-report) / [v1.1-report](https://github.com/Sejal-hani/Vault_DB/releases/tag/v1.1-report) (Version: [v1.1](https://github.com/Sejal-hani/Vault_DB/releases/tag/v1.1))
 * **Authors**: Somya Tomar, Vani Shrivastava, Sejal Patil (School of Engineering and Technology, BML Munjal University)
 * **High-Volume Benchmark & Architectural Evaluation**: VaultDB achieves zero-trust database security, dynamic in-flight PII masking, and cryptographic Merkle tree audit immutability under high-volume enterprise banking traffic (1,000 queries benchmarked with live Merkle consistency proofs, alongside an architectural capability evaluation against pgAudit). [View Benchmark Report](benchmarks/BENCHMARK_REPORT.md)
