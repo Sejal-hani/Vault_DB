@@ -136,10 +136,11 @@ class PostgresStorage:
             logger.error(f"Error updating user credentials for {email}: {e}")
 
     def execute_query(
-        self, query: str, params: Optional[Tuple[Any, ...]] = None
+        self, query: str, params: Optional[Tuple[Any, ...]] = None, read_only: bool = False
     ) -> Tuple[List[Any], List[str], int]:
         """
         Executes business query on PostgreSQL.
+        If read_only is True, sets transaction to read-only at the engine level to prevent any mutations.
         Returns: (results_list, column_names_list, rows_affected)
         """
         if not self._pool:
@@ -147,16 +148,25 @@ class PostgresStorage:
 
         with self._pool.connection() as conn:
             with conn.cursor() as cur:
-                cur.execute(query, params)
-                columns: List[str] = []
-                results: List[Any] = []
-                if cur.description is not None:
-                    columns = [desc[0] for desc in cur.description]
-                    results = cur.fetchall()
-                    rows_affected = len(results)
-                else:
-                    rows_affected = cur.rowcount if cur.rowcount != -1 else 0
-                return results, columns, rows_affected
+                if read_only:
+                    cur.execute("SET default_transaction_read_only = on;")
+                try:
+                    cur.execute(query, params)
+                    columns: List[str] = []
+                    results: List[Any] = []
+                    if cur.description is not None:
+                        columns = [desc[0] for desc in cur.description]
+                        results = cur.fetchall()
+                        rows_affected = len(results)
+                    else:
+                        rows_affected = cur.rowcount if cur.rowcount != -1 else 0
+                    return results, columns, rows_affected
+                finally:
+                    if read_only:
+                        try:
+                            cur.execute("SET default_transaction_read_only = off;")
+                        except Exception:
+                            pass
 
     def write_audit_log(
         self,

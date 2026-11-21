@@ -224,6 +224,8 @@ class MerkleVault:
         client_ip: str = "127.0.0.1",
         is_anomaly: bool = False,
         anomalies: Optional[List[str]] = None,
+        rows_affected: int = 0,
+        **kwargs,
     ) -> Dict[str, Any]:
         """
         Cryptographically commits an audit log entry to the append-only ledger.

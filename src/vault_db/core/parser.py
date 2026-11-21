@@ -16,7 +16,8 @@ SQL_RESERVED_KEYWORDS = {
 }
 
 SENSITIVE_FIELD_NAMES = {
-    "ssn", "password", "pwd", "secret", "api_key", "token", "auth_token", "credit_card"
+    "ssn", "password", "pwd", "secret", "api_key", "token", "auth_token",
+    "credit_card", "card_number", "card_no", "cvv", "pan"
 }
 
 
@@ -34,13 +35,49 @@ class SQLParser:
     """Parses and analyzes SQL statements for middleware policy checking and auditing."""
 
     @staticmethod
-    def split_statements(sql: str) -> List[str]:
+    def strip_comments(sql: str) -> str:
+        """Strips SQL comments (-- and /* */) without affecting strings inside quotes."""
+        out = []
+        i = 0
+        n = len(sql)
+        in_single = False
+        in_double = False
+        while i < n:
+            c = sql[i]
+            if c == "'" and not in_double:
+                in_single = not in_single
+                out.append(c)
+                i += 1
+                continue
+            elif c == '"' and not in_single:
+                in_double = not in_double
+                out.append(c)
+                i += 1
+                continue
+            if not in_single and not in_double:
+                if c == '-' and i + 1 < n and sql[i + 1] == '-':
+                    while i < n and sql[i] != '\n':
+                        i += 1
+                    continue
+                if c == '/' and i + 1 < n and sql[i + 1] == '*':
+                    i += 2
+                    while i + 1 < n and not (sql[i] == '*' and i + 1 < n and sql[i + 1] == '/'):
+                        i += 1
+                    i += 2
+                    continue
+            out.append(c)
+            i += 1
+        return ''.join(out).strip()
+
+    @classmethod
+    def split_statements(cls, sql: str) -> List[str]:
         """Splits SQL string into statements by semicolons outside of quotes."""
+        clean_sql = cls.strip_comments(sql)
         statements = []
         current = []
         in_single = False
         in_double = False
-        for char in sql:
+        for char in clean_sql:
             if char == "'" and not in_double:
                 in_single = not in_single
             elif char == '"' and not in_single:
@@ -59,15 +96,25 @@ class SQLParser:
 
     @classmethod
     def extract_action(cls, query: str) -> str:
-        q = query.strip()
-        # Remove single-line comments
-        q = re.sub(r'--.*$', '', q, flags=re.MULTILINE).strip()
+        q = cls.strip_comments(query).strip()
 
         statements = cls.split_statements(q)
         if len(statements) > 1:
             return "MULTI_STATEMENT"
 
         q_upper = q.upper()
+
+        # Handle Common Table Expressions (CTEs): check for data-modifying CTEs
+        if re.search(r"^\s*WITH\b", q_upper):
+            if re.search(r"\bDELETE\s+FROM\b", q_upper) or re.search(r"\bDELETE\b", q_upper):
+                return "DELETE"
+            if re.search(r"\bUPDATE\s+[A-Z0-9_.]+\s+SET\b", q_upper) or re.search(r"\bUPDATE\b", q_upper):
+                return "UPDATE"
+            if re.search(r"\bINSERT\s+INTO\b", q_upper) or re.search(r"\bINSERT\b", q_upper):
+                return "INSERT"
+            for verb in ["DROP", "TRUNCATE", "ALTER"]:
+                if re.search(rf"\b{verb}\b", q_upper):
+                    return f"DDL:{verb}"
 
         ddl_verbs = ["DROP", "TRUNCATE", "ALTER", "CREATE"]
         for verb in ddl_verbs:
@@ -89,21 +136,32 @@ class SQLParser:
 
         return "UNKNOWN"
 
-    @staticmethod
-    def extract_tables(query: str) -> List[str]:
+    @classmethod
+    def extract_tables(cls, query: str) -> List[str]:
         tables: Set[str] = set()
-        q = query.lower()
+        q = cls.strip_comments(query).lower()
 
-        # Match table references after FROM, INTO, UPDATE, TABLE, JOIN, TRUNCATE
-        matches = re.finditer(r'\b(from|into|update|table|join|truncate)\s+([a-zA-Z0-9_.]+)', q)
+        # 1. Comma-separated tables after FROM (e.g. FROM accounts a, users u)
+        from_match = re.search(r'\bfrom\s+([^;\(\)]+?)(?:\bwhere\b|\bjoin\b|\bgroup\b|\border\b|\bhaving\b|\blimit\b|\bunion\b|;|$)', q)
+        if from_match:
+            table_clause = from_match.group(1)
+            for part in table_clause.split(','):
+                tokens = part.strip().split()
+                if tokens:
+                    raw_token = tokens[0]
+                    clean_name = raw_token.split('.')[-1].strip('`"\'[];')
+                    if clean_name and clean_name not in SQL_RESERVED_KEYWORDS and not clean_name.startswith('('):
+                        tables.add(clean_name)
+
+        # 2. Match table references after INTO, UPDATE, TABLE, JOIN, TRUNCATE
+        matches = re.finditer(r'\b(into|update|table|join|truncate)\s+([a-zA-Z0-9_.]+)', q)
         for m in matches:
             token = m.group(2)
-            # Remove schema if present (e.g. app_data.accounts -> accounts)
             clean_name = token.split('.')[-1].strip('`"\'[];')
             if clean_name and clean_name not in SQL_RESERVED_KEYWORDS:
                 tables.add(clean_name)
 
-        # Match table references after DROP TABLE, ALTER TABLE, DROP SCHEMA
+        # 3. Match table references after DROP TABLE, ALTER TABLE, DROP SCHEMA
         drop_alter_matches = re.finditer(r'\b(?:drop|alter)\s+(?:table|schema)\s+([a-zA-Z0-9_.]+)', q)
         for m in drop_alter_matches:
             token = m.group(1)

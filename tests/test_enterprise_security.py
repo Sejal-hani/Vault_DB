@@ -10,7 +10,7 @@ import pytest
 from fastapi.testclient import TestClient
 from src.vault_db.api.app import app
 from src.vault_db.core.engine import VaultEngine
-from src.vault_db.core.rbac import AccessDeniedError
+from src.vault_db.core.rbac import AccessDeniedError, QueryExecutionError
 
 client = TestClient(app)
 engine = VaultEngine()
@@ -479,6 +479,63 @@ def test_merkle_vault_detects_offline_truncation(tmp_path):
     reloaded_vault = MerkleVault(data_dir=data_dir)
     assert reloaded_vault._truncation_detected is True
     assert reloaded_vault._tamper_detected is True
+
+
+def test_auditor_delete_comment_stacked_exploit_blocked():
+    """
+    Validates that a stacked statement injection 'SELECT '--'; DELETE ...'
+    is rejected both by multi-statement detection and by read-only transaction enforcement.
+    """
+    exploit_sql = "SELECT '--'; DELETE FROM app_data.accounts WHERE id = 99999;"
+    with pytest.raises((AccessDeniedError, QueryExecutionError)):
+        engine.execute(exploit_sql, app_user="compliance.lead@bank.com")
+
+
+def test_auditor_cte_data_modifying_delete_blocked():
+    """
+    Validates that a data-modifying CTE 'WITH deleted AS (DELETE ...) SELECT ...'
+    is detected as DELETE DML and blocked for read-only auditor personas.
+    """
+    exploit_sql = "WITH deleted AS (DELETE FROM app_data.accounts WHERE id = 99999 RETURNING *) SELECT * FROM deleted;"
+    with pytest.raises((AccessDeniedError, QueryExecutionError)):
+        engine.execute(exploit_sql, app_user="compliance.lead@bank.com")
+
+
+def test_customer_comma_join_users_table_blocked():
+    """
+    Validates that comma joins 'FROM accounts a, users u' correctly extract all tables,
+    denying customer access to the unauthorized users table.
+    """
+    exploit_sql = "SELECT a.id, u.email FROM app_data.accounts a, app_data.users u WHERE a.user_id = u.id;"
+    with pytest.raises(AccessDeniedError):
+        engine.execute(exploit_sql, app_user="alice@bank.com")
+
+
+def test_auditor_alias_credential_secret_blocked():
+    """
+    Validates that aliasing credential secrets 'SELECT api_key AS k'
+    is strictly blocked for non-admin personas.
+    """
+    exploit_sql = "SELECT api_key AS k FROM app_data.users;"
+    with pytest.raises(AccessDeniedError):
+        engine.execute(exploit_sql, app_user="compliance.lead@bank.com")
+
+
+def test_failed_syntax_queries_are_logged_to_immutable_ledger():
+    """
+    Validates that failed queries (e.g. division by zero, invalid column execution errors)
+    are committed to the Merkle ledger with status='ERROR', ensuring 100% query auditing.
+    """
+    error_sql = "SELECT 1 / 0 FROM app_data.accounts LIMIT 1;"
+    with pytest.raises(QueryExecutionError):
+        engine.execute(error_sql, app_user="alice@bank.com")
+
+    # Verify that the failed attempt was sealed into the immutable ledger
+    latest_logs = engine.get_audit_logs(limit=5, source="immudb")
+    error_entries = [l for l in latest_logs if l.get("status") == "ERROR" and "1 / 0" in str(l.get("query"))]
+    assert len(error_entries) > 0
+    assert error_entries[0]["status"] == "ERROR"
+
 
 
 

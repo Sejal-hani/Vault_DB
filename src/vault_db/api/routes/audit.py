@@ -473,7 +473,9 @@ async def export_pdf_report(
     For customers, strictly scopes the audit to all staff and systems that accessed their personal records.
     """
     eng = get_engine()
-    raw_logs = eng.get_audit_logs(limit=limit, source="immudb")
+    # If date range filtering is requested, fetch an adequate window so past logs are not truncated
+    fetch_limit = 5000 if (time_range and time_range != "all") or start_date or end_date else max(limit, 500)
+    raw_logs = eng.get_audit_logs(limit=fetch_limit, source="immudb")
 
     # Scope customer reports strictly to their own identity
     effective_customer = current_user.email if current_user.role == "customer" else customer

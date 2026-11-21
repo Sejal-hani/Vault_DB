@@ -9,7 +9,7 @@
 [![immudb](https://img.shields.io/badge/immudb-Pluggable%20Enterprise%20Adapter-green?logo=database)](https://immudb.io/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115%2B-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)](https://www.python.org/)
-[![Tests](https://img.shields.io/badge/Test%20Suite-171%20Passed-success)](tests/)
+[![Tests](https://img.shields.io/badge/Test%20Suite-176%20Passed-success)](tests/)
 [![Compliance](https://img.shields.io/badge/Compliance-GDPR%20|%20HIPAA%20|%20PCI--DSS-orange)](#11-regulatory-compliance-mapping)
 
 ---

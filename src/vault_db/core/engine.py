@@ -353,13 +353,85 @@ class VaultEngine:
 
                     raise AccessDeniedError(f"Access Denied: {denial_reason}", immudb_record=immudb_record)
 
+        # Disallow non-admin personas from directly querying internal credential secrets (even with aliasing)
+        if user_role.lower() != "admin":
+            for secret in ("api_key", "password_hash"):
+                if re.search(rf"\b{secret}\b", query, re.IGNORECASE):
+                    denial_reason = f"Direct selection of internal credential secret '{secret}' is prohibited."
+                    logged_query = mask_query_text(query)
+                    immudb_record = {}
+                    try:
+                        immudb_record = self.immudb.append_audit_log(
+                            app_user=app_user,
+                            user_role=user_role,
+                            action=analysis.action,
+                            target_table=target_str,
+                            query_text=logged_query,
+                            execution_status="DENIED",
+                            rows_affected=0,
+                            execution_time_ms=0.0,
+                            is_sensitive=True,
+                            sensitive_fields=[secret],
+                            client_ip=client_ip,
+                        )
+                        self.postgres.write_audit_log(
+                            app_user=app_user,
+                            user_role=user_role,
+                            action=analysis.action,
+                            target_table=target_str,
+                            query_text=logged_query,
+                            execution_status="DENIED",
+                            immudb_log_id=immudb_record.get("id"),
+                            immudb_tx_id=immudb_record.get("immudb_tx_id"),
+                            immudb_tx_hash=immudb_record.get("immudb_tx_hash"),
+                            is_sensitive=True,
+                        )
+                    except Exception:
+                        pass
+                    raise AccessDeniedError(f"Access Denied: {denial_reason}", immudb_record=immudb_record)
+
         # 2. Row-Level Security (RLS) Enforcement
         exec_query, is_scoped = apply_row_level_security(query, user_role, app_user)
 
         # 3. Execution on Business Database (PostgreSQL)
+        # Enforce PostgreSQL engine-level read-only transaction for non-writing personas (auditor, reader, customer, employee)
+        is_writer = (user_role.lower() in ("admin", "writer"))
+        read_only = not is_writer
+
         try:
-            results, columns, rows_affected = self.postgres.execute_query(exec_query, params)
+            results, columns, rows_affected = self.postgres.execute_query(exec_query, params, read_only=read_only)
         except Exception as e:
+            elapsed_ms = (time.perf_counter() - start_time) * 1000
+            logged_query = mask_query_text(query)
+            # Log failed queries to the cryptographic ledger as ERROR (guaranteeing 100% audit coverage)
+            try:
+                error_rec = self.immudb.append_audit_log(
+                    app_user=app_user,
+                    user_role=user_role,
+                    action=analysis.action,
+                    target_table=target_str,
+                    query_text=logged_query,
+                    execution_status="ERROR",
+                    rows_affected=0,
+                    execution_time_ms=round(elapsed_ms, 2),
+                    is_sensitive=analysis.is_sensitive,
+                    sensitive_fields=analysis.sensitive_fields_found,
+                    client_ip=client_ip,
+                )
+                self.postgres.write_audit_log(
+                    app_user=app_user,
+                    user_role=user_role,
+                    action=analysis.action,
+                    target_table=target_str,
+                    query_text=logged_query,
+                    execution_status="ERROR",
+                    immudb_log_id=error_rec.get("id"),
+                    immudb_tx_id=error_rec.get("immudb_tx_id"),
+                    immudb_tx_hash=error_rec.get("immudb_tx_hash"),
+                    is_sensitive=analysis.is_sensitive,
+                )
+            except Exception:
+                pass
             raise QueryExecutionError(str(e))
 
         elapsed_ms = (time.perf_counter() - start_time) * 1000
