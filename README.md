@@ -5,11 +5,11 @@
 > **Mathematically prove database access authenticity, enforce zero-trust access controls, and eliminate audit trail tampering.**
 
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16%2B-blue?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
-[![Merkle Ledger](https://img.shields.io/badge/Merkle%20Ledger-RFC%206962%20Native%20Engine-blueviolet?logo=git)](src/vault_db/core/merkle.py)
+[![Merkle Ledger](https://img.shields.io/badge/Merkle%20Ledger-Cryptographic%20Native%20Engine-blueviolet?logo=git)](src/vault_db/core/merkle.py)
 [![immudb](https://img.shields.io/badge/immudb-Pluggable%20Enterprise%20Adapter-green?logo=database)](https://immudb.io/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115%2B-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)](https://www.python.org/)
-[![Tests](https://img.shields.io/badge/Test%20Suite-164%20Passed-success)](tests/)
+[![Tests](https://img.shields.io/badge/Test%20Suite-166%20Passed-success)](tests/)
 [![Compliance](https://img.shields.io/badge/Compliance-GDPR%20|%20HIPAA%20|%20PCI--DSS-orange)](#11-regulatory-compliance-mapping)
 
 ---
@@ -19,7 +19,7 @@
 - [1. Product Overview](#1-product-overview)
 - [2. Product Demonstration](#2-product-demonstration)
 - [3. System Architecture & Dual-Storage Engine](#3-system-architecture--dual-storage-engine)
-- [4. Native RFC 6962 Merkle Tree Ledger](#4-native-rfc-6962-merkle-tree-ledger)
+- [4. Native Cryptographic Merkle Tree Ledger](#4-native-cryptographic-merkle-tree-ledger)
 - [5. Performance Benchmarks (Native vs. immudb)](#5-performance-benchmarks-native-vs-immudb)
 - [6. Core Capabilities](#6-core-capabilities)
 - [7. Threat Model & Defense Matrix](#7-threat-model--defense-matrix)
@@ -42,10 +42,10 @@ Traditional database architectures remain vulnerable to three primary attack vec
 2. **Client-Side Identity Spoofing**: Trusting client applications to declare their identity in SQL sessions invites privilege escalation and impersonation.
 3. **Reconnaissance Blind Spots**: Denied access attempts, cross-tenant queries, and multi-statement SQL injection attempts are frequently omitted from forensic logging.
 
-**VaultDB** functions as a high-performance, transparent security middleware proxy between client applications and database infrastructure. Every query is parsed at the AST level, evaluated under server-derived zero-trust identity, dynamically scoped to tenant boundaries, masked for sensitive PII, and committed simultaneously to a **cryptographic append-only Merkle tree ledger** and a [PostgreSQL](https://www.postgresql.org/) relational mirror.
+**VaultDB** functions as a high-performance, transparent security middleware proxy between client applications and database infrastructure. Every query is parsed by a custom rule-based SQL lexical inspector and injection firewall, evaluated under server-derived zero-trust identity, dynamically scoped to tenant boundaries via hardened RLS, masked for sensitive PII, and committed simultaneously to a **cryptographic append-only Merkle tree ledger** and a [PostgreSQL](https://www.postgresql.org/) relational mirror.
 
 VaultDB provides a **Pluggable Dual-Engine Storage Architecture**:
-- **Native RFC 6962 Pure-Python Merkle Ledger (`default`)**: Built from the ground up with zero external dependencies, RFC 6962 domain-separated leaf/branch hashing, logarithmic audit inclusion proofs, and persistent disk journaling. Works universally out of the box on Windows, macOS, and Linux without platform binaries or Docker containers.
+- **Native Cryptographic Merkle Ledger (`default`)**: Built from the ground up with zero external dependencies, a balanced binary Merkle tree with RFC 6962 domain-separated leaf/branch hashing, logarithmic audit inclusion proofs, startup payload re-hashing, and persistent disk journaling. Works universally out of the box on Windows, macOS, and Linux without platform binaries or Docker containers.
 - **immudb Enterprise Adapter (`optional`)**: An enterprise-grade distributed immutable database adapter. Organizations with existing immudb clusters can hot-swap backends with a single configuration flag (`STORAGE_BACKEND=immudb`).
 
 ---
@@ -71,7 +71,7 @@ flowchart TD
 
     subgraph Middleware ["VaultDB Security Middleware"]
         Auth["Authentication & Identity<br/>(JWT & Password Hashing)"]
-        Parser["AST SQL Parser & Firewall"]
+        Parser["SQL Lexical Inspector & Firewall"]
         Policy["Policy Engine & Data Masking"]
         Engine["VaultEngine Orchestrator"]
 
@@ -81,7 +81,7 @@ flowchart TD
     subgraph Storage ["Pluggable Dual-Storage Layer"]
         PG[("PostgreSQL<br/>Relational Store & Mirror")]
         subgraph LedgerEngines ["Pluggable Cryptographic Ledger (Hot-Swappable)"]
-            Native[("Native RFC 6962 Merkle Ledger<br/>(Pure-Python, Zero-Dependency, Default)")]
+            Native[("Native Cryptographic Merkle Ledger<br/>(Pure-Python, Zero-Dependency, Default)")]
             Immu[("immudb Enterprise Daemon<br/>(Optional gRPC Enterprise Adapter)")]
         end
     end
@@ -100,7 +100,7 @@ flowchart LR
         direction TB
         Engine["VaultEngine"]
         PG_Mirror[("PostgreSQL Mirror<br/>vault_audit.audit_logs")]
-        Ledger_Tree[("Cryptographic Merkle Tree<br/>(Native RFC 6962 / immudb)")]
+        Ledger_Tree[("Cryptographic Merkle Tree<br/>(Native Merkle / immudb)")]
 
         Engine -->|Relational Record| PG_Mirror
         Engine -->|Cryptographic Append| Ledger_Tree
@@ -136,17 +136,19 @@ VaultDB couples two complementary storage technologies:
 
 ---
 
-## 4. Native RFC 6962 Merkle Tree Ledger
+## 4. Native Cryptographic Merkle Tree Ledger
 
 To guarantee **universal portability** on any machine (macOS, Linux, and Windows) with zero required Docker containers or external `.exe` binaries, VaultDB features a custom, pure-Python cryptographic Merkle Tree engine:
 
 ### 4.1 Cryptographic Design & Domain Separation
-Implemented in [`src/vault_db/core/merkle.py`](src/vault_db/core/merkle.py), the ledger adheres to the **RFC 6962** (Certificate Transparency) specification:
+Implemented in [`src/vault_db/core/merkle.py`](src/vault_db/core/merkle.py), the ledger implements a balanced binary Merkle tree architecture with RFC 6962 domain separation:
 - **Leaf Domain Separation**: Each audit entry is serialized into deterministic canonical JSON and hashed with a `0x00` byte prefix:
   $$\text{LeafHash} = \text{SHA-256}(0\text{x}00 \parallel \text{PayloadBytes})$$
 - **Interior Node Domain Separation**: When combining child nodes, intermediate hashes are prefixed with `0x01`:
   $$\text{ParentHash} = \text{SHA-256}(0\text{x}01 \parallel \text{LeftHash} \parallel \text{RightHash})$$
   *Why Domain Separation?* Prepending distinct single-byte prefixes prevents **second preimage attacks**, mathematically guaranteeing that an attacker cannot pass off an intermediate branch node as a valid leaf payload.
+- **Tree Structure & Balancing**: Follows standard binary Merkle tree construction where odd-numbered leaf levels duplicate the final node to maintain complete binary tree geometry across arbitrary transaction heights.
+- **Startup Integrity & Checkpointing**: On system boot, `MerkleVault` re-hashes every audit entry from raw canonical JSON payload bytes to verify that stored leaf digests match disk content. Furthermore, it validates the loaded transaction count and computed root against `data/merkle_vault/ledger_state.json`, immediately flagging offline journal tampering, rollback, or file truncation.
 
 ### 4.2 Logarithmic Inclusion Proofs ($O(\log N)$)
 When an auditor requests proof of a transaction, `MerkleTree.get_audit_path(index)` computes the exact list of sibling hashes (and traversal directions) necessary to reconstruct the current Merkle root:
@@ -158,7 +160,7 @@ If even a single byte of the audit record was altered or backdated, the computed
 
 ### 4.3 High-Performance Append-Only Storage (`merkle_vault.py`)
 Implemented in [`src/vault_db/storage/merkle_vault.py`](src/vault_db/storage/merkle_vault.py):
-- **Append-Only Write-Ahead Log**: Stored on disk in `data/merkle_vault/audit_ledger.jsonl`. New transactions are appended atomically with POSIX file locks.
+- **Append-Only Write-Ahead Log**: Stored on disk in `data/merkle_vault/audit_ledger.jsonl`. New transactions are appended atomically with file locks.
 - **Incremental State Journal**: Maintains `data/merkle_vault/ledger_state.json` recording the latest transaction counter (`tx_id`) and state root.
 - **Multi-Instance Concurrency Sync**: Uses file-offset tracking (`_sync_ledger`) so multiple web workers or test runners stay synchronized without lock contention.
 - **Full Drop-in Compatibility**: Implements identical duck-typed signatures as `ImmudbVault` (`append_audit_log`, `verify_audit_log`, `get_audit_logs`, `get_ledger_state`), allowing complete interchangeability.
@@ -173,9 +175,25 @@ STORAGE_BACKEND=merkle
 
 | Mode | Description | Requirements |
 | :--- | :--- | :--- |
-| **`merkle`** *(Default)* | Uses native RFC 6962 pure-Python Merkle tree. Ultra-fast, zero external processes. | Python 3.10+ (Standard library `hashlib`) |
+| **`merkle`** *(Default)* | Uses native pure-Python Merkle tree with RFC 6962 domain separation. Ultra-fast, zero external processes. | Python 3.10+ (Standard library `hashlib`) |
 | **`immudb`** | Routes ledger commits to an external immudb enterprise daemon over gRPC. | immudb running on port 3322 |
 | **`auto`** | Probes immudb daemon; if alive, uses immudb; if unavailable, seamlessly falls back to native Merkle. | None (auto-adapts) |
+
+#### How to Plug in immudb (Optional Enterprise Backend)
+VaultDB supports hot-swapping between the native Merkle ledger and immudb without changing any application code:
+1. **Start the immudb server**:
+   - On Windows: Run `.\bin\immudb.exe --dir data/immudb --port 3322 --pgsql-server=false --web-server=false`
+   - Via Docker: `docker-compose up -d immudb`
+2. **Update `.env`**:
+   ```ini
+   STORAGE_BACKEND=immudb
+   IMMUDB_HOST=127.0.0.1
+   IMMUDB_PORT=3322
+   IMMUDB_USER=immudb
+   IMMUDB_PASSWORD=immudb
+   IMMUDB_DATABASE=defaultdb
+   ```
+3. **Restart VaultDB**: Run `python server.py`. VaultDB's `VaultEngine` will automatically route all audit commits and cryptographic inclusion proofs through `ImmudbVault` over gRPC.
 
 ---
 
@@ -212,7 +230,7 @@ sequenceDiagram
     Client->>Auth: Request + JWT Cookie / Session
     Auth->>Auth: Verify Signature & Derive Authenticated User + Role
     Client->>Engine: Execute SQL Query
-    Engine->>Engine: Parse AST, extract actions, tables, sensitive columns
+    Engine->>Engine: Lexical inspection, extract actions, tables, sensitive columns
     Engine->>Policy: Evaluate RBAC permissions & multi-statement check
 
     alt Access Denied / Policy Violation
@@ -244,13 +262,14 @@ sequenceDiagram
 * **Mathematical Inclusion Proofs**: Each audit entry produces a verifiable SHA-256 state root and linear transaction height. Auditors can independently verify cryptographic membership proofs directly in the web console or via API.
 * **Engine-Level Immutability**: PostgreSQL PL/pgSQL triggers in [`db/schema.sql`](db/schema.sql) reject direct `UPDATE`, `DELETE`, and `TRUNCATE` operations on `vault_audit.audit_logs`. If a DBA circumvents relational triggers out-of-band, the Merkle tree state flags the discrepancy with field-by-field verification diffs.
 
-### Role-Based Access Control (RBAC) & AST Parser
+### Role-Based Access Control (RBAC) & SQL Inspection Firewall
 * **Server-Derived Identity**: Client requests cannot dictate or override `app_user` or `user_role`. Identity is derived strictly server-side via RFC 7519 HS256 JWT tokens and salted PBKDF2 password hashing in [`src/vault_db/auth/`](src/vault_db/auth/).
-* **AST-Level SQL Inspection**: Deep parsing in [`src/vault_db/core/parser.py`](src/vault_db/core/parser.py) extracts targets, actions (`SELECT`, `INSERT`, `UPDATE`, `DELETE`, `DDL:DROP`, `ALTER`), and sensitive attributes before execution.
+* **Rule-Based SQL Lexical Inspection & Injection Firewall**: Deterministic lexical tokenizer and validator in [`src/vault_db/core/parser.py`](src/vault_db/core/parser.py) extracts targets, actions (`SELECT`, `INSERT`, `UPDATE`, `DELETE`, `DDL:DROP`, `ALTER`), and sensitive attributes before execution.
 * **Injection Firewall**: Blocks stacked queries (multi-statement injection), CTE write attacks (`WITH x AS (DELETE ...) SELECT 1;`), `COPY PROGRAM`, and unprivileged privilege escalation (`SET ROLE`).
 
 ### Tenant Isolation via Row-Level Security (RLS)
 * **Automatic Query Rewriting**: Customer queries are dynamically intercepted in [`src/vault_db/core/rls.py`](src/vault_db/core/rls.py) and constrained to personal account and transaction records at runtime.
+* **Strict Predicate Encapsulation**: Transparently injects tenant constraints into compound `WHERE` clauses and multi-branch `UNION` queries, preventing unauthorized tenant bypasses via `OR 1=1` injections.
 * **Cross-Tenant Violation Guard**: Explicit customer attempts to query foreign account numbers (`ACC-...`) or arbitrary user records are blocked with an immediate security denial and recorded into the ledger.
 
 ### Dynamic In-Flight Data Masking
@@ -282,9 +301,9 @@ sequenceDiagram
 | :--- | :--- | :--- |
 | **Rogue DBA / Insider Threat** | Attacker with database admin access executes `DELETE FROM audit_logs` or modifies past queries. | **Cryptographic Merkle Tree**: Immutable append-only ledger prevents alterations. PostgreSQL triggers reject direct table mutations. In-browser verification flags field-by-field diffs if the relational store is tampered with. |
 | **Client Identity Spoofing** | Adversary injects `{"user": "admin@bank.com"}` in query parameters. | **Server-Derived Identity**: User identity and permissions are resolved exclusively from cryptographic JWT signatures and secure password verification. Client declarations are ignored. |
-| **Stacked SQL Injection** | Malicious input attempts `SELECT 1; DROP TABLE app_data.accounts;`. | **AST Multi-Statement Firewall**: Detects stacked statements and CTE write vectors; blocks execution before reaching PostgreSQL and logs a security violation. |
+| **Stacked SQL Injection** | Malicious input attempts `SELECT 1; DROP TABLE app_data.accounts;`. | **Multi-Statement Injection Firewall**: Detects stacked statements and CTE write vectors; blocks execution before reaching PostgreSQL and logs a security violation. |
 | **PII Data Exfiltration** | Employee attempts to query unmasked customer SSNs or card numbers. | **Dynamic Data Masking**: In-flight regex masking redacts sensitive tokens (`***-**-XXXX`) in query results and sanitizes SQL constants in audit logs. |
-| **Cross-Tenant Snooping** | Retail customer attempts to query other customer account numbers. | **Row-Level Security (RLS)**: Enforces tenant boundary isolation by rewriting customer queries to filter on authenticated user ID only. |
+| **Cross-Tenant Snooping** | Retail customer attempts to query other customer account numbers. | **Row-Level Security (RLS)**: Enforces strict tenant boundary isolation by rewriting customer queries to filter on authenticated user ID only; safely wraps existing `WHERE` conditions and disallows `OR 1=1` or `UNION` filter bypasses. |
 | **Reconnaissance Probing** | Adversary probes non-existent tables or triggers repeated denials. | **Persistent Denial Auditing**: Every denial is sealed into the ledger; rapid repeated denials trigger behavioral security alerts. |
 
 ---
@@ -456,7 +475,7 @@ VaultDB includes 4 pre-seeded enterprise banking personas available for instant 
 
 ## 11. Automated Verification & Test Suite
 
-VaultDB features an automated test suite containing **164 tests** in [`tests/`](tests/) covering adversarial vectors, cryptographic validation, and role enforcement:
+VaultDB features an automated test suite containing **166 tests** in [`tests/`](tests/) covering adversarial vectors, cryptographic validation, and role enforcement:
 
 ```bash
 pytest tests/ -v
@@ -464,10 +483,10 @@ pytest tests/ -v
 
 ### Test Coverage Highlights
 * **100+ Adversarial SQL Vectors** ([`tests/test_attack_vectors.py`](tests/test_attack_vectors.py)): Multi-statement injection, CTE writes, `COPY PROGRAM`, `SET ROLE`, out-of-band schema drops, and comment truncation.
-* **Native RFC 6962 Merkle Tree Engine** ([`tests/test_merkle_vault.py`](tests/test_merkle_vault.py)): Domain-separated hashing (`0x00`/`0x01`), $O(\log N)$ inclusion proof generation, disk journal replay, state recovery, and mathematical tamper detection.
+* **Native Merkle Tree Engine** ([`tests/test_merkle_vault.py`](tests/test_merkle_vault.py)): RFC 6962 domain-separated hashing (`0x00`/`0x01`), $O(\log N)$ inclusion proof generation, disk journal replay, state recovery, and mathematical tamper detection.
 * **immudb Enterprise Verification** ([`tests/test_immudb.py`](tests/test_immudb.py)): SHA-256 state root consistency and tamper detection logic against external daemon.
 * **Engine Immutability Triggers**: Verification that direct `UPDATE`, `DELETE`, and `TRUNCATE` operations on `vault_audit.audit_logs` are rejected by PostgreSQL.
-* **Enterprise Security & Approvals** ([`tests/test_enterprise_security.py`](tests/test_enterprise_security.py)): Evaluation of bulk thresholds (`>= 1,000` rows), after-hours windows, repeated denial accumulation, temporary JIT elevation, PDF compliance export, credential secret suppression (`password_hash`, `api_key`), and non-admin SSN masking.
+* **Enterprise Security & Approvals** ([`tests/test_enterprise_security.py`](tests/test_enterprise_security.py)): Evaluation of bulk thresholds (`>= 1,000` rows), after-hours windows, repeated denial accumulation, temporary JIT elevation, PDF compliance export, credential secret suppression (`password_hash`, `api_key`), non-admin SSN masking, RLS query injection bypass prevention (compound predicates and `UNION` injection), and MerkleVault startup re-hashing and checkpointing.
 * **Tenant Isolation & Masking** ([`tests/test_rbac.py`](tests/test_rbac.py)): Customer row scoping and in-flight PII redaction.
 
 ---
@@ -646,15 +665,15 @@ Vault_DB/
 │       │   ├── crypto.py               # AES-256-GCM column encryption utilities
 │       │   ├── engine.py               # VaultEngine middleware orchestrator
 │       │   ├── masking.py              # In-flight PII masking engine (SSN, cards, passwords)
-│       │   ├── merkle.py               # RFC 6962 pure-Python Merkle tree implementation
-│       │   ├── parser.py               # AST SQL inspection & injection firewall
+│       │   ├── merkle.py               # Binary Merkle tree with RFC 6962 domain separation
+│       │   ├── parser.py               # Rule-based SQL lexical inspection & injection firewall
 │       │   ├── rbac.py                 # Role-based access control engine
 │       │   └── rls.py                  # Row-level security dynamic query rewriter
 │       ├── reports/                    # Compliance Reporting
 │       │   └── pdf_generator.py        # Certified PDF compliance report generator
 │       └── storage/                    # Database Connectors & Interfaces
 │           ├── immudb_vault.py         # immudb enterprise gRPC adapter
-│           ├── merkle_vault.py         # Native RFC 6962 pure-Python Merkle storage engine
+│           ├── merkle_vault.py         # Native Merkle tree storage engine with state checkpointing
 │           └── postgres.py             # PostgreSQL ConnectionPool interface
 ├── static/                             # Frontend Web Console Assets
 │   ├── css/
@@ -668,6 +687,6 @@ Vault_DB/
     ├── test_attack_vectors.py          # 100+ Adversarial SQL injection & exploit tests
     ├── test_enterprise_security.py     # Enterprise RBAC, RLS, JIT approvals & PDF tests
     ├── test_immudb.py                  # immudb enterprise adapter tests
-    ├── test_merkle_vault.py            # Native RFC 6962 Merkle tree & proof tests
+    ├── test_merkle_vault.py            # Native Merkle tree & inclusion proof tests
     └── test_rbac.py                    # Role-based access control permission tests
 ```

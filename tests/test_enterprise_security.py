@@ -4,6 +4,7 @@ Validates role-based access control, customer RLS on transactions,
 sensitive column detection on SELECT *, and query-text masking in logs.
 """
 
+import json
 import re
 import pytest
 from fastapi.testclient import TestClient
@@ -383,6 +384,90 @@ def test_schema_explorer_secrets_and_status_hidden():
     assert "api_key" not in str(data_accs)
     # Raw SSN pattern must never appear in table inspection
     assert not re.search(r"\b\d{3}-\d{2}-\d{4}\b", str(data_accs["rows"]))
+
+
+def test_merkle_vault_detects_offline_payload_tampering(tmp_path):
+    """
+    Validates that MerkleVault recalculates leaf hashes from canonical payload bytes
+    upon startup, detecting offline file tampering and setting _tamper_detected.
+    """
+    from src.vault_db.storage.merkle_vault import MerkleVault
+
+    data_dir = str(tmp_path / "merkle_tamper_test")
+    vault = MerkleVault(data_dir=data_dir)
+
+    # 1. Append legitimate audit logs
+    vault.append_audit_log(
+        app_user="alice@bank.com",
+        user_role="customer",
+        action="SELECT",
+        target_table="accounts",
+        query_text="SELECT * FROM accounts;",
+        execution_status="SUCCESS",
+    )
+    vault.append_audit_log(
+        app_user="admin@bank.com",
+        user_role="admin",
+        action="UPDATE",
+        target_table="accounts",
+        query_text="UPDATE accounts SET balance = 1000000 WHERE id = 1;",
+        execution_status="SUCCESS",
+    )
+    assert not vault._tamper_detected
+
+    # 2. Simulate offline tampering: modify line 2 in audit_ledger.jsonl
+    ledger_path = tmp_path / "merkle_tamper_test" / "audit_ledger.jsonl"
+    with open(ledger_path, "r", encoding="utf-8") as f:
+        lines = f.readlines()
+
+    tampered_entry = json.loads(lines[1])
+    tampered_entry["payload"]["query_text"] = "SELECT * FROM accounts;"  # altered query
+    lines[1] = json.dumps(tampered_entry) + "\n"
+
+    with open(ledger_path, "w", encoding="utf-8") as f:
+        f.writelines(lines)
+
+    # 3. Reload vault and verify tampering is flagged immediately on startup
+    reloaded_vault = MerkleVault(data_dir=data_dir)
+    assert reloaded_vault._tamper_detected is True
+    assert 2 in reloaded_vault._tampered_entries
+
+
+def test_merkle_vault_detects_offline_truncation(tmp_path):
+    """
+    Validates that MerkleVault compares record count against persisted ledger_state.json,
+    detecting offline truncation/rollbacks and setting _truncation_detected.
+    """
+    from src.vault_db.storage.merkle_vault import MerkleVault
+
+    data_dir = str(tmp_path / "merkle_trunc_test")
+    vault = MerkleVault(data_dir=data_dir)
+
+    for i in range(5):
+        vault.append_audit_log(
+            app_user="admin@bank.com",
+            user_role="admin",
+            action="SELECT",
+            target_table="accounts",
+            query_text=f"SELECT {i};",
+            execution_status="SUCCESS",
+        )
+    assert vault.get_ledger_state()["tx_id"] == 5
+
+    # Simulate offline truncation: remove the last 2 records from audit_ledger.jsonl
+    ledger_path = tmp_path / "merkle_trunc_test" / "audit_ledger.jsonl"
+    with open(ledger_path, "r", encoding="utf-8") as f:
+        lines = f.readlines()
+
+    assert len(lines) == 5
+    with open(ledger_path, "w", encoding="utf-8") as f:
+        f.writelines(lines[:3])  # Truncate to 3
+
+    # Reload vault and verify truncation is caught
+    reloaded_vault = MerkleVault(data_dir=data_dir)
+    assert reloaded_vault._truncation_detected is True
+    assert reloaded_vault._tamper_detected is True
+
 
 
 
