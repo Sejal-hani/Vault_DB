@@ -148,9 +148,7 @@
       'compliance.lead@bank.com': 'auditor',
       'john@bank.com': 'employee',
       'alice@bank.com': 'customer',
-      'bob@bank.com': 'customer',
-      'sarah.writer@bank.com': 'writer',
-      'bob.reader@bank.com': 'reader'
+      'bob@bank.com': 'customer'
     };
 
     function validateReqRoles() {
@@ -171,9 +169,7 @@
       'admin': { email: 'admin@bank.com', password: 'AdminPass123!' },
       'auditor': { email: 'compliance.lead@bank.com', password: 'AuditorPass123!' },
       'employee': { email: 'john@bank.com', password: 'EmployeePass123!' },
-      'customer': { email: 'alice@bank.com', password: 'CustomerPass123!' },
-      'writer': { email: 'sarah.writer@bank.com', password: 'WriterPass123!' },
-      'reader': { email: 'bob.reader@bank.com', password: 'ReaderPass123!' }
+      'customer': { email: 'alice@bank.com', password: 'CustomerPass123!' }
     };
 
     let currentAuth = {
@@ -198,85 +194,36 @@
       if (drop) drop.style.display = 'none';
     }
 
-    function switchLoginTab(tab) {
-      const btn1Click = document.getElementById('tab-btn-1click');
-      const btnPass = document.getElementById('tab-btn-password');
-      const panel1Click = document.getElementById('auth-panel-1click');
-      const panelPass = document.getElementById('auth-panel-password');
+    async function handleDropdownLogin(e) {
+      e.preventDefault();
+      const emailInput = document.getElementById('dropdown-login-email');
+      const passInput = document.getElementById('dropdown-login-password');
+      const errBox = document.getElementById('dropdown-login-error');
+      if (errBox) errBox.style.display = 'none';
 
-      if (tab === 'password') {
-        if (btn1Click) { btn1Click.classList.remove('active'); btn1Click.style.background = 'transparent'; btn1Click.style.color = 'var(--text-dim)'; }
-        if (btnPass) { btnPass.classList.add('active'); btnPass.style.background = '#2563eb'; btnPass.style.color = '#fff'; }
-        if (panel1Click) panel1Click.style.display = 'none';
-        if (panelPass) panelPass.style.display = 'flex';
-      } else {
-        if (btnPass) { btnPass.classList.remove('active'); btnPass.style.background = 'transparent'; btnPass.style.color = 'var(--text-dim)'; }
-        if (btn1Click) { btn1Click.classList.add('active'); btn1Click.style.background = '#2563eb'; btn1Click.style.color = '#fff'; }
-        if (panelPass) panelPass.style.display = 'none';
-        if (panel1Click) panel1Click.style.display = 'flex';
-      }
-    }
+      const email = emailInput ? emailInput.value.trim() : '';
+      const password = passInput ? passInput.value : '';
 
-    function applyQuickFill(persona) {
-      const cred = DEMO_CREDENTIALS[persona];
-      if (cred) {
-        const emailEl = document.getElementById('login-email-input');
-        const passEl = document.getElementById('login-password-input');
-        const hintEl = document.getElementById('quick-password-hint');
-        if (emailEl) emailEl.value = cred.email;
-        if (passEl) passEl.value = cred.password;
-        if (hintEl) hintEl.innerText = `Key: ${cred.password}`;
-        const errEl = document.getElementById('login-error-msg');
-        if (errEl) errEl.style.display = 'none';
-      }
-    }
-
-    function applyModalQuickFill(persona) {
-      const cred = DEMO_CREDENTIALS[persona];
-      if (cred) {
-        const emailEl = document.getElementById('modal-login-email');
-        const passEl = document.getElementById('modal-login-password');
-        const hintEl = document.getElementById('modal-password-hint');
-        if (emailEl) emailEl.value = cred.email;
-        if (passEl) passEl.value = cred.password;
-        if (hintEl) hintEl.innerText = `Password: ${cred.password}`;
-        const errEl = document.getElementById('modal-login-error');
-        if (errEl) errEl.style.display = 'none';
-      }
-    }
-
-    function togglePasswordVisibility(inputId = 'login-password-input') {
-      const input = document.getElementById(inputId);
-      if (!input) return;
-      input.type = input.type === 'password' ? 'text' : 'password';
-    }
-
-    function openPasswordLoginModal() {
-      const modal = document.getElementById('loginModal');
-      if (modal) {
-        modal.style.display = 'flex';
-        if (currentAuth && currentAuth.email) {
-          const emailInput = document.getElementById('modal-login-email');
-          if (emailInput && !emailInput.value) emailInput.value = currentAuth.email;
+      try {
+        const resp = await fetch(`${API}/api/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
+        if (!resp.ok) {
+          const err = await resp.json().catch(() => ({}));
+          throw new Error(err.detail || 'Invalid email or password');
+        }
+        const data = await resp.json();
+        applyAuthData(data);
+        const drop = document.getElementById('account-dropdown');
+        if (drop) drop.style.display = 'none';
+      } catch (err) {
+        if (errBox) {
+          errBox.innerText = err.message;
+          errBox.style.display = 'block';
         }
       }
-    }
-
-    function closePasswordLoginModal() {
-      const modal = document.getElementById('loginModal');
-      if (modal) modal.style.display = 'none';
-    }
-
-    async function handleLogout() {
-      try {
-        await fetch(`${API}/api/auth/logout`, { method: 'POST' });
-      } catch (e) {
-        console.warn('Logout API call failed:', e);
-      }
-      showToast('Signed out. Reverted to Retail Customer persona.', 'info');
-      switchPersona('customer');
-      const drop = document.getElementById('account-dropdown');
-      if (drop) drop.style.display = 'none';
     }
 
     function showToast(message, type = 'info') {
@@ -284,8 +231,7 @@
       if (!container) return;
       const pill = document.createElement('div');
       pill.className = `toast-pill toast-${type}`;
-      const icon = type === 'success' ? '✅' : (type === 'error' ? '❌' : 'ℹ️');
-      pill.innerHTML = `<span>${icon}</span><span>${escapeHtml(message)}</span>`;
+      pill.innerHTML = `<span>${escapeHtml(message)}</span>`;
       container.appendChild(pill);
       setTimeout(() => {
         pill.style.opacity = '0';
@@ -321,9 +267,7 @@
         'admin': 'Chief Security Officer',
         'auditor': 'Independent Compliance Auditor',
         'employee': 'Commercial Lending & Branch Operations',
-        'customer': 'Retail Banking Client',
-        'writer': 'Loan Operations',
-        'reader': 'Compliance Review'
+        'customer': 'Retail Banking Client'
       };
       const descEl = document.getElementById('identity-desc-text');
       if (descEl) {
@@ -348,108 +292,6 @@
       if (ledgerUserFilter && ledgerUserFilter.value) {
         ledgerUserFilter.value = data.email;
         loadAuditLogs();
-      }
-    }
-
-    async function handlePasswordLogin(event) {
-      if (event) event.preventDefault();
-      const email = document.getElementById('login-email-input').value.trim();
-      const password = document.getElementById('login-password-input').value;
-      const errEl = document.getElementById('login-error-msg');
-      const submitBtn = document.getElementById('btn-submit-password-login');
-
-      if (!email || !password) {
-        if (errEl) {
-          errEl.innerText = 'Please provide both email and password.';
-          errEl.style.display = 'block';
-        }
-        return;
-      }
-
-      if (errEl) errEl.style.display = 'none';
-      const origText = submitBtn ? submitBtn.innerText : '';
-      if (submitBtn) {
-        submitBtn.disabled = true;
-        submitBtn.innerText = 'Verifying credentials...';
-      }
-
-      try {
-        const resp = await fetch(`${API}/api/auth/login`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password })
-        });
-        const data = await resp.json();
-
-        if (!resp.ok) {
-          throw new Error(data.detail || 'Invalid email or password.');
-        }
-
-        applyAuthData(data);
-        const drop = document.getElementById('account-dropdown');
-        if (drop) drop.style.display = 'none';
-        showToast(`Signed in: ${data.full_name} (${data.role})`, 'success');
-      } catch (err) {
-        if (errEl) {
-          errEl.innerText = err.message;
-          errEl.style.display = 'block';
-        }
-        showToast(`Login failed: ${err.message}`, 'error');
-      } finally {
-        if (submitBtn) {
-          submitBtn.disabled = false;
-          submitBtn.innerText = origText;
-        }
-      }
-    }
-
-    async function handleModalPasswordLogin(event) {
-      if (event) event.preventDefault();
-      const email = document.getElementById('modal-login-email').value.trim();
-      const password = document.getElementById('modal-login-password').value;
-      const errEl = document.getElementById('modal-login-error');
-      const submitBtn = document.getElementById('btn-modal-login-submit');
-
-      if (!email || !password) {
-        if (errEl) {
-          errEl.innerText = 'Please provide both email and password.';
-          errEl.style.display = 'block';
-        }
-        return;
-      }
-
-      if (errEl) errEl.style.display = 'none';
-      const origText = submitBtn ? submitBtn.innerText : '';
-      if (submitBtn) {
-        submitBtn.disabled = true;
-        submitBtn.innerText = 'Verifying PBKDF2 hash...';
-      }
-
-      try {
-        const resp = await fetch(`${API}/api/auth/login`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password })
-        });
-        const data = await resp.json();
-
-        if (!resp.ok) {
-          throw new Error(data.detail || 'Invalid email or password.');
-        }
-
-        applyAuthData(data);
-        closePasswordLoginModal();
-        showToast(`Authenticated: ${data.full_name} (${data.role})`, 'success');
-      } catch (err) {
-        if (errEl) {
-          errEl.innerText = err.message;
-          errEl.style.display = 'block';
-        }
-      } finally {
-        if (submitBtn) {
-          submitBtn.disabled = false;
-          submitBtn.innerText = origText;
-        }
       }
     }
 
@@ -542,10 +384,8 @@
         const resp = await fetch(`${API}/api/auth/demo-login/${persona}`, { method: 'POST' });
         const data = await resp.json();
         applyAuthData(data);
-        showToast(`Active persona: ${data.full_name} (${data.role})`, 'info');
       } catch (err) {
         console.error('Failed to switch persona:', err);
-        showToast(`Failed to switch persona: ${err.message}`, 'error');
       }
     }
 

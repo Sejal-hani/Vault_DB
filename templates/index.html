@@ -78,20 +78,12 @@
             </svg>
           </button>
 
-          <!-- Dropdown Popover for 1-Click User Switching & Password Login -->
-          <div id="account-dropdown" style="display: none; position: absolute; right: 0; top: 38px; width: 330px; background: #141417; border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 16px 36px rgba(0,0,0,0.65); z-index: 2000; padding: 10px;">
-            <!-- Mode Switcher Tabs -->
-            <div style="display: flex; background: rgba(255,255,255,0.05); border-radius: 6px; padding: 2px; margin-bottom: 10px;">
-              <button type="button" id="tab-btn-1click" onclick="switchLoginTab('1click')" class="auth-tab-btn active" style="flex: 1; padding: 6px 8px; font-size: 11px; font-weight: 600; border-radius: 4px; border: none; background: #2563eb; color: #fff; cursor: pointer;">
-                ⚡ 1-Click Persona
-              </button>
-              <button type="button" id="tab-btn-password" onclick="switchLoginTab('password')" class="auth-tab-btn" style="flex: 1; padding: 6px 8px; font-size: 11px; font-weight: 600; border-radius: 4px; border: none; background: transparent; color: var(--text-dim); cursor: pointer;">
-                🔑 Password Login
-              </button>
+          <!-- Dropdown Popover for 1-Click User Switching -->
+          <div id="account-dropdown" style="display: none; position: absolute; right: 0; top: 38px; width: 310px; background: #141417; border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 16px 36px rgba(0,0,0,0.65); z-index: 2000; padding: 10px;">
+            <div style="font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-dim); padding: 4px 8px 8px 8px; border-bottom: 1px solid var(--border); margin-bottom: 8px;">
+              Switch Active User
             </div>
-
-            <!-- Panel 1: 1-Click Instant Persona Switching -->
-            <div id="auth-panel-1click" style="display: flex; flex-direction: column; gap: 4px;">
+            <div style="display: flex; flex-direction: column; gap: 4px;">
               <button type="button" class="user-item-btn" onclick="selectAccountItem('admin')" style="display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 7px 10px; background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 6px; color: var(--text); cursor: pointer; text-align: left; transition: all 0.15s ease;">
                 <div>
                   <div style="font-weight: 600; font-size: 12px;">Chief Security Officer</div>
@@ -123,68 +115,16 @@
                 </div>
                 <span class="role-badge role-customer">customer</span>
               </button>
-
-              <button type="button" class="user-item-btn" onclick="selectAccountItem('writer')" style="display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 7px 10px; background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 6px; color: var(--text); cursor: pointer; text-align: left; transition: all 0.15s ease;">
-                <div>
-                  <div style="font-weight: 600; font-size: 12px;">Sarah Writer</div>
-                  <div class="mono" style="font-size: 10.5px; color: var(--text-dim);">sarah.writer@bank.com</div>
-                </div>
-                <span class="role-badge role-writer">writer</span>
-              </button>
-
-              <button type="button" class="user-item-btn" onclick="selectAccountItem('reader')" style="display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 7px 10px; background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 6px; color: var(--text); cursor: pointer; text-align: left; transition: all 0.15s ease;">
-                <div>
-                  <div style="font-weight: 600; font-size: 12px;">Bob Reader</div>
-                  <div class="mono" style="font-size: 10.5px; color: var(--text-dim);">bob.reader@bank.com</div>
-                </div>
-                <span class="role-badge role-reader">reader</span>
-              </button>
             </div>
 
-            <!-- Panel 2: Password Login Form -->
-            <div id="auth-panel-password" style="display: none; flex-direction: column; gap: 8px;">
-              <div>
-                <label style="font-size: 10.5px; color: var(--text-dim); display: block; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;">Autofill Persona</label>
-                <select id="quick-fill-select" onchange="applyQuickFill(this.value)" style="width: 100%; padding: 6px 8px; font-size: 11.5px; background: #18181b; border: 1px solid var(--border); border-radius: 6px; color: var(--text); cursor: pointer;">
-                  <option value="">-- Choose Account to Autofill --</option>
-                  <option value="admin">CSO Admin (admin@bank.com)</option>
-                  <option value="auditor">Compliance Lead (compliance.lead@bank.com)</option>
-                  <option value="employee">Lending Officer (john@bank.com)</option>
-                  <option value="customer">Retail Client (alice@bank.com)</option>
-                  <option value="writer">Loan Operations (sarah.writer@bank.com)</option>
-                  <option value="reader">Compliance Reviewer (bob.reader@bank.com)</option>
-                </select>
-              </div>
-
-              <form id="password-login-form" onsubmit="handlePasswordLogin(event)" style="display: flex; flex-direction: column; gap: 8px; margin: 0;">
-                <div>
-                  <label for="login-email-input" style="font-size: 10.5px; color: var(--text-dim); display: block; margin-bottom: 3px; font-weight: 500;">Email Address</label>
-                  <input type="email" id="login-email-input" class="mono" required placeholder="user@bank.com" style="width: 100%; padding: 6px 9px; font-size: 12px; background: #09090b; border: 1px solid var(--border); border-radius: 5px; color: #fff; box-sizing: border-box;">
-                </div>
-
-                <div>
-                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px;">
-                    <label for="login-password-input" style="font-size: 10.5px; color: var(--text-dim); font-weight: 500;">Password (PBKDF2)</label>
-                    <span id="quick-password-hint" style="font-size: 10px; color: var(--text-dim);"></span>
-                  </div>
-                  <div style="position: relative;">
-                    <input type="password" id="login-password-input" required placeholder="••••••••••••" style="width: 100%; padding: 6px 30px 6px 9px; font-size: 12px; background: #09090b; border: 1px solid var(--border); border-radius: 5px; color: #fff; box-sizing: border-box;">
-                    <button type="button" onclick="togglePasswordVisibility('login-password-input')" style="position: absolute; right: 6px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--text-dim); cursor: pointer; padding: 2px; font-size: 12px;" title="Toggle visibility">👁️</button>
-                  </div>
-                </div>
-
-                <div id="login-error-msg" style="display: none; font-size: 11px; color: #f87171; background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.3); border-radius: 5px; padding: 6px 8px;"></div>
-
-                <button type="submit" id="btn-submit-password-login" class="btn btn-primary" style="padding: 7px; font-size: 12px; font-weight: 600; border-radius: 5px; cursor: pointer; margin-top: 4px;">
-                  Sign In with Password
-                </button>
+            <!-- Email & Password Login -->
+            <div style="border-top: 1px solid var(--border); margin-top: 8px; padding-top: 8px;">
+              <form id="dropdown-login-form" onsubmit="handleDropdownLogin(event)" style="display: flex; flex-direction: column; gap: 6px; margin: 0;">
+                <input type="email" id="dropdown-login-email" required placeholder="email" style="width: 100%; padding: 6px 9px; font-size: 11.5px; background: #0c0d0e; border: 1px solid var(--border); border-radius: 5px; color: #fff; box-sizing: border-box;">
+                <input type="password" id="dropdown-login-password" required placeholder="password" style="width: 100%; padding: 6px 9px; font-size: 11.5px; background: #0c0d0e; border: 1px solid var(--border); border-radius: 5px; color: #fff; box-sizing: border-box;">
+                <div id="dropdown-login-error" style="display: none; font-size: 10.5px; color: #ef4444; background: rgba(239, 68, 68, 0.1); padding: 4px 8px; border-radius: 4px;"></div>
+                <button type="submit" class="btn btn-primary btn-sm" style="width: 100%; justify-content: center; font-weight: 600; padding: 6px; font-size: 11.5px; border-radius: 5px; cursor: pointer;">Login</button>
               </form>
-            </div>
-
-            <!-- Footer / Session Controls -->
-            <div style="border-top: 1px solid var(--border); margin-top: 8px; padding-top: 8px; display: flex; justify-content: space-between; align-items: center;">
-              <span style="font-size: 10px; color: var(--text-dim);">HS256 JWT Signed</span>
-              <button type="button" onclick="handleLogout()" class="btn btn-ghost btn-sm" style="color: #ef4444; font-size: 10.5px; padding: 2px 6px; cursor: pointer;">Sign Out</button>
             </div>
           </div>
         </div>
@@ -234,11 +174,6 @@
                 <button type="button" class="persona-btn" id="btn-persona-auditor" onclick="switchPersona('auditor')">Auditor</button>
                 <button type="button" class="persona-btn" id="btn-persona-employee" onclick="switchPersona('employee')">Employee</button>
                 <button type="button" class="persona-btn" id="btn-persona-customer" onclick="switchPersona('customer')">Customer</button>
-                <button type="button" class="persona-btn" id="btn-persona-writer" onclick="switchPersona('writer')">Writer</button>
-                <button type="button" class="persona-btn" id="btn-persona-reader" onclick="switchPersona('reader')">Reader</button>
-                <button type="button" class="btn btn-secondary btn-sm" onclick="openPasswordLoginModal()" style="font-size: 11px; padding: 3px 8px; margin-left: 6px; display: inline-flex; align-items: center; gap: 4px; cursor: pointer;">
-                  🔑 Password Login
-                </button>
               </div>
             </div>
 
@@ -676,63 +611,6 @@
       </div>
       <div class="modal-body" id="modal-content">
         <!-- Injected via JavaScript -->
-      </div>
-    </div>
-  </div>
-
-  <!-- Dedicated Password Login Modal -->
-  <div id="loginModal" class="modal-overlay" onclick="if(event.target===this) closePasswordLoginModal()" style="display: none;">
-    <div class="modal-dialog" style="width: 440px;">
-      <div class="modal-head">
-        <div style="display: flex; align-items: center; gap: 8px;">
-          <span style="font-size: 15px;">🔐</span>
-          <span class="modal-head-title">Sign In with Credentials</span>
-        </div>
-        <button class="modal-close-btn" onclick="closePasswordLoginModal()">&times;</button>
-      </div>
-      <div class="modal-body" style="padding: 18px;">
-        <!-- Autofill quick presets -->
-        <div style="margin-bottom: 12px;">
-          <label style="font-size: 11px; color: var(--text-dim); display: block; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;">Autofill Persona</label>
-          <select id="modal-quick-fill-select" onchange="applyModalQuickFill(this.value)" class="clean-select" style="width: 100%; padding: 7px 10px; font-size: 12px; background: #141416; border: 1px solid var(--border); border-radius: 6px; color: var(--text); cursor: pointer;">
-            <option value="">-- Choose Account to Autofill --</option>
-            <option value="admin">CSO Admin (admin@bank.com / AdminPass123!)</option>
-            <option value="auditor">Compliance Lead (compliance.lead@bank.com / AuditorPass123!)</option>
-            <option value="employee">Lending Officer (john@bank.com / EmployeePass123!)</option>
-            <option value="customer">Retail Client (alice@bank.com / CustomerPass123!)</option>
-            <option value="writer">Loan Operations (sarah.writer@bank.com / WriterPass123!)</option>
-            <option value="reader">Compliance Reviewer (bob.reader@bank.com / ReaderPass123!)</option>
-          </select>
-        </div>
-
-        <form id="modal-password-login-form" onsubmit="handleModalPasswordLogin(event)" style="display: flex; flex-direction: column; gap: 10px; margin: 0;">
-          <div>
-            <label for="modal-login-email" style="font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 4px; font-weight: 500;">Email Address</label>
-            <input type="email" id="modal-login-email" class="mono" required placeholder="user@bank.com" style="width: 100%; padding: 7px 10px; font-size: 12.5px; background: #09090b; border: 1px solid var(--border); border-radius: 5px; color: #fff; box-sizing: border-box;">
-          </div>
-
-          <div>
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-              <label for="modal-login-password" style="font-size: 11px; color: var(--text-muted); font-weight: 500;">Password (PBKDF2 Salted Hash)</label>
-              <span id="modal-password-hint" style="font-size: 10.5px; color: var(--text-dim);"></span>
-            </div>
-            <div style="position: relative;">
-              <input type="password" id="modal-login-password" required placeholder="Enter password" style="width: 100%; padding: 7px 32px 7px 10px; font-size: 12.5px; background: #09090b; border: 1px solid var(--border); border-radius: 5px; color: #fff; box-sizing: border-box;">
-              <button type="button" onclick="togglePasswordVisibility('modal-login-password')" style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--text-dim); cursor: pointer; padding: 2px; font-size: 13px;" title="Toggle visibility">👁️</button>
-            </div>
-          </div>
-
-          <div id="modal-login-error" style="display: none; font-size: 11.5px; color: #f87171; background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.3); border-radius: 5px; padding: 7px 10px;"></div>
-
-          <button type="submit" id="btn-modal-login-submit" class="btn btn-primary" style="padding: 9px; font-size: 12.5px; font-weight: 600; border-radius: 5px; cursor: pointer; margin-top: 4px;">
-            Sign In with Password
-          </button>
-        </form>
-
-        <div style="margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; font-size: 10.5px; color: var(--text-dim);">
-          <span>🔐 RFC 7519 HS256 JWT Token</span>
-          <span>🛡️ PBKDF2 Password Verification</span>
-        </div>
       </div>
     </div>
   </div>
