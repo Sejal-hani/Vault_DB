@@ -61,7 +61,11 @@ async def get_logs(
     filtered = []
     for entry in raw_logs:
         # Exclude login/authentication events, SQL execution error logs, and fictitious test tables
-        if entry.get("action", "").startswith("AUTH:") or entry.get("status") == "ERROR" or entry.get("table") == "u":
+        action_str = entry.get("action") or ""
+        table_str = entry.get("table") or ""
+        status_str = entry.get("status") or ""
+
+        if action_str.startswith("AUTH:") or status_str == "ERROR" or table_str == "u":
             continue
 
         # Standardize enterprise banking personas
@@ -90,7 +94,7 @@ async def get_logs(
 
         if user and entry.get("user") != user:
             continue
-        if table and (not entry.get("table") or table.lower() not in entry.get("table", "").lower()):
+        if table and (not table_str or table.lower() not in table_str.lower()):
             continue
         if status == "SENSITIVE":
             if not entry.get("is_sensitive"):

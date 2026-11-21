@@ -334,7 +334,7 @@ class MerkleVault:
                 }
 
             # Recompute leaf hash from actual stored payload data
-            payload = target_entry.get("payload", {})
+            payload = target_entry.get("payload") or {k: v for k, v in target_entry.items() if k not in ("leaf_hash", "root_hash", "tx_id")}
             payload_bytes = json.dumps(payload, sort_keys=True).encode("utf-8")
             actual_leaf_hash = MerkleTree.hash_leaf(payload_bytes)
 
@@ -398,7 +398,7 @@ class MerkleVault:
 
             logs: List[Dict[str, Any]] = []
             for item in sliced:
-                p = item.get("payload", {})
+                p = item.get("payload") or item
                 logs.append({
                     "id": p.get("id", item.get("id")),
                     "time": p.get("timestamp"),
