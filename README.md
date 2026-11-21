@@ -539,7 +539,7 @@ ORDER BY logged_at DESC;
 | `2026-10-22 14:45:10` | `john@bank.com` | `employee` | `SELECT` | `SELECT name, balance FROM app_data.accounts WHERE id = 101` | `SUCCESS` |
 | `2026-10-22 10:30:45` | `compliance.lead@bank.com` | `auditor` | `SELECT` | `SELECT * FROM app_data.accounts WHERE id = 101` | `SUCCESS` |
 
-> **Compliance Report Summary**: *"John and Sarah accessed Customer #101's records 2 times total. Cryptographic Merkle inclusion proofs verified for regulatory delivery."*
+> **Compliance Report Summary**: *"John accessed Customer #101's records 2 times total. Cryptographic Merkle inclusion proofs verified for regulatory delivery."*
 
 ---
 
