@@ -8,12 +8,11 @@ import re
 import pytest
 from fastapi.testclient import TestClient
 from src.vault_db.api.app import app
-from src.vault_db.api.dependencies import get_engine
 from src.vault_db.core.engine import VaultEngine
 from src.vault_db.core.rbac import AccessDeniedError
 
 client = TestClient(app)
-engine = get_engine()
+engine = VaultEngine()
 
 
 @pytest.fixture(autouse=True)
@@ -250,6 +249,24 @@ def test_customer_cannot_access_other_records_and_or_bypass_prevented():
     if res_tx["results"]:
         for row in res_tx["results"]:
             assert row[1] == 1  # Alice only owns Account 1
+
+    # 4. Alice attempts bypass using name condition + OR 1=1
+    or_bypass = "SELECT id, name, balance FROM app_data.accounts WHERE name = 'Alice Smith' OR 1=1;"
+    res_or = engine.execute(or_bypass, app_user="alice@bank.com")
+    assert res_or["status"] == "SUCCESS"
+    assert res_or["is_scoped"] is True
+    or_names = [row[1] for row in res_or["results"]]
+    assert "Robert Ross" not in or_names
+    assert all(n == "Alice Smith" for n in or_names)
+
+    # 5. Alice attempts bypass using UNION
+    union_bypass = "SELECT id, name, balance FROM app_data.accounts UNION SELECT id, name, balance FROM app_data.accounts;"
+    res_union = engine.execute(union_bypass, app_user="alice@bank.com")
+    assert res_union["status"] == "SUCCESS"
+    assert res_union["is_scoped"] is True
+    union_names = [row[1] for row in res_union["results"]]
+    assert "Robert Ross" not in union_names
+    assert all(n == "Alice Smith" for n in union_names)
 
 
 def test_non_admin_cannot_approve_requests_backend_enforcement():
