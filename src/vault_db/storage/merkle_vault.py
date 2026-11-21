@@ -91,8 +91,12 @@ class MerkleVault:
                                     self._tamper_detected = True
                                     self._tampered_entries.append(entry.get("id"))
                                 leaf_hash = computed_hash
-                            else:
+                            elif entry.get("leaf_hash"):
                                 leaf_hash = entry.get("leaf_hash")
+                            else:
+                                payload_copy = {k: v for k, v in entry.items() if k not in ("leaf_hash", "root_hash", "tx_id")}
+                                payload_bytes = json.dumps(payload_copy, sort_keys=True).encode("utf-8")
+                                leaf_hash = MerkleTree.hash_leaf(payload_bytes)
 
                             self._tree.append_leaf(leaf_hash)
                             self._counter = max(self._counter, entry.get("id", self._counter + 1))
@@ -133,8 +137,12 @@ class MerkleVault:
                                 self._tamper_detected = True
                                 self._tampered_entries.append(entry.get("id", count + 1))
                             leaf_hash = computed_hash
-                        else:
+                        elif entry.get("leaf_hash"):
                             leaf_hash = entry.get("leaf_hash")
+                        else:
+                            payload_copy = {k: v for k, v in entry.items() if k not in ("leaf_hash", "root_hash", "tx_id")}
+                            payload_bytes = json.dumps(payload_copy, sort_keys=True).encode("utf-8")
+                            leaf_hash = MerkleTree.hash_leaf(payload_bytes)
 
                         leaf_hashes.append(leaf_hash)
                         count = max(count, entry.get("id", count + 1))
