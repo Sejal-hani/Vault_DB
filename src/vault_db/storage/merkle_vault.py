@@ -45,23 +45,29 @@ class MerkleVault:
         self._lock = threading.Lock()
         self._tree = MerkleTree()
         self._counter: int = 0
+        self._file_offset: int = 0
         self._load_ledger()
 
     def _ensure_connected(self) -> None:
         """Interface compatibility method for duck typing with ImmudbVault."""
         pass
 
-    def _load_ledger(self) -> None:
+    def _sync_ledger(self) -> None:
         """
-        Reads existing transaction records from append-only storage and
-        reconstructs the Merkle tree state root in memory.
+        Incrementally reads any new ledger entries appended by other processes or instances.
         """
-        with self._lock:
-            leaf_hashes: List[str] = []
-            count: int = 0
+        if not self.ledger_file.exists():
+            return
 
-            if self.ledger_file.exists():
+        try:
+            current_size = self.ledger_file.stat().st_size
+            if current_size < self._file_offset:
+                self._load_ledger()
+                return
+
+            if current_size > self._file_offset:
                 with open(self.ledger_file, "r", encoding="utf-8") as f:
+                    f.seek(self._file_offset)
                     for line in f:
                         line = line.strip()
                         if not line:
@@ -72,18 +78,49 @@ class MerkleVault:
                             if not leaf_hash:
                                 payload_bytes = json.dumps(entry["payload"], sort_keys=True).encode("utf-8")
                                 leaf_hash = MerkleTree.hash_leaf(payload_bytes)
-                            leaf_hashes.append(leaf_hash)
-                            count = max(count, entry.get("id", count + 1))
-                        except Exception as e:
-                            logger.warning(f"Skipping malformed ledger line: {e}")
+                            self._tree.append_leaf(leaf_hash)
+                            self._counter = max(self._counter, entry.get("id", self._counter + 1))
+                        except Exception:
                             continue
+                    self._file_offset = f.tell()
+        except Exception as e:
+            logger.warning(f"Error syncing ledger from disk: {e}")
 
-            self._tree = MerkleTree(leaf_hashes)
-            self._counter = count
-            logger.info(
-                f"MerkleVault active: {self._counter} records loaded. "
-                f"Current Root: {self._tree.get_root()[:16]}..."
-            )
+    def _load_ledger(self) -> None:
+        """
+        Reads existing transaction records from append-only storage and
+        reconstructs the Merkle tree state root in memory.
+        """
+        leaf_hashes: List[str] = []
+        count: int = 0
+
+        if self.ledger_file.exists():
+            with open(self.ledger_file, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        entry = json.loads(line)
+                        leaf_hash = entry.get("leaf_hash")
+                        if not leaf_hash:
+                            payload_bytes = json.dumps(entry["payload"], sort_keys=True).encode("utf-8")
+                            leaf_hash = MerkleTree.hash_leaf(payload_bytes)
+                        leaf_hashes.append(leaf_hash)
+                        count = max(count, entry.get("id", count + 1))
+                    except Exception as e:
+                        logger.warning(f"Skipping malformed ledger line: {e}")
+                        continue
+                self._file_offset = f.tell()
+        else:
+            self._file_offset = 0
+
+        self._tree = MerkleTree(leaf_hashes)
+        self._counter = count
+        logger.info(
+            f"MerkleVault active: {self._counter} records loaded. "
+            f"Current Root: {self._tree.get_root()[:16]}..."
+        )
 
     def _persist_state(self) -> None:
         """Writes current ledger state metadata to disk."""
@@ -119,6 +156,7 @@ class MerkleVault:
             Dictionary with audit metadata and cryptographic proof hashes.
         """
         with self._lock:
+            self._sync_ledger()
             self._counter += 1
             log_id = self._counter
             iso_timestamp = datetime.now(timezone.utc).isoformat()
@@ -156,6 +194,7 @@ class MerkleVault:
             # Append atomically to the JSONL log file
             with open(self.ledger_file, "a", encoding="utf-8") as f:
                 f.write(json.dumps(disk_record) + "\n")
+                self._file_offset = f.tell()
 
             self._persist_state()
 
@@ -186,17 +225,20 @@ class MerkleVault:
             Dictionary detailing verification status, proof path length, and tamper diagnosis.
         """
         with self._lock:
+            self._sync_ledger()
             target_entry: Optional[Dict[str, Any]] = None
+            target_index: int = -1
 
             if self.ledger_file.exists():
                 with open(self.ledger_file, "r", encoding="utf-8") as f:
-                    for line in f:
+                    for idx, line in enumerate(f):
                         if not line.strip():
                             continue
                         try:
                             entry = json.loads(line)
                             if entry.get("id") == log_id:
                                 target_entry = entry
+                                target_index = idx
                                 break
                         except Exception:
                             continue
@@ -216,7 +258,7 @@ class MerkleVault:
             actual_leaf_hash = MerkleTree.hash_leaf(payload_bytes)
 
             stored_leaf_hash = target_entry.get("leaf_hash")
-            index = log_id - 1
+            index = target_index if target_index >= 0 else (log_id - 1)
             proof = self._tree.get_audit_path(index)
             current_root = self._tree.get_root()
 
@@ -254,6 +296,7 @@ class MerkleVault:
             List of standardized audit log dictionaries.
         """
         with self._lock:
+            self._sync_ledger()
             if not self.ledger_file.exists():
                 return []
 
@@ -297,6 +340,7 @@ class MerkleVault:
             Dictionary with database name, transaction counter, and root hash.
         """
         with self._lock:
+            self._sync_ledger()
             return {
                 "database": "native_merkle_ledger",
                 "tx_id": self._counter,

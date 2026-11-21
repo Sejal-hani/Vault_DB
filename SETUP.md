@@ -112,18 +112,3 @@ python scripts/quickstart.py
    python scripts/start_services.py
    ```
 3. Open **`http://localhost:8000`** in your browser.
-
----
-
-## 🎓 Viva & Faculty Evaluation Guide
-
-When presenting VaultDB to faculty or evaluators:
-
-### Q1: *"Where does the audit ledger come from, and can someone modify an email in it?"*
-> **Answer**: *"The audit ledger is written append-only to our cryptographic engine. Each record is serialized and cryptographically hashed using SHA-256 with RFC 6962 leaf domain separation (`0x00`). These hashes form a binary Merkle Tree where every node is the hash of its children (`0x01 + left + right`). If anyone, even an administrator or rogue DBA, modifies an email or character in the database, the leaf hash changes. The recomputed Merkle path no longer matches the certified state root. Clicking 'Verify Proof' immediately flags the record with `CRITICAL DATABASE TAMPERING DETECTED`."*
-
-### Q2: *"Can this run on my computer (Mac / Linux / Windows)?"*
-> **Answer**: *"Yes! VaultDB features a Dual-Engine Cryptographic Architecture. For distributed enterprise deployments, it supports immudb. But to guarantee 100% universal portability on any computer without requiring platform-specific `.exe` binaries or Docker, we also engineered our own pure-Python RFC 6962 Merkle Tree ledger (`src/vault_db/storage/merkle_vault.py`). Anyone can clone the repository on macOS, Linux, or Windows and run `python scripts/quickstart.py` with 1 command."*
-
-### Q3: *"Did you implement all project requirements?"*
-> **Answer**: *"Yes, 100% of V1 core requirements are implemented and verified (Query logging middleware, Immutable audit log, 3-role RBAC, Audit dashboard with filters/sorting, Sensitive query detection, and PDF compliance export). Additionally, all 4 V2 bonus features are fully functional: Dynamic Data Masking, Row-Level Security, 24-Hour Approval Workflows with auto-revocation, and Behavioral Anomaly Detection."*

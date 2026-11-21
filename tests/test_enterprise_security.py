@@ -8,11 +8,12 @@ import re
 import pytest
 from fastapi.testclient import TestClient
 from src.vault_db.api.app import app
+from src.vault_db.api.dependencies import get_engine
 from src.vault_db.core.engine import VaultEngine
 from src.vault_db.core.rbac import AccessDeniedError
 
 client = TestClient(app)
-engine = VaultEngine()
+engine = get_engine()
 
 
 @pytest.fixture(autouse=True)
