@@ -76,6 +76,11 @@ async def execute_query(
             immudb_tx_id=res.get("immudb_tx_id"),
             immudb_verified=res.get("immudb_verified"),
             immudb_tx_hash=res.get("immudb_tx_hash"),
+            log_id=res.get("immudb_log_id") or res.get("id"),
+            tx_id=res.get("immudb_tx_id") or res.get("tx_id"),
+            ledger_tx_id=res.get("immudb_tx_id") or res.get("tx_id"),
+            ledger_verified=res.get("immudb_verified"),
+            ledger_tx_hash=res.get("immudb_tx_hash"),
         )
     except AccessDeniedError as pe:
         analysis = SQLParser.analyze(req.query)
@@ -90,6 +95,11 @@ async def execute_query(
             immudb_tx_id=rec.get("immudb_tx_id"),
             immudb_verified=rec.get("immudb_verified", True),
             immudb_tx_hash=rec.get("immudb_tx_hash"),
+            log_id=rec.get("id"),
+            tx_id=rec.get("immudb_tx_id") or rec.get("tx_id"),
+            ledger_tx_id=rec.get("immudb_tx_id") or rec.get("tx_id"),
+            ledger_verified=rec.get("immudb_verified", True),
+            ledger_tx_hash=rec.get("immudb_tx_hash"),
         )
     except QueryExecutionError as qe:
         analysis = SQLParser.analyze(req.query)
@@ -104,6 +114,11 @@ async def execute_query(
             immudb_tx_id=rec.get("immudb_tx_id"),
             immudb_verified=rec.get("immudb_verified", True),
             immudb_tx_hash=rec.get("immudb_tx_hash"),
+            log_id=rec.get("id"),
+            tx_id=rec.get("immudb_tx_id") or rec.get("tx_id"),
+            ledger_tx_id=rec.get("immudb_tx_id") or rec.get("tx_id"),
+            ledger_verified=rec.get("immudb_verified", True),
+            ledger_tx_hash=rec.get("immudb_tx_hash"),
         )
     except Exception as ex:
         analysis = SQLParser.analyze(req.query)

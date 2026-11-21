@@ -538,9 +538,12 @@
         });
         const data = await resp.json();
 
+        const txId = data.tx_id || data.ledger_tx_id || data.immudb_tx_id;
+        const logId = data.log_id || data.ledger_log_id || data.immudb_log_id;
+
         if (data.status === 'SUCCESS') {
           banner.className = 'alert-banner success';
-          let msg = `Executed successfully. Sealed in immudb at transaction #${data.immudb_tx_id}.`;
+          let msg = `Executed successfully. Sealed in Cryptographic Ledger at transaction #${txId || '-'}.`;
           if (data.is_sensitive) {
             msg += `<br><span style="color:#fbbf24; font-weight:600;">⚠ Sensitive query detected (PII)! Flagged in audit log (fields: ${(data.sensitive_fields||[]).join(', ')}).</span>`;
           }
@@ -555,26 +558,26 @@
           }
           banner.innerHTML = msg;
 
-          stats.innerText = `${data.execution_time_ms} ms | ${data.rows_affected} row(s) | Tx #${data.immudb_tx_id}`;
+          stats.innerText = `${data.execution_time_ms} ms | ${data.rows_affected} row(s) | Tx #${txId || '-'}`;
           lastQueryColumns = data.columns || [];
           lastQueryRows = data.results || [];
           renderResultTableLimited();
         } else if (data.status === 'DENIED') {
           banner.className = 'alert-banner denied';
           let msg = `<strong>Policy Violation Blocked:</strong> ${escapeHtml(data.error)}`;
-          if (data.immudb_tx_id) {
-            msg += `<br><span style="font-family:var(--font-mono); font-size:11px;">Attempt recorded in immudb at transaction #${data.immudb_tx_id} (Log #${data.immudb_log_id}).</span>`;
+          if (txId) {
+            msg += `<br><span style="font-family:var(--font-mono); font-size:11px;">Attempt recorded in Cryptographic Ledger at transaction #${txId} (Log #${logId || '-'}).</span>`;
           }
-          if (data.immudb_log_id) {
+          if (logId) {
             msg += `<br><div style="display:flex; gap:6px; margin-top:6px; flex-wrap:wrap;">
-              <button class="btn btn-secondary btn-sm" style="padding:2px 8px; font-size:10px;" onclick="viewSpecificLog(${data.immudb_log_id})">View this record (#${data.immudb_log_id}) &rarr;</button>
+              <button class="btn btn-secondary btn-sm" style="padding:2px 8px; font-size:10px;" onclick="viewSpecificLog(${logId})">View this record (#${logId}) &rarr;</button>
               <button class="btn btn-secondary btn-sm" style="padding:2px 8px; font-size:10px;" onclick="navigateToLedger('', false, true, 'total')">View all records &rarr;</button>
             </div>`;
           } else {
             msg += `<br><button class="btn btn-secondary btn-sm" style="margin-top:6px; padding:2px 8px; font-size:10px;" onclick="navigateToLedger('', false, true, 'total')">View in Audit Ledger &rarr;</button>`;
           }
           banner.innerHTML = msg;
-          stats.innerText = data.immudb_tx_id ? `Denied | Tx #${data.immudb_tx_id}` : 'Denied';
+          stats.innerText = txId ? `Denied | Tx #${txId}` : 'Denied';
           clearResultTable('Query blocked by access policy.');
         } else {
           banner.className = 'alert-banner warning';
@@ -754,9 +757,10 @@
       else if (timeRange === '30d') cutoff = new Date(now.getTime() - 30 * 24 * 3600 * 1000);
 
       let filtered = cachedLedger.filter(l => {
+        const txVal = l.tx_id || l.ledger_tx_id || l.immudb_tx_id;
         const matchesSearch = !search ||
           (l.id && String(l.id).includes(cleanSearch)) ||
-          (l.immudb_tx_id && String(l.immudb_tx_id).includes(cleanSearch)) ||
+          (txVal && String(txVal).includes(cleanSearch)) ||
           (l.query && l.query.toLowerCase().includes(search)) ||
           (l.user && l.user.toLowerCase().includes(search)) ||
           (l.table && l.table.toLowerCase().includes(search)) ||
@@ -782,7 +786,7 @@
       filtered.sort((a, b) => {
         let valA = a[sortColumn];
         let valB = b[sortColumn];
-        if (sortColumn === 'id' || sortColumn === 'immudb_tx_id') {
+        if (sortColumn === 'id' || sortColumn === 'tx_id' || sortColumn === 'ledger_tx_id' || sortColumn === 'immudb_tx_id') {
           const numA = Number(valA) || 0;
           const numB = Number(valB) || 0;
           return sortAscending ? numA - numB : numB - numA;
@@ -909,7 +913,7 @@
             <td>${escapeHtml(l.action || '-')}</td>
             <td><code class="mono" style="color: var(--text-muted);">${escapeHtml(l.table || '-')}</code></td>
             <td style="white-space: nowrap;"><div style="display: inline-flex; align-items: center; gap: 4px;">${statusTag}${sensTag}${anomalyTag}</div></td>
-            <td class="mono" style="color: #93c5fd;">#${l.immudb_tx_id || '-'}</td>
+            <td class="mono" style="color: #93c5fd;">#${l.tx_id || l.ledger_tx_id || l.immudb_tx_id || '-'}</td>
             <td><button class="btn btn-secondary btn-sm" onclick="verifyProof(${l.id})">Verify proof</button></td>
             <td class="sql-cell" title="${escapeHtml(l.query || '')}">${escapeHtml(l.query || '')}</td>
           </tr>
@@ -929,7 +933,7 @@
       const modal = document.getElementById('proofModal');
       const body = document.getElementById('modal-content');
       modal.style.display = 'flex';
-      body.innerHTML = '<p style="color: var(--text-dim); font-size: 12px;">Querying immudb for cryptographic inclusion proof...</p>';
+      body.innerHTML = '<p style="color: var(--text-dim); font-size: 12px;">Querying Cryptographic Ledger for Merkle inclusion proof...</p>';
 
       try {
         const resp = await fetch(`${API}/api/verify/${logId}`);
@@ -940,8 +944,8 @@
         const ledgerPassed = data.ledger_integrity !== undefined ? !!data.ledger_integrity : !!data.verified;
         const mirrorPassed = data.mirror_match !== undefined ? !!data.mirror_match : !data.database_tampered;
         const rootHash = data.current_root_hash || '-';
-        const txId = data.tx_id || record.immudb_tx_id || '-';
-        const ledgerKey = data.immudb_key || `audit:log:${logId}`;
+        const txId = data.tx_id || data.ledger_tx_id || record.tx_id || record.ledger_tx_id || record.immudb_tx_id || '-';
+        const ledgerKey = data.ledger_key || data.immudb_key || `audit:log:${logId}`;
 
         const userStr = record.app_user || '-';
         const roleStr = record.user_role || '-';
@@ -955,7 +959,7 @@
           bannerHtml = `
             <div class="verdict-banner tampered">
               <span class="verdict-title">TAMPERED</span>
-              <span class="verdict-desc">PostgreSQL record differs from the cryptographic record sealed in immudb.</span>
+              <span class="verdict-desc">PostgreSQL record differs from the cryptographic record sealed in ledger.</span>
             </div>
           `;
         } else {
@@ -967,12 +971,12 @@
           `;
         }
 
-        // 2. Two independent checks: Ledger integrity (immudb Merkle proof) and PostgreSQL mirror match
+        // 2. Two independent checks: Ledger integrity (Cryptographic Merkle proof) and PostgreSQL mirror match
         const checklistHtml = `
           <div class="check-list">
             <div class="check-item">
               <span class="check-badge ${ledgerPassed ? 'pass' : 'fail'}">${ledgerPassed ? 'PASS' : 'FAIL'}</span>
-              <span>Ledger integrity (immudb Merkle proof)</span>
+              <span>Ledger integrity (Cryptographic Merkle proof)</span>
             </div>
             <div class="check-item">
               <span class="check-badge ${mirrorPassed ? 'pass' : 'fail'}">${mirrorPassed ? 'PASS' : 'FAIL'}</span>
@@ -1006,7 +1010,7 @@
                 <thead>
                   <tr>
                     <th style="width: 120px;">Field</th>
-                    <th>Sealed in immudb (trusted)</th>
+                    <th>Sealed in Ledger (trusted)</th>
                     <th>Current in PostgreSQL</th>
                   </tr>
                 </thead>
@@ -1239,7 +1243,7 @@
           const hEl = document.getElementById('kpi-height');
           if (hEl) hEl.innerText = '#' + (s.ledger_height || 0).toLocaleString();
           const pEl = document.getElementById('topbar-proof-text');
-          if (pEl) pEl.innerText = `immudb Merkle Root #${s.ledger_height} (Sealed)`;
+          if (pEl) pEl.innerText = `Cryptographic Merkle Root #${s.ledger_height} (Sealed)`;
         }
       } catch (e) {
         console.error("Error loading stats:", e);
@@ -1479,8 +1483,9 @@
           const userStr = a.user || 'unknown';
           const roleStr = a.role || '-';
 
-          const ledgerLink = a.immudb_log_id 
-            ? `<a href="#" onclick="viewSpecificLog(${a.immudb_log_id}); return false;" class="mono" style="color: #60a5fa; font-weight: 600; text-decoration: none; border-bottom: 1px dashed #60a5fa;" title="View record in Audit Ledger">#${a.immudb_log_id}</a>` 
+          const logIdVal = a.log_id || a.ledger_log_id || a.immudb_log_id;
+          const ledgerLink = logIdVal 
+            ? `<a href="#" onclick="viewSpecificLog(${logIdVal}); return false;" class="mono" style="color: #60a5fa; font-weight: 600; text-decoration: none; border-bottom: 1px dashed #60a5fa;" title="View record in Audit Ledger">#${logIdVal}</a>` 
             : '<span style="color: var(--text-dim);">-</span>';
 
           return `

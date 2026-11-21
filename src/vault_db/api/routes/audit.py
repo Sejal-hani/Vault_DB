@@ -110,6 +110,9 @@ async def get_logs(
             except Exception:
                 pass
 
+        tx_val = entry.get("immudb_tx_id") or entry.get("tx_id") or entry.get("id")
+        entry["tx_id"] = tx_val
+        entry["ledger_tx_id"] = tx_val
         filtered.append(entry)
         if len(filtered) >= limit:
             break
@@ -120,13 +123,14 @@ async def get_logs(
 @router.get("/verify/{log_id}", response_model=VerifyLogResponse)
 async def verify_log(log_id: int):
     """
-    Cryptographically verifies the authenticity and Merkle tree proof of an audit log in immudb.
+    Cryptographically verifies the authenticity and Merkle tree proof of an audit log.
     Also cross-verifies against the PostgreSQL relational mirror to detect any database tampering.
     """
     eng = get_engine()
     result = eng.verify_audit_log(log_id)
+    result["ledger_key"] = result.get("ledger_key") or result.get("immudb_key") or f"audit:log:{log_id}"
 
-    # 1. Independent immudb cryptographic Merkle inclusion proof
+    # 1. Independent cryptographic Merkle inclusion proof
     ledger_integrity = bool(result.get("verified", True))
     result["ledger_integrity"] = ledger_integrity
 
@@ -167,13 +171,13 @@ async def verify_log(log_id: int):
                         "sealed": str(sealed_val),
                         "current": str(current_val),
                     })
-                    mismatches.append(f"{field_name} mismatch (PostgreSQL: '{current_val}' vs immudb: '{sealed_val}')")
+                    mismatches.append(f"{field_name} mismatch (PostgreSQL: '{current_val}' vs sealed ledger: '{sealed_val}')")
 
             if not mirror_match:
                 result["database_tampered"] = True
                 result["tamper_detected"] = True
                 result["verified"] = False
-                result["message"] = f"CRITICAL DATABASE TAMPERING DETECTED: PostgreSQL mirror does not match the immutable immudb Merkle root! {'; '.join(mismatches)}"
+                result["message"] = f"CRITICAL DATABASE TAMPERING DETECTED: PostgreSQL mirror does not match the immutable Merkle root! {'; '.join(mismatches)}"
             else:
                 result["database_tampered"] = False
                 result["tamper_detected"] = not ledger_integrity
@@ -183,7 +187,7 @@ async def verify_log(log_id: int):
             result["database_tampered"] = True
             result["tamper_detected"] = True
             result["verified"] = False
-            result["message"] = f"Record #{log_id} exists in immudb but is missing from PostgreSQL relational mirror!"
+            result["message"] = f"Record #{log_id} exists in cryptographic ledger but is missing from PostgreSQL relational mirror!"
     except Exception as e:
         logger.warning(f"Could not cross-verify PostgreSQL mirror for log #{log_id}: {e}")
 

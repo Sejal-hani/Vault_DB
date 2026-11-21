@@ -52,6 +52,11 @@ class ExecuteQueryResponse(BaseModel):
     immudb_tx_id: Optional[int] = None
     immudb_verified: Optional[bool] = None
     immudb_tx_hash: Optional[str] = None
+    log_id: Optional[int] = None
+    tx_id: Optional[int] = None
+    ledger_tx_id: Optional[int] = None
+    ledger_verified: Optional[bool] = None
+    ledger_tx_hash: Optional[str] = None
     error: Optional[str] = None
 
 
@@ -70,6 +75,8 @@ class AuditLogEntry(BaseModel):
     query: Optional[str] = None
     is_sensitive: bool = False
     immudb_tx_id: Optional[int] = None
+    tx_id: Optional[int] = None
+    ledger_tx_id: Optional[int] = None
     is_anomaly: bool = False
     anomalies: Optional[List[str]] = None
 
@@ -83,6 +90,7 @@ class FieldDiff(BaseModel):
 class VerifyLogResponse(BaseModel):
     log_id: int
     immudb_key: Optional[str] = None
+    ledger_key: Optional[str] = None
     tx_id: Optional[int] = None
     verified: bool
     tamper_detected: bool
@@ -108,6 +116,7 @@ class SystemHealthResponse(BaseModel):
     status: str
     postgres: str
     immudb: str
+    ledger: Optional[str] = None
     version: str
 
 

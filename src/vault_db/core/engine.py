@@ -66,9 +66,10 @@ class VaultEngine:
         approval_manager: Optional[ApprovalManager] = None,
     ):
         self.postgres = postgres_storage or PostgresStorage()
-        self.immudb = immudb_vault if immudb_vault is not None else self._create_immutable_vault()
+        self.ledger = immudb_vault if immudb_vault is not None else self._create_immutable_vault()
+        self.immudb = self.ledger
         self.rbac = rbac_manager or RBACManager()
-        self.approvals = approval_manager or ApprovalManager(self.postgres, self.immudb)
+        self.approvals = approval_manager or ApprovalManager(self.postgres, self.ledger)
 
     def get_user_role(self, app_user: str) -> str:
         """Resolves user role, checking time-bounded approved elevations (24h) first."""
@@ -448,32 +449,37 @@ class VaultEngine:
             "masked_fields": masked_cols,
             "is_scoped": is_scoped,
             "anomalies": anomalies,
+            "log_id": immudb_record.get("id"),
+            "tx_id": immudb_record.get("tx_id") or immudb_record.get("immudb_tx_id"),
+            "ledger_tx_id": immudb_record.get("ledger_tx_id") or immudb_record.get("immudb_tx_id"),
+            "ledger_verified": immudb_record.get("ledger_verified") or immudb_record.get("immudb_verified"),
+            "ledger_tx_hash": immudb_record.get("ledger_tx_hash") or immudb_record.get("immudb_tx_hash"),
             "immudb_log_id": immudb_record.get("id"),
             "immudb_tx_id": immudb_record.get("immudb_tx_id"),
             "immudb_verified": immudb_record.get("immudb_verified"),
             "immudb_tx_hash": immudb_record.get("immudb_tx_hash"),
         }
 
-    def get_audit_logs(self, limit: int = 20, source: str = "immudb") -> List[Dict[str, Any]]:
+    def get_audit_logs(self, limit: int = 20, source: str = "ledger") -> List[Dict[str, Any]]:
         """
         Fetches audit logs.
-        Defaults to immudb for cryptographic tamper-proof records, with PostgreSQL as fallback.
+        Defaults to cryptographic ledger for tamper-proof records, with PostgreSQL as fallback.
         """
-        if source == "immudb":
-            logs = self.immudb.get_audit_logs(limit=limit)
+        if source in ("ledger", "immudb", "merkle"):
+            logs = self.ledger.get_audit_logs(limit=limit)
             if logs:
                 return logs
         return self.postgres.get_audit_logs(limit=limit)
 
     def verify_audit_log(self, log_id: int) -> Dict[str, Any]:
-        """Validates cryptographic Merkle tree consistency proof from immudb."""
-        return self.immudb.verify_audit_log(log_id)
+        """Validates cryptographic Merkle tree consistency proof from ledger."""
+        return self.ledger.verify_audit_log(log_id)
 
     def get_ledger_state(self) -> Dict[str, Any]:
-        """Fetches latest immudb Merkle root state."""
-        return self.immudb.get_ledger_state()
+        """Fetches latest cryptographic Merkle root state."""
+        return self.ledger.get_ledger_state()
 
     def close(self):
         """Releases all database connection pools and client sessions."""
         self.postgres.close()
-        self.immudb.close()
+        self.ledger.close()
