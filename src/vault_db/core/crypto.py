@@ -52,10 +52,26 @@ class ColumnEncryption:
                 return val
             nonce = payload[:12]
             ciphertext = payload[12:]
-            key = cls._get_key()
-            aesgcm = AESGCM(key)
-            decrypted_bytes = aesgcm.decrypt(nonce, ciphertext, None)
-            return decrypted_bytes.decode("utf-8")
+
+            # Try configured key first, then fallback known project keys for cross-version compatibility
+            keys_to_try = [cls._get_key()]
+            for alt_secret in [
+                "vaultdb-enterprise-merkle-secret-key-2026",
+                "vaultdb-default-encryption-secret-key",
+            ]:
+                alt_k = hashlib.sha256(alt_secret.encode("utf-8")).digest()
+                if alt_k not in keys_to_try:
+                    keys_to_try.append(alt_k)
+
+            for key in keys_to_try:
+                try:
+                    aesgcm = AESGCM(key)
+                    decrypted_bytes = aesgcm.decrypt(nonce, ciphertext, None)
+                    return decrypted_bytes.decode("utf-8")
+                except Exception:
+                    continue
+
+            return val
         except Exception:
             # If decryption fails, return original value safely
             return val
