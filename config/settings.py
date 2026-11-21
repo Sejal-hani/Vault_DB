@@ -33,6 +33,9 @@ class Settings:
     # Cryptographic Ledger Backend: "merkle" (default, native pure-Python Merkle tree ledger) or "immudb" (optional enterprise daemon)
     STORAGE_BACKEND: str = os.getenv("STORAGE_BACKEND", "merkle").lower()
 
+    # Cryptographic & Security Settings
+    SECRET_KEY: str = os.getenv("SECRET_KEY", "vaultdb-enterprise-merkle-secret-key-2026")
+
     # API / Server Configuration
     APP_HOST: str = os.getenv("APP_HOST", "0.0.0.0")
     APP_PORT: int = int(os.getenv("APP_PORT", "8000"))

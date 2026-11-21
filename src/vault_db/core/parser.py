@@ -16,7 +16,7 @@ SQL_RESERVED_KEYWORDS = {
 }
 
 SENSITIVE_FIELD_NAMES = {
-    "ssn", "password", "pwd", "secret", "api_key", "token", "auth_token"
+    "ssn", "password", "pwd", "secret", "api_key", "token", "auth_token", "credit_card"
 }
 
 
