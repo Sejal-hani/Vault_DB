@@ -106,8 +106,9 @@ def resolve_cryptographic_ledger() -> subprocess.Popen | None:
     return None
 
 
-def print_banner() -> None:
+def print_banner(host: str = settings.APP_HOST, port: int = settings.APP_PORT) -> None:
     """Displays startup telemetry and dashboard connection instructions."""
+    display_host = "localhost" if host in ("0.0.0.0", "127.0.0.1") else host
     print("=" * 72)
     print("   _   _             _ _   ____  ____  ")
     print("  | | | | __ _ _   _| | |_|  _ \\| __ ) ")
@@ -115,11 +116,11 @@ def print_banner() -> None:
     print("  \\ \\_/ / (_| | |_| | | |_| |_| | |_) |")
     print("   \\___/ \\__,_|\\__,_|_|\\__|____/|____/ ")
     print("  Universal Immutable Database Middleware & Compliance Platform")
-    print(f"  Version: {settings.VERSION} | Host: {settings.APP_HOST}:{settings.APP_PORT}")
+    print(f"  Version: {settings.VERSION} | Host: {host}:{port}")
     print("=" * 72)
-    print(f"[*] Web Console:  http://localhost:{settings.APP_PORT}/")
-    print(f"[*] Health Check: http://localhost:{settings.APP_PORT}/api/health")
-    print(f"[*] Audit Ledger: http://localhost:{settings.APP_PORT}/api/logs")
+    print(f"[*] Web Console:  http://{display_host}:{port}/")
+    print(f"[*] Health Check: http://{display_host}:{port}/api/health")
+    print(f"[*] Audit Ledger: http://{display_host}:{port}/api/logs")
     print("=" * 72)
 
 
@@ -127,7 +128,26 @@ def main() -> None:
     """Main execution flow for running VaultDB services."""
     check_python_runtime()
     ensure_environment_config()
-    print_banner()
+
+    import argparse
+    parser = argparse.ArgumentParser(description="VaultDB Server Launcher")
+    parser.add_argument("--port", "-p", type=int, default=None, help="Port to run the web server on")
+    parser.add_argument("--host", "-H", type=str, default=None, help="Host interface to bind to")
+    args, _ = parser.parse_known_args()
+
+    port = args.port or settings.APP_PORT
+    host = args.host or settings.APP_HOST
+
+    # If the desired port is bound, automatically locate an available alternate
+    if is_port_bound(port, host):
+        print(f"[!] Port {port} is already in use.")
+        for alt_port in [8080, 8002, 8081, 8088, 8888, 5000]:
+            if not is_port_bound(alt_port, host):
+                print(f"[+] Automatically selecting available port {alt_port}.")
+                port = alt_port
+                break
+
+    print_banner(host, port)
 
     immudb_proc = resolve_cryptographic_ledger()
     verify_database_schemas()
@@ -135,8 +155,8 @@ def main() -> None:
     try:
         uvicorn.run(
             "src.vault_db.api.app:app",
-            host=settings.APP_HOST,
-            port=settings.APP_PORT,
+            host=host,
+            port=port,
             reload=False,
             log_level="info",
         )
