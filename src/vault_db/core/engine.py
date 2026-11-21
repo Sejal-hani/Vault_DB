@@ -34,29 +34,27 @@ class VaultEngine:
     @staticmethod
     def _create_immutable_vault() -> Any:
         """
-        Creates an immutable ledger instance based on settings or auto-detection.
-        If immudb is unavailable or on a platform without immudb binary,
-        seamlessly falls back to the native pure-Python Merkle tree ledger.
+        Creates the immutable ledger instance.
+        Defaults strictly to the Native Pure-Python Merkle Tree Ledger.
+        Only uses immudb if explicitly requested via STORAGE_BACKEND=immudb.
         """
-        backend = getattr(settings, "STORAGE_BACKEND", "auto").lower()
-        if backend in ("merkle", "native"):
-            logger.info("Using Native Cryptographic Merkle Tree Ledger (Pure Python).")
-            return MerkleVault()
-
+        backend = getattr(settings, "STORAGE_BACKEND", "merkle").lower()
         if backend == "immudb":
-            return ImmudbVault()
+            try:
+                logger.info("STORAGE_BACKEND=immudb configured. Initializing immudb Enterprise Adapter.")
+                vault = ImmudbVault()
+                vault._ensure_connected()
+                return vault
+            except Exception as e:
+                logger.warning(
+                    f"External immudb daemon unavailable ({e}). "
+                    f"Falling back to Native Cryptographic Merkle Tree Ledger."
+                )
+                return MerkleVault()
 
-        # 'auto' mode: try immudb first; if daemon offline, gracefully fallback
-        try:
-            vault = ImmudbVault()
-            vault._ensure_connected()
-            return vault
-        except Exception as e:
-            logger.warning(
-                f"External immudb daemon unavailable ({e}). "
-                f"Falling back seamlessly to Native Cryptographic Merkle Tree Ledger (Pure Python)."
-            )
-            return MerkleVault()
+        # Default: Always Native Pure-Python Merkle Ledger
+        logger.info("Using Native Cryptographic Merkle Tree Ledger (Default).")
+        return MerkleVault()
 
     def __init__(
         self,

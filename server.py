@@ -65,11 +65,20 @@ def verify_database_schemas() -> None:
 
 def resolve_cryptographic_ledger() -> subprocess.Popen | None:
     """
-    Detects or initializes the cryptographic ledger backend.
-    Connects to immudb daemon if active; otherwise activates the native pure-Python Merkle tree.
+    Initializes the cryptographic ledger backend.
+    By default, activates the native pure-Python Merkle Tree Ledger.
+    Only connects to or launches immudb if STORAGE_BACKEND is explicitly set to 'immudb'.
     """
+    backend = getattr(settings, "STORAGE_BACKEND", "merkle").lower()
+
+    if backend != "immudb":
+        print("[+] Activated Native Cryptographic Merkle Tree Ledger (Pure Python, Default).")
+        print("    100% portable on macOS, Linux, and Windows — zero external binaries needed.")
+        return None
+
+    # Only when STORAGE_BACKEND is explicitly set to 'immudb':
     if is_port_bound(settings.IMMUDB_PORT, settings.IMMUDB_HOST):
-        print(f"[+] immudb daemon active on port {settings.IMMUDB_PORT}.")
+        print(f"[+] immudb daemon active on port {settings.IMMUDB_PORT} (Enterprise Adapter).")
         return None
 
     # On Windows, attempt launching bundled immudb binary if present
@@ -86,7 +95,7 @@ def resolve_cryptographic_ledger() -> subprocess.Popen | None:
                 "--web-server=false",
                 "--port", str(settings.IMMUDB_PORT),
             ]
-            print(f"[*] Launching local immudb server on port {settings.IMMUDB_PORT}...")
+            print(f"[*] STORAGE_BACKEND=immudb requested. Launching local immudb server on port {settings.IMMUDB_PORT}...")
             proc = subprocess.Popen(
                 cmd,
                 stdout=subprocess.DEVNULL,
@@ -99,10 +108,8 @@ def resolve_cryptographic_ledger() -> subprocess.Popen | None:
                     return proc
                 time.sleep(0.3)
 
-    # Universal Native Merkle Tree fallback (macOS, Linux, bare-metal Windows)
-    print("[i] External immudb daemon not detected on port 3322.")
-    print("[+] Activated Native RFC 6962 Merkle Tree Ledger (Pure Python).")
-    print("    100% portable on macOS, Linux, and Windows — zero external binaries needed.")
+    print("[!] STORAGE_BACKEND=immudb requested but immudb daemon is unreachable on port 3322.")
+    print("[+] Falling back to Native Cryptographic Merkle Tree Ledger.")
     return None
 
 

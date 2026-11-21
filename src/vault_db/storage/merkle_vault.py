@@ -37,6 +37,7 @@ class MerkleVault:
             data_dir: Path to directory where ledger records and state are stored.
                       Defaults to 'data/merkle_vault'.
         """
+        self._is_default_dir: bool = data_dir is None
         self.base_dir = Path(data_dir or "data/merkle_vault")
         self.base_dir.mkdir(parents=True, exist_ok=True)
         self.ledger_file = self.base_dir / "audit_ledger.jsonl"
@@ -154,6 +155,19 @@ class MerkleVault:
             self._file_offset = 0
 
         self._tree = MerkleTree(leaf_hashes)
+
+        # In production ledger, align counter above existing PostgreSQL log_ids to prevent primary key collision
+        if self._is_default_dir:
+            try:
+                from src.vault_db.storage.postgres import PostgresStorage
+                pg = PostgresStorage()
+                if pg._pool:
+                    pg_res, _, _ = pg.execute_query("SELECT MAX(log_id) FROM vault_audit.audit_logs;")
+                    if pg_res and pg_res[0] and pg_res[0][0]:
+                        count = max(count, int(pg_res[0][0]))
+            except Exception:
+                pass
+
         self._counter = count
 
         # Cross-validate against persisted checkpoint state to detect offline truncation or root divergence
