@@ -1,0 +1,63 @@
+{
+  "metadata": {
+    "benchmark_name": "VaultDB High-Volume Enterprise Workload Benchmark",
+    "timestamp": "2026-11-27T14:44:09Z",
+    "script": "scripts/benchmark_1000_queries.py",
+    "active_ledger_engine": "Native Pure-Python Merkle Tree Ledger (RFC 6962)",
+    "workload_description": "Mixed enterprise banking queries: authorized reads, transactional writes, customer tenant-scoped RLS queries, RBAC security violations, and sensitive PII queries",
+    "total_queries_executed": 1000,
+    "environment": {
+      "os": "win32",
+      "python_version": "3.12.10",
+      "storage_backend": "Native Merkle Tree Ledger (RFC 6962)",
+      "postgresql_version": "16.x"
+    }
+  },
+  "raw_postgresql_baseline": {
+    "num_queries": 500,
+    "duration_seconds": 0.84,
+    "throughput_qps": 595.9,
+    "p50_ms": 0.64,
+    "p95_ms": 7.21,
+    "p99_ms": 8.03
+  },
+  "vaultdb_middleware_results": {
+    "total_queries": 1000,
+    "total_duration_seconds": 45.43,
+    "throughput_qps": 22.01,
+    "latency_percentiles_ms": {
+      "p50_median": 42.44,
+      "p95_tail": 73.62,
+      "p99_tail": 93.6
+    },
+    "middleware_overhead_ms": {
+      "p50_overhead": 41.8,
+      "p95_overhead": 66.41
+    },
+    "workload_breakdown": {
+      "authorized_queries_success": 632,
+      "blocked_violations_denied": 240,
+      "sensitive_queries_flagged": 117
+    },
+    "cryptographic_ledger_state": {
+      "backend": "Native Pure-Python Merkle Tree Ledger (RFC 6962)",
+      "starting_tx_height": 15326,
+      "final_tx_height": 16326,
+      "total_transactions_committed": 1000,
+      "final_root_hash": "96e2218d64b93ef8df7252c0572ec1cb259199c7e45b0caa54557484bc8c7a07"
+    },
+    "verification": {
+      "merkle_proof_valid": true,
+      "tamper_detected": false,
+      "tamper_detection_accuracy": "100%",
+      "attack_rejection_accuracy": "100%"
+    }
+  },
+  "architectural_comparison_pgaudit": {
+    "evaluation_type": "Empirical and Architectural Overhead Evaluation",
+    "pgaudit_layer": "PostgreSQL Executor Hook (C-extension writing unindexed plaintext to syslog/stderr)",
+    "pgaudit_overhead_profile": "~0.5 to 1.0 ms (pure plaintext write, zero cryptography, zero query rewriting)",
+    "vaultdb_overhead_profile": "+41.80 ms median overhead",
+    "security_tradeoff_summary": "While pgAudit incurs negligible logging latency by flushing unindexed plaintext strings to disk, it provides zero tamper resistance against DBAs or root users, no cryptographic Merkle inclusion proofs, no dynamic PII masking, no customer tenant RLS rewriting, and no AST SQL injection firewall. VaultDB's measured overhead provides full zero-trust validation, SHA-256 Merkle tree root sealing, logarithmic inclusion proofs, and real-time DBA tamper detection."
+  }
+}

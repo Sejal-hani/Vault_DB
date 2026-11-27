@@ -41,6 +41,8 @@ class AnomalyDetector:
         target_table: Optional[str] = None,
         is_sensitive: bool = False,
         timestamp: Optional[datetime] = None,
+        base_role: Optional[str] = None,
+        is_elevated: bool = False,
     ) -> List[Dict[str, Any]]:
         """
         Evaluates execution telemetry against the 4 defined anomaly rules.
@@ -51,6 +53,7 @@ class AnomalyDetector:
         now_utc = timestamp or datetime.now(timezone.utc)
         clean_query = (query or "").strip()
         role_lower = (user_role or "").lower()
+        base_role_lower = (base_role or user_role or "").lower()
         effective_action = (action or "").upper()
         tbl_name = (target_table or "").lower()
 
@@ -58,12 +61,14 @@ class AnomalyDetector:
         # Rule 1: Unusual Bulk Data Access
         # -------------------------------------------------------------
         # Flag non-admin queries attempting to retrieve large customer records (> threshold).
-        # Administrators are fully authorized to inspect and export enterprise datasets.
+        # Only the permanent Administrator (CISO) is authorized to export large datasets.
+        # Users operating under temporary elevation are still monitored for bulk data access.
         limit_match = re.search(r"\bLIMIT\s+(\d+)\b", clean_query, re.IGNORECASE) if clean_query else None
         requested_limit = int(limit_match.group(1)) if limit_match else None
         effective_count = max(rows_affected, requested_limit or 0)
 
-        if role_lower != "admin" and (not effective_action or effective_action in ("SELECT", "BULK_DATA_ACCESS") or ("SELECT" in clean_query.upper() and effective_action != "MULTI_STATEMENT")):
+        is_permanent_admin = (base_role_lower == "admin" and not is_elevated and (app_user or "").lower() == "admin@bank.com")
+        if not is_permanent_admin and (not effective_action or effective_action in ("SELECT", "BULK_DATA_ACCESS") or ("SELECT" in clean_query.upper() and effective_action != "MULTI_STATEMENT")):
             if effective_count >= cls.BULK_ROW_THRESHOLD:
                 severity = "Critical" if effective_count >= 10000 else "Medium"
                 outcome = "Blocked" if execution_status == "DENIED" else "Flagged"
@@ -86,21 +91,35 @@ class AnomalyDetector:
         # -------------------------------------------------------------
         # Rule 2: Unusual After-Hours Access
         # -------------------------------------------------------------
-        # Flag employees accessing sensitive customer data outside configured working hours (09:00 - 18:00 IST)
-        # Retail customers legitimately access accounts 24/7; only internal employees are restricted to working hours.
+        # Flag internal staff accessing sensitive customer data outside configured working hours (09:00 - 18:00 IST).
+        # Retail customers legitimately access accounts 24/7; internal staff (employee, auditor, staff)
+        # and users operating under temporary elevation are restricted to working hours for customer data.
         ist_offset = timezone(timedelta(hours=5, minutes=30))
         now_ist = now_utc.astimezone(ist_offset)
         ist_hour = now_ist.hour
         is_outside_working_hours = (ist_hour < cls.WORKING_HOURS_START_IST or ist_hour >= cls.WORKING_HOURS_END_IST)
 
-        if is_outside_working_hours and role_lower in ("employee", "staff"):
+        is_internal_staff = (
+            base_role_lower in ("employee", "staff", "auditor")
+            or role_lower in ("employee", "staff", "auditor")
+            or (is_elevated and (app_user or "").lower() != "admin@bank.com")
+        )
+
+        if is_outside_working_hours and is_internal_staff:
             # Check if accessing sensitive customer tables or sensitive PII
             targets_customer_data = any(t in tbl_name for t in ("account", "transaction", "user", "customer")) or is_sensitive
             if targets_customer_data:
                 outcome = "Blocked" if execution_status == "DENIED" else "Flagged"
+                if is_elevated:
+                    role_desc = f"User under temporary '{role_lower}' grant (base: {base_role_lower})"
+                elif base_role_lower == "auditor" or role_lower == "auditor":
+                    role_desc = "Auditor"
+                else:
+                    role_desc = "Employee"
+
                 anomalies.append({
                     "name": "Unusual After-Hours Access",
-                    "explanation": f"Employee accessed sensitive customer data outside working hours ({now_ist.strftime('%H:%M')} IST; business hours: 09:00 - 18:00 IST)",
+                    "explanation": f"{role_desc} accessed sensitive customer data outside working hours ({now_ist.strftime('%H:%M')} IST; business hours: 09:00 - 18:00 IST)",
                     "table": tbl_name if tbl_name != "unknown" else "accounts",
                     "severity": "High",
                     "outcome": outcome,

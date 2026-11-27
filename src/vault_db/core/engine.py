@@ -95,9 +95,14 @@ class VaultEngine:
         
         # Resolve human identity & role
         try:
-            user_role = self.get_user_role(app_user)
+            base_role = self.postgres.get_user_role(app_user)
+            elevated = self.approvals.check_active_elevation(app_user)
+            user_role = elevated if elevated else base_role
+            is_elevated = bool(elevated)
         except Exception:
+            base_role = "unknown"
             user_role = "unknown"
+            is_elevated = False
 
         # Analyze SQL query safely
         try:
@@ -124,6 +129,8 @@ class VaultEngine:
                 action="MULTI_STATEMENT",
                 target_table=target_str,
                 is_sensitive=analysis.is_sensitive,
+                base_role=base_role,
+                is_elevated=is_elevated,
             )
 
             immudb_record = self.immudb.append_audit_log(
@@ -205,6 +212,8 @@ class VaultEngine:
                     action=analysis.action,
                     target_table=target_str,
                     is_sensitive=analysis.is_sensitive,
+                    base_role=base_role,
+                    is_elevated=is_elevated,
                 )
 
                 # Cryptographically seal security violation into immudb ledger
